@@ -1,0 +1,15 @@
+{
+    "python.pythonPath": "C:\\Python27\\python.exe",
+    "python.languageServer": "Default",
+    "python.linting.enabled": true,
+    "python.analysis.extraPaths": [
+        "C:\\Python27\\stubs\\release\\stubs.min\\",
+        "C:\\Users\\jtian\\AppData\\Roaming\\pyRevit-Master\\pyrevitlib"
+    ],
+    "python.autoComplete.extraPaths": [
+
+        "C:\\Python27\\stubs\\release\\stubs.min",
+        "C:\\Users\\jtian\\AppData\\Roaming\\pyRevit-Master\\pyrevitlib"
+    ],
+    "editor.fontVariations": false
+}

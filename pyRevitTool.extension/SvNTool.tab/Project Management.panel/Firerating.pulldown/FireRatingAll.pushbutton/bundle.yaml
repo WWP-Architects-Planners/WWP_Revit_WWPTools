@@ -1,0 +1,3 @@
+title:  "Create Fire Rating Lines for ALL walls in Current View"
+tooltip: "Create lines from fire rating for ALL walls on current view based on their center lines; Parameter will be set on 'FRR Walls', and Parameter should be formated as Number+HR, such as 0HR,1.5HR,3/4HR,2HR,3HR,1HR"
+author: "Jason Tian"

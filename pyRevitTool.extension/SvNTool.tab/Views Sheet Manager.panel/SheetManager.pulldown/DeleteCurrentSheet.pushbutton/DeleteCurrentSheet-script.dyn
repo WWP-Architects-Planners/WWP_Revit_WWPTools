@@ -1,0 +1,495 @@
+{
+  "Uuid": "3310b5f1-9bc1-4070-9520-1d72bc605eb4",
+  "IsCustomNode": false,
+  "Description": null,
+  "Name": "DeleteCurrentSheet-script",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "archilab.Revit.Elements.Elements.Delete@Revit.Elements.Element",
+      "Id": "2053496a58c34af2b7c7626caf56c0ca",
+      "Inputs": [
+        {
+          "Id": "a776be0109a84f0eb37eb2184de9bb74",
+          "Name": "element",
+          "Description": "Element to delete.\n\nElement",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "50d7a416ad2046bc95180170844f191b",
+          "Name": "bool",
+          "Description": "bool",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Delete element from Revit DB.\n\nElements.Delete (element: Element): bool"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "Revit.Elements.Views.Sheet.Views",
+      "Id": "bab6094c1f7d4baaabbdf3e47eb10a11",
+      "Inputs": [
+        {
+          "Id": "81bdfbd0b3d84607a00c4620900b9371",
+          "Name": "sheet",
+          "Description": "Revit.Elements.Views.Sheet",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "8e99ddc0109a43ec8c3f3524025c83f7",
+          "Name": "View[]",
+          "Description": "View[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Get the Views on a Sheet\n\nSheet.Views: View[]"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
+      "NodeType": "FunctionNode",
+      "FunctionSignature": "archilab.Revit.Elements.Elements.Delete@Revit.Elements.Element",
+      "Id": "f336c08629c448eba34432a1036e1ea5",
+      "Inputs": [
+        {
+          "Id": "38b27007a5694d849f8638f87582effc",
+          "Name": "element",
+          "Description": "Element to delete.\n\nElement",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "caadda1388d3474687ed2630d87b1551",
+          "Name": "bool",
+          "Description": "bool",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Delete element from Revit DB.\n\nElements.Delete (element: Element): bool"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Function, DynamoCore",
+      "FunctionSignature": "8a176012-6eba-46df-8f41-6a40b2bb13a5",
+      "FunctionType": "Graph",
+      "NodeType": "FunctionNode",
+      "Id": "2d5542f92d664e1c824bf29df150241e",
+      "Inputs": [
+        {
+          "Id": "494f893da72f4a0598865298d6e68a4a",
+          "Name": "data",
+          "Description": "Data to pass through\n\nvar[]..[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "2d30a446aa454e84b6d1d1b81f61972a",
+          "Name": "waitFor",
+          "Description": "Data to wait for until\nthe upper stream can be\npassed.\n\nvar[]..[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "a7d92e7550fd440db4542d349556628a",
+          "Name": "data",
+          "Description": "Passed through data",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Tells the first input to wait for the second input to arrive, then passes on the first input. Really useful for scripts which have branching paths that rely on their outputs to carry each other forward.\r\n\r\nQuite a few custom packages have a 'passthrough' or 'waitfor' node. I use these all the time, so find it useful to have them contained in this package also."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Function, DynamoCore",
+      "FunctionSignature": "c97876d8-cd0e-49f2-851f-eb70a2915436",
+      "FunctionType": "Graph",
+      "NodeType": "FunctionNode",
+      "Id": "ee2210089c3a4e228d8751a5a646ae17",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "cf982ed82cf040949f3aca357daaead6",
+          "Name": "selection",
+          "Description": "return value",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Return current selected elements"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Function, DynamoCore",
+      "FunctionSignature": "841ff10b-9598-4416-b137-3728cef3943f",
+      "FunctionType": "Graph",
+      "NodeType": "FunctionNode",
+      "Id": "0610c808ee5c41a28e96419b7175be6b",
+      "Inputs": [
+        {
+          "Id": "9ae1762bb1d64b96807b543009808466",
+          "Name": "content",
+          "Description": "var[]..[]",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "db2def97f4114ed08a809248933da5d2",
+          "Name": "bool",
+          "Description": "return value",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Pop - up Dialog for boolean"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Logic.RefactoredIf, CoreNodeModels",
+      "NodeType": "ExtensionNode",
+      "Id": "dbdedb027f2242e785c0d0ff8d292bc5",
+      "Inputs": [
+        {
+          "Id": "150dcdd05c4e4ef0a9043db8f3c2693b",
+          "Name": "test",
+          "Description": "Boolean test",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "8de2fc252b6d4cdea27db76472f47397",
+          "Name": "true",
+          "Description": "Returned if test is true",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "9fda7241e6d0494589e223892a46be9a",
+          "Name": "false",
+          "Description": "Returned if test is false",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "a15850a47bd74846a9f5f95eb1b74ebc",
+          "Name": "result",
+          "Description": "Result block produced",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Auto",
+      "Description": "Returns the result of either True or False input depending on what boolean value is toggled in the test input. Supports recursion which requires that only a single branch be executed. It's critical that that both True and False branches are isolated and do not interact with each other!"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "Null;",
+      "Id": "bd8252ee4d524e13b84aebb81ce2f171",
+      "Inputs": [
+        {
+          "Id": "e564b84dc6154fc5b31e8b504f4fe6a8",
+          "Name": "Null",
+          "Description": "Null",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "37f9845d95f84162b11fff2f8828423c",
+          "Name": "",
+          "Description": "Value of expression at line 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows for DesignScript code to be authored directly"
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "8e99ddc0109a43ec8c3f3524025c83f7",
+      "End": "38b27007a5694d849f8638f87582effc",
+      "Id": "d49dfbce362a49a080e4eecee8a26cb5",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "caadda1388d3474687ed2630d87b1551",
+      "End": "2d30a446aa454e84b6d1d1b81f61972a",
+      "Id": "582465b76bf64841a8a765cb864282f8",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "a7d92e7550fd440db4542d349556628a",
+      "End": "a776be0109a84f0eb37eb2184de9bb74",
+      "Id": "ecd960965f8c4a00b752321d3de62bd8",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "cf982ed82cf040949f3aca357daaead6",
+      "End": "494f893da72f4a0598865298d6e68a4a",
+      "Id": "7a456e137a2248b089c534498c24b29e",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "cf982ed82cf040949f3aca357daaead6",
+      "End": "8de2fc252b6d4cdea27db76472f47397",
+      "Id": "c7acb39df1ce4e3781895ae652b49031",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "db2def97f4114ed08a809248933da5d2",
+      "End": "150dcdd05c4e4ef0a9043db8f3c2693b",
+      "Id": "bf5c8fa3960c44f4ab33c0080d0883f4",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "a15850a47bd74846a9f5f95eb1b74ebc",
+      "End": "81bdfbd0b3d84607a00c4620900b9371",
+      "Id": "85381ebc4532460b8a4d346f371d4963",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "37f9845d95f84162b11fff2f8828423c",
+      "End": "9fda7241e6d0494589e223892a46be9a",
+      "Id": "ab895ace5df6479884e1d97df950b2a4",
+      "IsHidden": "False"
+    }
+  ],
+  "Dependencies": [
+    "8a176012-6eba-46df-8f41-6a40b2bb13a5",
+    "c97876d8-cd0e-49f2-851f-eb70a2915436",
+    "841ff10b-9598-4416-b137-3728cef3943f"
+  ],
+  "NodeLibraryDependencies": [
+    {
+      "Name": "archi-lab.net",
+      "Version": "2022.212.2722",
+      "ReferenceType": "Package",
+      "Nodes": [
+        "2053496a58c34af2b7c7626caf56c0ca"
+      ]
+    },
+    {
+      "Name": "archi-lab.net",
+      "Version": "2023.213.1722",
+      "ReferenceType": "Package",
+      "Nodes": [
+        "f336c08629c448eba34432a1036e1ea5"
+      ]
+    },
+    {
+      "Name": "Crumple",
+      "Version": "2022.5.27",
+      "ReferenceType": "Package",
+      "Nodes": [
+        "2d5542f92d664e1c824bf29df150241e"
+      ]
+    },
+    {
+      "Name": "SvN Packages",
+      "Version": "0.0.1",
+      "ReferenceType": "Package",
+      "Nodes": [
+        "ee2210089c3a4e228d8751a5a646ae17",
+        "0610c808ee5c41a28e96419b7175be6b"
+      ]
+    }
+  ],
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "2.16",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "3.0",
+      "Data": {}
+    }
+  ],
+  "Author": "None provided",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.16.2.5624",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Background Preview",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Name": "Elements.Delete",
+        "ShowGeometry": true,
+        "Id": "2053496a58c34af2b7c7626caf56c0ca",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 2925.3121207699983,
+        "Y": 927.01145597414029
+      },
+      {
+        "Name": "Sheet.Views",
+        "ShowGeometry": true,
+        "Id": "bab6094c1f7d4baaabbdf3e47eb10a11",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 2085.8201488584932,
+        "Y": 935.47472744436948
+      },
+      {
+        "Name": "Elements.Delete",
+        "ShowGeometry": true,
+        "Id": "f336c08629c448eba34432a1036e1ea5",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 2338.3121207699983,
+        "Y": 953.01145597414029
+      },
+      {
+        "Name": "© Flow.WaitFor",
+        "ShowGeometry": true,
+        "Id": "2d5542f92d664e1c824bf29df150241e",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 2634.3121207699983,
+        "Y": 927.01145597414029
+      },
+      {
+        "Name": "SvN - CurrentSelection",
+        "ShowGeometry": true,
+        "Id": "ee2210089c3a4e228d8751a5a646ae17",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1471.9294249082545,
+        "Y": 986.1214202101628
+      },
+      {
+        "Name": "SvN - Popup w/ Buttons",
+        "ShowGeometry": true,
+        "Id": "0610c808ee5c41a28e96419b7175be6b",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1488.8108832675728,
+        "Y": 794.79071626274265
+      },
+      {
+        "Name": "If",
+        "ShowGeometry": true,
+        "Id": "dbdedb027f2242e785c0d0ff8d292bc5",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1838.2111027097246,
+        "Y": 919.58806317600136
+      },
+      {
+        "Name": "Code Block",
+        "ShowGeometry": true,
+        "Id": "bd8252ee4d524e13b84aebb81ce2f171",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1524.1554717482809,
+        "Y": 1159.0870984123947
+      }
+    ],
+    "Annotations": [],
+    "X": -1118.4659984683276,
+    "Y": -327.63315613893997,
+    "Zoom": 0.82932041712787918
+  }
+}
