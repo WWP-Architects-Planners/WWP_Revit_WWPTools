@@ -9,7 +9,7 @@ if msgUtils_muted():
 
 # Get icon file (doesn't work)
 # curPath = script.get_script_path()
-# remPath = curPath.split('SvNTool.tab')[0]
+# remPath = curPath.split('WWPTools.tab')[0]
 # icoFile = remPath + r'bin\Graphics\ico256_SvN.ico'
 
 # Display the message to the user
