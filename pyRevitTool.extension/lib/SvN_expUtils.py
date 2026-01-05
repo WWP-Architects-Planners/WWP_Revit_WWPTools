@@ -5,7 +5,7 @@ import os, datetime
 
 # get print directory
 def expUtils_getDir():
-	dp = os.path.expanduser("\\guRoo Exports")
+	dp = os.path.expanduser("\\SvN Exports")
 	return dp
 
 # make subfolder extension
@@ -30,14 +30,7 @@ def expUtils_openDir(dp):
 
 # function for checking version
 def expUtils_canPrint():
-	app = __revit__.Application
-	rvt_year = int(app.VersionNumber)
-	# Check that version is 2022 or higher
-	if rvt_year < 2022:
-		forms.alert("Only available in Revit 2022 or later.", title= "Script cancelled")
-		script.exit()
-	else:
-		return True
+	return True
 
 # make sheet name for print
 def expUtils_nameSheet(s):
@@ -48,7 +41,7 @@ def expUtils_nameSheet(s):
 	except:
 		curNum = "-"
 	# get string utility
-	from guRoo_strUtils import *
+	from SvN_strUtils import strUtils_legalize
 	# make sheet name
 	preName = s.SheetNumber + "[" + curNum + "] -" + s.Name
 	shtName = strUtils_legalize(preName)
@@ -57,7 +50,7 @@ def expUtils_nameSheet(s):
 # make view name for print
 def expUtils_nameView(v):
 	# get string utility
-	from guRoo_strUtils import *
+	from SvN_strUtils import strUtils_legalize
 	# make sheet name
 	preName = str(v.ViewType) + '_' + v.Name
 	viewName = strUtils_legalize(preName)

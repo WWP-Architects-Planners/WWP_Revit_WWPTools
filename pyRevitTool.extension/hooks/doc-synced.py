@@ -1,6 +1,6 @@
 # mute check
 from pyrevit import script
-from guRoo_msgUtils import *
+from SvN_msgUtils import *
 
 # check if notifications are disabled
 if msgUtils_muted():
