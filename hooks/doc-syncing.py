@@ -1,6 +1,6 @@
 # mute check
 from pyrevit import script
-from SvN_msgUtils import *
+from WWP_msgUtils import *
 
 # import libraries
 from datetime import datetime

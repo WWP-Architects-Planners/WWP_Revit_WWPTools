@@ -2786,7 +2786,7 @@
       "Outputs": [
         {
           "Id": "80f4f51fcab24ed8ad8228f0a083b49c",
-          "Name": "SvN Logo",
+          "Name": "WWP Logo",
           "Description": "return value",
           "UsingDefaultValue": false,
           "Level": 2,
@@ -3459,7 +3459,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -4206,7 +4206,7 @@
       },
       {
         "Id": "b96468ab12ab4f81b0d3e4d82f9f82ec",
-        "Name": "SvN - Logo",
+        "Name": "WWP - Logo",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

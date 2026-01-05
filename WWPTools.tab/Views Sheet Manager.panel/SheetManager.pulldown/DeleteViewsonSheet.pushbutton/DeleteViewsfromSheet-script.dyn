@@ -19,7 +19,7 @@
       "Outputs": [
         {
           "Id": "cc355ef88c7046d298595b20b4640a32",
-          "Name": "SvN Logo",
+          "Name": "WWP Logo",
           "Description": "return value",
           "UsingDefaultValue": false,
           "Level": 2,
@@ -1321,7 +1321,7 @@
   ],
   "NodeLibraryDependencies": [
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -1382,7 +1382,7 @@
     "NodeViews": [
       {
         "ShowGeometry": true,
-        "Name": "SvNLogo",
+        "Name": "WWPLogo",
         "Id": "a8724912bbbb41a58f956e8ca9d44d44",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
@@ -1684,7 +1684,7 @@
     "Annotations": [
       {
         "Id": "9fea6d4a406a4c449990859f4e5023e5",
-        "Title": "SvN Tool",
+        "Title": "WWP Tool",
         "Nodes": [],
         "Left": 1104.7605696751261,
         "Top": 1120.3032939488055,

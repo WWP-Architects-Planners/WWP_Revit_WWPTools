@@ -1606,7 +1606,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Creates a string",
-      "InputValue": "SvN_EXTERIOR TYPE"
+      "InputValue": "WWP_EXTERIOR TYPE"
     },
     {
       "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
@@ -3472,7 +3472,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Creates a string",
-      "InputValue": "SvN_Area Parameter"
+      "InputValue": "WWP_Area Parameter"
     },
     {
       "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
@@ -7544,7 +7544,7 @@
       "Outputs": [
         {
           "Id": "7ed1a115d12b4da49ff717859672a36a",
-          "Name": "SvN Logo",
+          "Name": "WWP Logo",
           "Description": "return value",
           "UsingDefaultValue": false,
           "Level": 2,
@@ -9568,7 +9568,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -11715,7 +11715,7 @@
       },
       {
         "Id": "53f3c157682b4cb98d388482b3bdc878",
-        "Name": "SvN - Logo",
+        "Name": "WWP - Logo",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

@@ -157,8 +157,8 @@
       ],
       "Replication": "Disabled",
       "Description": "Allows you to select a file on the system and returns its file path",
-      "HintPath": "M:\\SvN\\6.0_Logo\\Social Media\\SvN_logo_bw_square.png",
-      "InputValue": "M:\\SvN\\6.0_Logo\\Social Media\\SvN_logo_bw_square.png"
+      "HintPath": "M:\\WWP\\6.0_Logo\\Social Media\\WWP_logo_bw_square.png",
+      "InputValue": "M:\\WWP\\6.0_Logo\\Social Media\\WWP_logo_bw_square.png"
     },
     {
       "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Function, DynamoCore",
@@ -849,7 +849,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -1014,7 +1014,7 @@
       },
       {
         "Id": "f75991f5275c48db8af3fbced93079bb",
-        "Name": "SvN - Popup w/ Buttons",
+        "Name": "WWP - Popup w/ Buttons",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

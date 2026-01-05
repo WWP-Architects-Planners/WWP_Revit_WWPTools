@@ -1737,7 +1737,7 @@
       "Outputs": [
         {
           "Id": "f315cd0a74f04172a8822b837fbf8b63",
-          "Name": "SvN Logo",
+          "Name": "WWP Logo",
           "Description": "return value",
           "UsingDefaultValue": false,
           "Level": 2,
@@ -2156,7 +2156,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -2623,7 +2623,7 @@
       },
       {
         "Id": "d3f0075686074abbb1bc3d0a4bf9d3c9",
-        "Name": "SvN - Boooled Popup w/ Buttons",
+        "Name": "WWP - Boooled Popup w/ Buttons",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,
@@ -2653,7 +2653,7 @@
       },
       {
         "Id": "ddfbf444b70c4a6a97c8f8d263324617",
-        "Name": "SvN - Boooled Popup w/ Buttons",
+        "Name": "WWP - Boooled Popup w/ Buttons",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,
@@ -2693,7 +2693,7 @@
       },
       {
         "Id": "7b36da2ca2e44b5da910bce8a509ba77",
-        "Name": "SvN - Logo",
+        "Name": "WWP - Logo",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

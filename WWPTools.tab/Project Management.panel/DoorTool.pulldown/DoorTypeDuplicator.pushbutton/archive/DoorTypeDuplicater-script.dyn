@@ -1,7 +1,7 @@
 {
   "Uuid": "375bbb44-13e4-44a0-80ab-5965dce861c7",
   "IsCustomNode": true,
-  "Category": "SVN Package.List",
+  "Category": "WWP Package.List",
   "Description": "Select all families from category (Including unplaced)",
   "Name": "AllFamilyTypesofCategory",
   "ElementResolver": {

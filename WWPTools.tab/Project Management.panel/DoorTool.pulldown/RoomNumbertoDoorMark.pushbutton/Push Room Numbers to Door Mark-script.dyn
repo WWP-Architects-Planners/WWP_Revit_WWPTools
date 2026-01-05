@@ -751,7 +751,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -888,7 +888,7 @@
       },
       {
         "Id": "88dd622d93d14670b72c5a56d75996c8",
-        "Name": "SvN - Popup w/ Buttons",
+        "Name": "WWP - Popup w/ Buttons",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

@@ -160,7 +160,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Allows you to select a file on the system and returns its file path",
-      "HintPath": "C:\\Users\\jtian\\DC\\ACCDocs\\SvN Architects + Planners\\SvN_BIM_WIP\\Project Files\\Library\\Shared Parameter\\Shared Parameters Import.xlsx",
+      "HintPath": "C:\\Users\\jtian\\DC\\ACCDocs\\WWP Architects + Planners\\WWP_BIM_WIP\\Project Files\\Library\\Shared Parameter\\Shared Parameters Import.xlsx",
       "InputValue": "..\\..\\..\\..\\..\\Library\\Shared Parameter\\Shared Parameters Import.xlsx"
     },
     {

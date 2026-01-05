@@ -816,7 +816,7 @@
   ],
   "NodeLibraryDependencies": [
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -866,7 +866,7 @@
     "NodeViews": [
       {
         "ShowGeometry": true,
-        "Name": "SvN - String to List",
+        "Name": "WWP - String to List",
         "Id": "1eb18c1d596f41a69f2910f2675b9b05",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
@@ -1026,7 +1026,7 @@
       },
       {
         "ShowGeometry": true,
-        "Name": "SvN - Popup w/ Buttons",
+        "Name": "WWP - Popup w/ Buttons",
         "Id": "dc947f1596d448f39eba092f53754c25",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,

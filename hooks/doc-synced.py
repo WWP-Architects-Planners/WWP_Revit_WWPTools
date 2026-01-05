@@ -1,6 +1,6 @@
 # mute check
 from pyrevit import script
-from SvN_msgUtils import *
+from WWP_msgUtils import *
 
 # check if notifications are disabled
 if msgUtils_muted():
@@ -63,7 +63,7 @@ try:
         msg_time, 
         title = msg_title, 
         appid=None, 
-        icon="N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\PYREVIT\\SVN LOGO.jpg", 
+        icon="N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\PYREVIT\\WWP LOGO.jpg", 
         click=None, 
         actions=None
        )

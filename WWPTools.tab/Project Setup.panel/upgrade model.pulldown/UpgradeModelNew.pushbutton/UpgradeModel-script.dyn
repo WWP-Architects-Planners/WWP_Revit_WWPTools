@@ -2,7 +2,7 @@
   "Uuid": "ccbdebdd-7f94-4cf8-b5a3-c31edf38c686",
   "IsCustomNode": false,
   "Description": "",
-  "Name": "SvN - UpgradeModel-script",
+  "Name": "WWP - UpgradeModel-script",
   "ElementResolver": {
     "ResolutionMap": {}
   },

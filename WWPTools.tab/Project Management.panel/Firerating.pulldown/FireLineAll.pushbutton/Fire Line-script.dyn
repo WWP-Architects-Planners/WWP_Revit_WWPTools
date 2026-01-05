@@ -17,7 +17,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - PH",
+      "Value": "WWP - FRR - PH",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 82
     }
@@ -125,7 +125,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 82,
-      "SelectedString": "SvN - FRR - PH",
+      "SelectedString": "WWP - FRR - PH",
       "Id": "f5ab7a0050f3491699c0138db81c20f9",
       "NodeType": "ExtensionNode",
       "Inputs": [],

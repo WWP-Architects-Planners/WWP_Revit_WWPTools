@@ -62,7 +62,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 1H",
+      "Value": "WWP - FRR - 1H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 78
     },
@@ -71,7 +71,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 1.5H",
+      "Value": "WWP - FRR - 1.5H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 77
     },
@@ -80,7 +80,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 0H",
+      "Value": "WWP - FRR - 0H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 76
     },
@@ -89,7 +89,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 2H",
+      "Value": "WWP - FRR - 2H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 79
     },
@@ -98,7 +98,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 3H",
+      "Value": "WWP - FRR - 3H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 81
     },
@@ -116,7 +116,7 @@
       "Name": "Line Styles",
       "Type": "selection",
       "Type2": "dropdownSelection",
-      "Value": "SvN - FRR - 3/4H",
+      "Value": "WWP - FRR - 3/4H",
       "Description": "Retrieve all available Line Styles.",
       "SelectedIndex": 80
     }
@@ -1264,7 +1264,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 78,
-      "SelectedString": "SvN - FRR - 1H",
+      "SelectedString": "WWP - FRR - 1H",
       "Id": "9792b505faec42a082d6ac76fd1054b4",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -1353,7 +1353,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 77,
-      "SelectedString": "SvN - FRR - 1.5H",
+      "SelectedString": "WWP - FRR - 1.5H",
       "Id": "22048e10db38480f94141718b5279a13",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -1482,7 +1482,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 76,
-      "SelectedString": "SvN - FRR - 0H",
+      "SelectedString": "WWP - FRR - 0H",
       "Id": "41159d61956d4a0e97829dde6b43ac14",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -1563,7 +1563,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 79,
-      "SelectedString": "SvN - FRR - 2H",
+      "SelectedString": "WWP - FRR - 2H",
       "Id": "d28fb43049f0404e9c5b213401530c44",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -1692,7 +1692,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 81,
-      "SelectedString": "SvN - FRR - 3H",
+      "SelectedString": "WWP - FRR - 3H",
       "Id": "4be488deb79e4c0090b347974cf1702b",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -2205,7 +2205,7 @@
     {
       "ConcreteType": "archilabUI.LineStyleUi, archilabUI2024",
       "SelectedIndex": 80,
-      "SelectedString": "SvN - FRR - 3/4H",
+      "SelectedString": "WWP - FRR - 3/4H",
       "Id": "b78e18fb3543452ab19f7837773911a1",
       "NodeType": "ExtensionNode",
       "Inputs": [],
@@ -2974,7 +2974,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -3661,7 +3661,7 @@
       },
       {
         "Id": "42b14b480a8e4948ae4ad402010a21fd",
-        "Name": "SvN - CurrentSelection",
+        "Name": "WWP - CurrentSelection",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
         "Excluded": false,

@@ -350,7 +350,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -447,7 +447,7 @@
         "Y": 927.01145597414029
       },
       {
-        "Name": "SvN - CurrentSelection",
+        "Name": "WWP - CurrentSelection",
         "ShowGeometry": true,
         "Id": "ee2210089c3a4e228d8751a5a646ae17",
         "IsSetAsInput": false,
@@ -457,7 +457,7 @@
         "Y": 986.1214202101628
       },
       {
-        "Name": "SvN - Popup w/ Buttons",
+        "Name": "WWP - Popup w/ Buttons",
         "ShowGeometry": true,
         "Id": "0610c808ee5c41a28e96419b7175be6b",
         "IsSetAsInput": false,

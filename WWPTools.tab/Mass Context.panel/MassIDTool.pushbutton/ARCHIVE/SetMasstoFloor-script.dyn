@@ -1611,7 +1611,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Creates a string",
-      "InputValue": "SvN_Unit Count"
+      "InputValue": "WWP_Unit Count"
     },
     {
       "ConcreteType": "Dynamo.Graph.Nodes.ZeroTouch.DSFunction, DynamoCore",
@@ -2081,7 +2081,7 @@
       ],
       "Replication": "Disabled",
       "Description": "Creates a string",
-      "InputValue": "SvN_Count"
+      "InputValue": "WWP_Count"
     },
     {
       "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",

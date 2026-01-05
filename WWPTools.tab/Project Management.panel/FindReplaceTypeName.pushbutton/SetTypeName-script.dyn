@@ -505,7 +505,7 @@
       "Outputs": [
         {
           "Id": "671d4a3075884397921c366055afa0d3",
-          "Name": "SvN Logo",
+          "Name": "WWP Logo",
           "Description": "return value",
           "UsingDefaultValue": false,
           "Level": 2,
@@ -1031,7 +1031,7 @@
       ]
     },
     {
-      "Name": "SvN Packages",
+      "Name": "WWP Packages",
       "Version": "0.0.1",
       "ReferenceType": "Package",
       "Nodes": [
@@ -1176,7 +1176,7 @@
       },
       {
         "ShowGeometry": true,
-        "Name": "SvN - PopupDialog",
+        "Name": "WWP - PopupDialog",
         "Id": "71133f04a51c44438d1c2d43b0dbfaaf",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
@@ -1206,7 +1206,7 @@
       },
       {
         "ShowGeometry": true,
-        "Name": "SvN - Logo",
+        "Name": "WWP - Logo",
         "Id": "380e3ac9c7e84ca4a7bd8419ba746c6a",
         "IsSetAsInput": false,
         "IsSetAsOutput": false,
