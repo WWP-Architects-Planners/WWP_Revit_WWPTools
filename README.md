@@ -12,6 +12,11 @@ WWPTools is a pyRevit toolbar extension distributed via GitHub Releases for easy
 2) Double-click it. It installs/updates the extension in:
    `%APPDATA%\pyRevit\Extensions`
 
+## Dynamo packages (optional)
+If you want shared Dynamo packages without overwriting user packages:
+1) Download `Install_DynamoPackages.bat` from the repo.
+2) Double-click it. It installs packages to `C:\dynpackages` and adds that
+   folder to Dynamo's Custom Package Folders (for any installed Dynamo Revit versions).
+
 ## Customize the repo owner
 Edit `Update_WWPTools.ps1` and set `RepoOwner` to your GitHub org/user name.
-
