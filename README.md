@@ -11,7 +11,8 @@ WWPTools is a pyRevit toolbar extension distributed via GitHub Releases for easy
 ## For users (install or update)
 1) Download the MSI from the latest GitHub release (example: `V1.01`).
 2) Run `WWPTools.msi`.
-3) The installer installs/updates the extension in:
+3) The installer shows the install path and lets you change it if needed.
+4) The installer installs/updates the extension in:
    `%APPDATA%\pyRevit\Extensions\WWPTools.extension`
    and installs Dynamo packages to `C:\dynpackages`.
 
