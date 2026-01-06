@@ -32,6 +32,7 @@
     </Feature>
 
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
     <UI>
       <ui:WixUI Id="WixUI_InstallDir" />
     </UI>
@@ -48,4 +49,5 @@
     </InstallExecuteSequence>
   </Package>
 </Wix>
+
 
