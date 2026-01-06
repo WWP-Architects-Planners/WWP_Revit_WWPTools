@@ -7,10 +7,10 @@ WWPTools is a pyRevit toolbar extension distributed via GitHub Releases for easy
 2) Publish updates by pushing to `main` (the installer pulls the repo zip from GitHub).
 3) If the repo owner or name changes, update it in `installer/WWPTools.wxs` and rebuild the MSI.
 4) Build the MSI by running `installer/Build_WWPTools_MSI.ps1`.
-5) Attach the MSI to a GitHub release (example: `V1.01`).
+5) Attach the MSI to a GitHub release (example: `V1.0.0`).
 
 ## For users (install or update)
-1) Download the MSI from the latest GitHub release (example: `V1.01`).
+1) Download the MSI from the latest GitHub release (example: `V1.0.0`).
 2) Run `WWPTools.msi`.
 3) The installer shows the install path and lets you change it if needed.
 4) The installer installs/updates the extension in:
