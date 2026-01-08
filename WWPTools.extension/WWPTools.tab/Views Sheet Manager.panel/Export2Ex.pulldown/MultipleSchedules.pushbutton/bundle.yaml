@@ -1,4 +1,0 @@
-title:  "Multiple Schedules Exporter"
-tooltip: '''Publish existing schedules to excel file sheets.
-requires Data-shapes, Crumple, bimorphNodes, BumbleBee, and WWP Packages'''
-author: "Jason Tian"
