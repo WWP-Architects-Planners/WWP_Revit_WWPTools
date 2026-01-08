@@ -1,8 +1,0 @@
-title:  "Single Schedule Exporter"
-tooltip: '''Publish an existing schedule to excel file sheet. 
-Require: 
-Data-Shapes, 
-Crumple, 
-bimorphNodes, 
-WWP Packages'''
-author: "Jason Tian"
