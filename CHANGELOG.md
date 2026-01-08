@@ -8,18 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.1] - 2026-01-08
 
 ### Changed
-- Multiple Schedules Exporter completely rewritten for CPython with WinForms UI
+- Multiple Schedules Exporter rewritten for CPython with WinForms UI
 - Excel export now uses openpyxl via CSV pipeline; CSV export unchanged
-- Export tool now remembers last schedule selection, last Excel file location, and last CSV folder
-- Schedule list excludes legend views
+- Remembers last schedule selection, last Excel file, and last CSV folder
+- Excludes legend views from schedule list
 - Sync task excludes archive folders
-- Refactored Export2Ex tool from pulldown menu to single pushbutton
-- Consolidated multiple schedule export tools into unified interface
-- Improved user experience with streamlined export workflow
-
-### Removed
-- Deprecated separate SingleSchedule and MultipleSchedules buttons
-- Removed archive Dynamo scripts for schedule export
 
 ## [1.1.0] - 2026-01-07
 
