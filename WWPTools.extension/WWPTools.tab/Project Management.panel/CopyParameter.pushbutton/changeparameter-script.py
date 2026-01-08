@@ -1,25 +1,122 @@
-"""
-Copy and transform instance parameters with find/replace functionality.
-Copies a source parameter value to a target parameter with optional text replacement.
-"""
-
-from pyrevit import revit, DB, forms, script
-from typing import Optional, List
-
+#! python3
+from pyrevit import revit, DB, script
+from Autodesk.Revit import UI
 # Get the active document
 doc = revit.doc
 output = script.get_output()
 
-def get_selected_elements() -> List[DB.Element]:
+
+def ask_for_inputs(param_names):
+    """Single form for parameter mapping and text transforms."""
+    try:
+        import System
+        from System.Drawing import Size
+        from System.Windows.Forms import Form, Label, TextBox, Button, DialogResult, ComboBox, ComboBoxStyle
+    except Exception as e:
+        UI.TaskDialog.Show("Copy Parameter", f"Unable to load input dialog: {str(e)}")
+        return None
+
+    form = Form()
+    form.Text = "Copy and Transform Parameter"
+    form.Width = 420
+    form.Height = 320
+    form.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
+    form.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+    form.MaximizeBox = False
+    form.MinimizeBox = False
+
+    labels = [
+        ("Source Parameter", "View Name"),
+        ("Target Parameter", "Title on Sheet"),
+        ("Find Text", ""),
+        ("Replace Text", ""),
+        ("Prefix", ""),
+        ("Suffix", ""),
+    ]
+
+    inputs = []
+    top = 10
+    for index, (label_text, default_value) in enumerate(labels):
+        label = Label()
+        label.Left = 10
+        label.Top = top
+        label.Width = 120
+        label.Text = label_text
+
+        if index in (0, 1):
+            control = ComboBox()
+            control.Left = 140
+            control.Top = top - 2
+            control.Width = 250
+            control.DropDownStyle = ComboBoxStyle.DropDown
+            if param_names:
+                control.Items.AddRange(list(param_names))
+            control.Text = default_value
+        else:
+            control = TextBox()
+            control.Left = 140
+            control.Top = top - 2
+            control.Width = 250
+            control.Text = default_value
+
+        form.Controls.Add(label)
+        form.Controls.Add(control)
+        inputs.append(control)
+        top += 30
+
+    ok = Button()
+    ok.Text = "OK"
+    ok.Left = 230
+    ok.Top = top + 10
+    ok.DialogResult = DialogResult.OK
+
+    cancel = Button()
+    cancel.Text = "Cancel"
+    cancel.Left = 310
+    cancel.Top = top + 10
+    cancel.DialogResult = DialogResult.Cancel
+
+    form.AcceptButton = ok
+    form.CancelButton = cancel
+
+    form.Controls.Add(ok)
+    form.Controls.Add(cancel)
+
+    result = form.ShowDialog()
+    if result != DialogResult.OK:
+        return None
+
+    return {
+        "source_param": inputs[0].Text,
+        "target_param": inputs[1].Text,
+        "find_text": inputs[2].Text,
+        "replace_text": inputs[3].Text,
+        "prefix": inputs[4].Text,
+        "suffix": inputs[5].Text,
+    }
+
+def get_all_parameter_names(elements):
+    """Return a sorted list of parameter names across all selected elements."""
+    names = set()
+    for element in elements:
+        try:
+            for param in element.Parameters:
+                if param and param.Definition:
+                    names.add(param.Definition.Name)
+        except Exception:
+            continue
+    return sorted(names)
+
+def get_selected_elements():
     """Get currently selected elements from the Revit model."""
     try:
         selection = revit.get_selection()
         return list(selection.elements)
     except Exception as e:
-        forms.alert(f"Error getting selection: {str(e)}")
+        UI.TaskDialog.Show("Copy Parameter", f"Error getting selection: {str(e)}")
         return []
 
-def get_parameter_value(element: DB.Element, param_name: str) -> Optional[str]:
+def get_parameter_value(element, param_name):
     """
     Get the value of a parameter from an element.
     
@@ -39,7 +136,7 @@ def get_parameter_value(element: DB.Element, param_name: str) -> Optional[str]:
         print(f"Error getting parameter '{param_name}': {str(e)}")
         return None
 
-def set_parameter_value(element: DB.Element, param_name: str, value: str) -> bool:
+def set_parameter_value(element, param_name, value):
     """
     Set the value of a parameter on an element.
     
@@ -63,7 +160,7 @@ def set_parameter_value(element: DB.Element, param_name: str, value: str) -> boo
         print(f"Error setting parameter '{param_name}': {str(e)}")
         return False
 
-def show_input_dialog() -> Optional[dict]:
+def show_input_dialog(elements):
     """
     Display user input dialog for parameter names and find/replace values.
     
@@ -71,56 +168,11 @@ def show_input_dialog() -> Optional[dict]:
         Dictionary with 'source_param', 'target_param', 'find_text', 'replace_text'
         or None if cancelled
     """
-    from pyrevit.forms import WPFWindow
-    
-    # Create simple input dialog
-    components = [
-        ("Source Parameter", "View Name"),
-        ("Target Parameter", "Title on Sheet"),
-        ("Find Text", ""),
-        ("Replace Text", "")
-    ]
-    
-    # Use TaskDialog for simpler input
-    dialog = DB.TaskDialog("Copy and Transform Parameter")
-    dialog.MainInstruction = "Enter the parameters and find/replace values"
-    dialog.MainContent = "Please configure the parameter copy operation"
-    
-    # For now, use a workaround with multiple dialogs
-    source_param = forms.ask_for_one_item(
-        ["View Name", "Title on Sheet"],
-        "Select Source Parameter:"
-    )
-    
-    if not source_param:
+    param_names = get_all_parameter_names(elements)
+    if not param_names:
+        UI.TaskDialog.Show("Copy Parameter", "No parameters found on selected elements.")
         return None
-    
-    target_param = forms.ask_for_one_item(
-        ["View Name", "Title on Sheet"],
-        "Select Target Parameter:"
-    )
-    
-    if not target_param:
-        return None
-    
-    find_text = forms.ask_for_string(
-        default="",
-        prompt="Text to find (leave empty for no replacement):",
-        title="Find Text"
-    )
-    
-    replace_text = forms.ask_for_string(
-        default="",
-        prompt="Text to replace with:",
-        title="Replace Text"
-    )
-    
-    return {
-        "source_param": source_param,
-        "target_param": target_param,
-        "find_text": find_text or "",
-        "replace_text": replace_text or ""
-    }
+    return ask_for_inputs(param_names)
 
 def main():
     """Main execution function."""
@@ -128,54 +180,59 @@ def main():
     elements = get_selected_elements()
     
     if not elements:
-        forms.alert("No elements selected. Please select elements and try again.")
+        UI.TaskDialog.Show("Copy Parameter", "No elements selected. Please select elements and try again.")
         return
     
     # Get user input
-    config = show_input_dialog()
+    config = show_input_dialog(elements)
     if not config:
         return
     
     source_param = config["source_param"]
     target_param = config["target_param"]
-    find_text = config["find_text"]
-    replace_text = config["replace_text"]
+    find_text = config["find_text"] or ""
+    replace_text = config["replace_text"] or ""
+    prefix = config.get("prefix") or ""
+    suffix = config.get("suffix") or ""
     
     # Process elements
     success_count = 0
     error_count = 0
     
-    with DB.Transaction(doc, "Copy and Transform Parameter") as txn:
-        txn.Start()
-        
-        for element in elements:
-            # Get source parameter value
-            source_value = get_parameter_value(element, source_param)
-            
-            if source_value is None:
-                print(f"Element {element.Id}: Parameter '{source_param}' not found")
-                error_count += 1
-                continue
-            
-            # Apply find/replace if specified
-            if find_text:
-                target_value = source_value.replace(find_text, replace_text)
-            else:
-                target_value = source_value
-            
-            # Set target parameter
-            if set_parameter_value(element, target_param, target_value):
-                print(f"Element {element.Id}: '{source_param}' → '{target_param}' = '{target_value}'")
-                success_count += 1
-            else:
-                print(f"Element {element.Id}: Failed to set parameter '{target_param}'")
-                error_count += 1
-        
-        txn.Commit()
+    txn = DB.Transaction(doc, "Copy and Transform Parameter")
+    txn.Start()
+
+    for element in elements:
+        # Get source parameter value
+        source_value = get_parameter_value(element, source_param)
+
+        if source_value is None:
+            print(f"Element {element.Id}: Parameter '{source_param}' not found")
+            error_count += 1
+            continue
+
+        # Apply find/replace if specified
+        if find_text:
+            target_value = source_value.replace(find_text, replace_text)
+        else:
+            target_value = source_value
+
+        if prefix or suffix:
+            target_value = f"{prefix}{target_value}{suffix}"
+
+        # Set target parameter
+        if set_parameter_value(element, target_param, target_value):
+            print(f"Element {element.Id}: '{source_param}' -> '{target_param}' = '{target_value}'")
+            success_count += 1
+        else:
+            print(f"Element {element.Id}: Failed to set parameter '{target_param}'")
+            error_count += 1
+
+    txn.Commit()
     
     # Show results
-    message = f"Operation Complete:\n\n✓ Successful: {success_count}\n✗ Failed: {error_count}"
-    forms.alert(message, title="Parameter Copy Results")
+    message = f"Operation Complete:\n\nSuccessful: {success_count}\nFailed: {error_count}"
+    UI.TaskDialog.Show("Parameter Copy Results", message)
     
     print("\n" + "="*50)
     print(message)
