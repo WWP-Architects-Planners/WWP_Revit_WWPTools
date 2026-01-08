@@ -2,7 +2,17 @@ $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $wxsPath = Join-Path $scriptDir "WWPTools.wxs"
-$msiPath = Join-Path $scriptDir "WWPTools.msi"
+
+# Extract version from WXS file
+[xml]$wxsContent = Get-Content $wxsPath
+$version = $wxsContent.Wix.Package.Version
+if ($version -match '^(\d+\.\d+\.\d+)') {
+    $versionTag = "v$($matches[1])"
+    $msiPath = Join-Path $scriptDir "WWPTools-$versionTag.msi"
+} else {
+    $msiPath = Join-Path $scriptDir "WWPTools.msi"
+}
+
 $wixExe = "C:\Program Files\WiX Toolset v6.0\bin\wix.exe"
 $bindPath = $scriptDir
 
