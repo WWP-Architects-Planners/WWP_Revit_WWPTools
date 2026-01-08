@@ -1,0 +1,11 @@
+- 2026-01-08
+  - Multiple Schedules Exporter now runs in CPython with WinForms UI.
+  - Excel export uses openpyxl with a CSV pipeline; CSV export preserved.
+  - Export remembers last schedules and last used Excel/CSV locations.
+  - Schedule list excludes legends.
+  - Sync task ignores archive folders and appends ACCDocs SUBCHANGELOG.
+- Multiple Schedules Exporter rewritten for CPython with WinForms UI.
+- Excel export now uses openpyxl via CSV pipeline; CSV export unchanged.
+- Remembers last schedule selection, last Excel file, and last CSV folder.
+- Excludes legend views from schedule list.
+- Sync task excludes archive folders.
