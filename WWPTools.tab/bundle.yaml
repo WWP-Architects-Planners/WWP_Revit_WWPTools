@@ -1,8 +1,7 @@
 layout:
-  - About
-  - Project Setup
-  - Project Management
-  - Mass Context
-  - Detail Manager
-  - Views Sheet Manager
-  - Revit Cleanup
+  - 1. Project Setup
+  - 2. Mass Context
+  - 3. Project Management
+  - 4. Views Sheet Manager
+  - 5. Revit Cleanup
+  - 6. Links
