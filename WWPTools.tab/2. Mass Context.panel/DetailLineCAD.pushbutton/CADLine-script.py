@@ -1,5 +1,16 @@
 #! python3
+import collections
 from collections import defaultdict
+
+try:
+    from collections.abc import Callable as _Callable
+except Exception:
+    _Callable = None
+
+if _Callable is not None and not hasattr(collections, "Callable"):
+    collections.Callable = _Callable
+if not hasattr(collections, "callable"):
+    collections.callable = callable
 
 from System.Collections.Generic import List
 
