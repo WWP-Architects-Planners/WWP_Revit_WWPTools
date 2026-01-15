@@ -34,6 +34,7 @@
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
     <WixVariable Id="WixUIBannerBmp" Value="WWPTools-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="WWPTools-dialog.png" />
     <UI>
       <ui:WixUI Id="WixUI_InstallDir" />
     </UI>
