@@ -12,7 +12,7 @@ How to use:
 
 ## CAD Line Tool
 Location: WWPTools > 2. Mass Context > CAD Line Tool
-Screenshot: (Add later)
+Screenshot: ![CAD Line Tool](assets/svn-tools-page-15.png)
 Purpose: Convert linked CAD layers into detail line groups in the current view.
 How to use:
 1. Select the linked CAD file in the view.
@@ -20,14 +20,14 @@ How to use:
 
 ## Random Tree
 Location: WWPTools > 2. Mass Context > Random Tree
-Screenshot: (Add later)
+Screenshot: ![Random Tree](assets/svn-tools-page-30.png)
 Purpose: Randomize tree family rotation and scale within a small range.
 How to use:
 1. Run the tool to randomize tree direction and size within 10 percent.
 
 ## Sync Mass Tool
 Location: WWPTools > 2. Mass Context > Sync Mass Tool
-Screenshot: (Add later)
+Screenshot: ![Sync Mass Tool](assets/svn-tools-page-31.png)
 Purpose: Push mass data to mass floors for GCA/GFA and FSI reporting.
 How to use:
 1. Create a mass and mass levels.
@@ -39,7 +39,7 @@ Purpose: Create context building and site elements based on OSM or CAD.
 
 ### Building Importer
 Location: WWPTools > 2. Mass Context > Context Builder > Building Importer
-Screenshot: (Add later)
+Screenshot: ![Building Importer](assets/svn-tools-page-28.png)
 Purpose: Create context buildings from an OpenStreetMap (OSM) file.
 How to use:
 1. Export an OSM file from OpenStreetMap.
@@ -49,7 +49,7 @@ How to use:
 
 ### CADBuilder
 Location: WWPTools > 2. Mass Context > Context Builder > CADBuilder
-Screenshot: (Add later)
+Screenshot: ![CAD Builder](assets/svn-tools-page-29.png)
 Purpose: Create context buildings from a CAD file.
 How to use:
 1. Select the CAD file and the target layer.
@@ -58,7 +58,7 @@ How to use:
 
 ### CADBuilder2023
 Location: WWPTools > 2. Mass Context > Context Builder > CADBuilder2023
-Screenshot: (Add later)
+Screenshot: ![CAD Builder 2023](assets/svn-tools-page-29.png)
 Purpose: CADBuilder workflow for Revit 2023.
 How to use:
 1. Select the CAD file and the target layer.
@@ -67,7 +67,7 @@ How to use:
 
 ### Roads Importer
 Location: WWPTools > 2. Mass Context > Context Builder > Roads Importer
-Screenshot: (Add later)
+Screenshot: ![Road Importer](assets/svn-tools-page-30.png)
 Purpose: Create roads and parks from an OSM file.
 How to use:
 1. Select the OSM file and units (mm or meters).

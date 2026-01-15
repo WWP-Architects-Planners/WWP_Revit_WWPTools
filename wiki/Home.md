@@ -1,6 +1,6 @@
 # WWPTools Wiki
 
-Welcome to the WWPTools wiki. This set of pages documents each tool in the pyRevit extension.
+Welcome to the WWPTools wiki. This set of pages documents each tool in the pyRevit extension, with screenshots and workflows from the SvNTools PDF where available.
 
 ## Panels
 - [1. Project Setup](1-Project-Setup.md)
@@ -9,3 +9,6 @@ Welcome to the WWPTools wiki. This set of pages documents each tool in the pyRev
 - [4. Views Sheet Manager](4-Views-Sheet-Manager.md)
 - [5. Revit Cleanup](5-Revit-Cleanup.md)
 - [6. Links](6-Links.md)
+
+## Assets
+Screenshots referenced in the wiki live in `wiki/assets/`.

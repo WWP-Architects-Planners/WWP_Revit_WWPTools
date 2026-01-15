@@ -6,6 +6,7 @@ This page documents setup steps and tools found under the WWPTools add-on tab.
 
 ### Install pyRevit (required)
 Location: Revit installer
+Screenshot: ![Install pyRevit](assets/svn-tools-page-03.png)
 Purpose: Required host for WWPTools and SvNTool extensions.
 How to use:
 1. Run the installer from `N:\Library\Design Software\Autodesk\Revit\! Add-Ins\pyRevit\pyRevit_4.8.12.22247_signed.exe`.
@@ -14,6 +15,7 @@ How to use:
 
 ### Install WWPTools MSI
 Location: GitHub Releases
+Screenshot: (Add later)
 Purpose: Install the WWPTools add-in via the official MSI.
 How to use:
 1. Download the latest MSI from `https://github.com/SvN-Architects-Planners/WWPTools/releases/latest`.
@@ -23,6 +25,7 @@ How to use:
 
 ### Register SvNTool extensions in pyRevit (legacy)
 Location: Revit > pyRevit tab > pyRevit panel > Settings
+Screenshot: ![pyRevit Settings](assets/svn-tools-page-04.png)
 Purpose: Add the SvNTool extension folder so the tab appears in Revit.
 How to use:
 1. In pyRevit Settings, under Custom Extension Directories, click "Add folder".
@@ -31,6 +34,7 @@ How to use:
 
 ### Dynamo first-time setup (legacy)
 Location: Revit > Manage tab > Dynamo
+Screenshot: ![Dynamo first-time setup](assets/svn-tools-page-06.png)
 Purpose: Accept the Dynamo license and install core components.
 How to use:
 1. Launch Dynamo from Revit and accept the terms.
@@ -38,6 +42,7 @@ How to use:
 
 ### Install SvNTool Dynamo packages (legacy)
 Location: SvNTool tab > Install Packages
+Screenshot: ![SvNTool Dynamo packages](assets/svn-tools-page-06.png)
 Purpose: Install required Dynamo packages for all tools.
 How to use:
 1. In SvNTool, use Install Packages and select "Install on C drive".
@@ -47,6 +52,7 @@ How to use:
 
 ### Optional: enable EF_Tools extension (legacy)
 Location: Revit > pyRevit tab > Extensions
+Screenshot: ![EF_Tools extension](assets/svn-tools-page-07.png)
 Purpose: Enable EF_Tools add-on features.
 How to use:
 1. Select "EF-Tools" and click "Enable Extension".
@@ -69,6 +75,7 @@ How to use:
 
 ### Line Type Tool
 Location: WWPTools > 1. Project Setup > Line Type Tool
+Screenshot: ![Line Type Tool](assets/svn-tools-page-38.png)
 Purpose: Import and standardize line types in the project.
 Source file: `N:\Library\Design Software\Autodesk\Revit\Standards\Line Type\Linetypes.xlsx`
 How to use:
@@ -80,6 +87,7 @@ Purpose: Import standard shared parameters or build a template.
 
 #### Create Template
 Location: WWPTools > 1. Project Setup > Add Project Parameter > Create Template
+Screenshot: ![Import Project Parameter](assets/svn-tools-page-05.png)
 Purpose: Create an Excel template with shared parameters listed in the Variables sheet.
 How to use:
 1. Have the target sheet(s) available or selected as prompted.
@@ -88,6 +96,7 @@ How to use:
 
 #### Import from Excel
 Location: WWPTools > 1. Project Setup > Add Project Parameter > Import from Excel
+Screenshot: ![Import Project Parameter](assets/svn-tools-page-05.png)
 Purpose: Import shared parameters from a workbook.
 Source file: `N:\Library\Design Software\Autodesk\Revit\Shared Parameters\Shared Parameters Import.xlsx`
 How to use:
@@ -100,6 +109,7 @@ Purpose: Manage levels and generate views.
 
 #### Levels Setup
 Location: WWPTools > 1. Project Setup > Levels Setup > Levels Setup
+Screenshot: ![Levels Setup](assets/svn-tools-page-09.png)
 Purpose: Add or remove levels based on a target floor count.
 How to use:
 1. Enter the desired number of floors.
@@ -107,6 +117,7 @@ How to use:
 
 #### Views Creator
 Location: WWPTools > 1. Project Setup > Levels Setup > Views Creator
+Screenshot: ![Views Creator](assets/svn-tools-page-08.png)
 Purpose: Create Area Plans, Floor Plans, and RCPs for selected levels.
 How to use:
 1. Choose categories and view types (Area Plan, Floor Plan, or RCP).
@@ -115,6 +126,7 @@ How to use:
 
 ### Project Upgrader
 Location: WWPTools > 1. Project Setup > Project Upgrader
+Screenshot: ![Project Upgrader](assets/svn-tools-page-09.png)
 Purpose: Batch-upgrade families or models to the current Revit version.
 How to use:
 1. Select the source folder and click Select Folder.

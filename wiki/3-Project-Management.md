@@ -4,7 +4,7 @@ This page documents the tools found under this WWPTools panel.
 
 ## Copy Color Scheme
 Location: WWPTools > 3. Project Management > Copy Color Scheme
-Screenshot: (Add later)
+Screenshot: ![Copy Color Scheme](assets/svn-tools-page-10.png)
 Purpose: Copy color scheme settings between schemes.
 How to use:
 1. Select the source and target color scheme.
@@ -12,7 +12,7 @@ How to use:
 
 ## Copy Parameter
 Location: WWPTools > 3. Project Management > Copy Parameter
-Screenshot: (Add later)
+Screenshot: ![Copy Parameter](assets/svn-tools-page-14.png)
 Purpose: Copy values from one instance parameter to another with optional find/replace.
 How to use:
 1. Select elements to update.
@@ -22,7 +22,7 @@ How to use:
 
 ## Parking Count in Room
 Location: WWPTools > 3. Project Management > Parking Count in Room
-Screenshot: (Add later)
+Screenshot: ![Parking Count in Room](assets/svn-tools-page-19.png)
 Purpose: Count parking by room and fill the parking occupancy room tag.
 How to use:
 1. Fill required parameters on parking families.
@@ -31,7 +31,7 @@ How to use:
 
 ## Replace Type Name
 Location: WWPTools > 3. Project Management > Replace Type Name
-Screenshot: (Add later)
+Screenshot: ![Replace Type Name](assets/svn-tools-page-17.png)
 Purpose: Batch rename type names.
 How to use:
 1. Enter the search text and replacement text.
@@ -39,7 +39,7 @@ How to use:
 
 ## Match Filled Region
 Location: WWPTools > 3. Project Management > Match Filled Region
-Screenshot: (Add later)
+Screenshot: ![Match Filled Region](assets/svn-tools-page-19.png)
 Purpose: Standardize filled region graphics across project and families.
 How to use:
 1. Run the tool to match all filled regions to project standards.
@@ -58,14 +58,14 @@ Note: This tool is being deprecated due to the key area schedule method.
 
 ### AutoFill ALL WWP_Area
 Location: WWPTools > 3. Project Management > AutoFill WWP_Area > AutoFill ALL WWP_Area
-Screenshot: (Add later)
+Screenshot: ![AutoFill WWP_Area](assets/svn-tools-page-26.png)
 Purpose: Download all WWP standard data based on Unit Type.
 How to use:
 1. Run the tool and follow prompts.
 
 ### AutoFill Selected WWP_Area
 Location: WWPTools > 3. Project Management > AutoFill WWP_Area > AutoFill Selected WWP_Area
-Screenshot: (Add later)
+Screenshot: ![AutoFill WWP_Area](assets/svn-tools-page-26.png)
 Purpose: Download selected WWP standard data based on Unit Type.
 How to use:
 1. Select the target elements before running the tool.
@@ -76,7 +76,7 @@ Purpose: Copy filter graphic overrides between view templates and views.
 
 ### Copy Current Filters to Multiple Templates
 Location: WWPTools > 3. Project Management > Copy Filters > Copy Current Filters to Multiple Templates
-Screenshot: (Add later)
+Screenshot: ![Copy Filters](assets/svn-tools-page-11.png)
 Purpose: Copy filter graphic overrides from current view to multiple templates.
 How to use:
 1. Open the target view you want to affect.
@@ -84,7 +84,7 @@ How to use:
 
 ### Copy Filters to Current View
 Location: WWPTools > 3. Project Management > Copy Filters > Copy Filters to Current View
-Screenshot: (Add later)
+Screenshot: ![Copy Filters](assets/svn-tools-page-11.png)
 Purpose: Copy filter graphic overrides from one template to the current view.
 How to use:
 1. Open the target view you want to affect.
@@ -92,7 +92,7 @@ How to use:
 
 ### Copy Filters to Template
 Location: WWPTools > 3. Project Management > Copy Filters > Copy Filters to Template
-Screenshot: (Add later)
+Screenshot: ![Copy Filters](assets/svn-tools-page-11.png)
 Purpose: Copy filter graphic overrides from one template to another.
 How to use:
 1. Run the tool and follow prompts.
@@ -102,7 +102,7 @@ Purpose: Bulk edit door data and types.
 
 ### Door Type Duplicator
 Location: WWPTools > 3. Project Management > Door Tool > Door Type Duplicator
-Screenshot: (Add later)
+Screenshot: ![Door Tool](assets/svn-tools-page-16.png)
 Purpose: Duplicate a selected door type with specified dimensions.
 How to use:
 1. Make sure door elements are available in the active view or selection.
@@ -110,7 +110,7 @@ How to use:
 
 ### Get Door Number from Room
 Location: WWPTools > 3. Project Management > Door Tool > Get Door Number from Room
-Screenshot: (Add later)
+Screenshot: ![Door Tool](assets/svn-tools-page-16.png)
 Purpose: Write door numbers from To Room values into the door Mark.
 How to use:
 1. Make sure door elements are available in the active view or selection.
@@ -119,7 +119,7 @@ Note: This overwrites all doors in the project and does not work for model group
 
 ### Publish Fire Rating to Doors
 Location: WWPTools > 3. Project Management > Door Tool > Publish Fire Rating to Doors
-Screenshot: (Add later)
+Screenshot: ![Door Tool](assets/svn-tools-page-16.png)
 Purpose: Copy wall fire rating (FRR) to a door parameter.
 How to use:
 1. Select the target doors and walls.
@@ -128,7 +128,7 @@ How to use:
 
 ### Select Doors in View
 Location: WWPTools > 3. Project Management > Door Tool > Select Doors in View
-Screenshot: (Add later)
+Screenshot: ![Door Tool](assets/svn-tools-page-16.png)
 Purpose: Select all doors in the current view.
 How to use:
 1. Open the target view you want to affect.
@@ -139,7 +139,7 @@ Purpose: Create or clear fire rating detail lines for walls.
 
 ### Clear All fire rating lines in Current View
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Clear All fire rating lines in Current View
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-21.png)
 Purpose: Clear all auto-generated fire rating lines in the current view.
 How to use:
 1. Open the target view you want to affect.
@@ -147,7 +147,7 @@ How to use:
 
 ### Convert Lines to Detail Items
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Convert Lines to Detail Items
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-21.png)
 Purpose: Convert rated detail lines into line-based detail components.
 How to use:
 1. Load `N:\Library\Design Software\Autodesk\Revit\Families\Annotations\Families\SvN_FireRating_FRR Line Based.rfa`.
@@ -155,7 +155,7 @@ How to use:
 
 ### Create Fire Rating Lines for ALL walls in Current View
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Create Fire Rating Lines for ALL walls in Current View
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-18.png)
 Purpose: Create rated lines using wall FRR values.
 How to use:
 1. Open the target view you want to affect.
@@ -165,14 +165,14 @@ Notes:
 
 ### Create Fire Rating Lines for All walls in views with FRR indicator
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Create Fire Rating Lines for All walls in views with FRR indicator
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-20.png)
 Purpose: Create fire rating lines for all views that end with "FRR".
 How to use:
 1. Run the tool and follow prompts.
 
 ### Create Fire Rating Lines for Selected walls in Current View
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Create Fire Rating Lines for Selected walls in Current View
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-20.png)
 Purpose: Create rated lines for selected walls.
 How to use:
 1. Select walls in the current view.
@@ -180,7 +180,7 @@ How to use:
 
 ### Create Non-Rated Line for ALL walls in Current View
 Location: WWPTools > 3. Project Management > Fire Rating Tool > Create Non-Rated Line for ALL walls in Current View
-Screenshot: (Add later)
+Screenshot: ![Fire Rating Tool](assets/svn-tools-page-18.png)
 Purpose: Create solid centerline detail lines for all walls regardless of FRR values.
 How to use:
 1. Open the target view you want to affect.
@@ -191,7 +191,7 @@ Purpose: Create marketing blackline views and sheets (Revit 2023+).
 
 ### Make MULTIPLE KeyPlans from Selected Area
 Location: WWPTools > 3. Project Management > Marketing View Maker > Make MULTIPLE KeyPlans from Selected Area
-Screenshot: (Add later)
+Screenshot: ![Marketing View Maker](assets/svn-tools-page-24.png)
 Purpose: Create multiple keyplans based on selected areas.
 How to use:
 1. Select the target areas.
@@ -199,7 +199,7 @@ How to use:
 
 ### Make Single Suite (Recommended)
 Location: WWPTools > 3. Project Management > Marketing View Maker > Make Single Suite (Recommended)
-Screenshot: (Add later)
+Screenshot: ![Marketing View Maker](assets/svn-tools-page-24.png)
 Purpose: Create suite blackline views and sheets from a selected area and entry door.
 How to use:
 1. Select an area and its entry door.
@@ -214,7 +214,7 @@ Purpose: Export schedules to CSV and manage project statistics.
 
 ### Projectsetup
 Location: WWPTools > 3. Project Management > Project Stat Manager > Projectsetup
-Screenshot: (Add later)
+Screenshot: ![Project Stat Manager](assets/svn-tools-page-22.png)
 Purpose: Export selected schedules (SvN_*) to CSV.
 How to use:
 1. Copy sample Excel files from `N:\Library\Design Software\Autodesk\Revit\Sample Files\stats`.
@@ -224,7 +224,7 @@ How to use:
 
 ### UpdateStats
 Location: WWPTools > 3. Project Management > Project Stat Manager > UpdateStats
-Screenshot: (Add later)
+Screenshot: ![Project Stat Manager](assets/svn-tools-page-23.png)
 Purpose: Update all CSV exports for the stats workbook.
 How to use:
 1. Run UpdateStats to refresh CSV outputs.
