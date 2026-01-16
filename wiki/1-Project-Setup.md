@@ -19,7 +19,7 @@ Screenshot: (Add later)
 Purpose: Install the WWPTools add-in via the official MSI.
 How to use:
 1. Download the latest MSI from `https://github.com/WWP-Architects-Planners/WWPTools/releases/latest`.
-   - Current release: `WWPTools-v1.1.3.msi`
+   - Current release: `WWPTools-v1.1.4.msi`
 2. Run the MSI and follow the prompts.
 3. Open Revit and verify the WWPTools tab is visible.
 

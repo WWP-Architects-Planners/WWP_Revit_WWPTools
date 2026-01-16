@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import importlib
 import os
 import re
 import shutil
@@ -10,16 +11,9 @@ import tempfile
 
 from pyrevit import DB, revit, script
 
-import System
-from System.Drawing import Point, Size
 from System.Windows.Forms import (
-    Button,
-    CheckedListBox,
     DialogResult,
-    Form,
-    Label,
     MessageBox,
-    RadioButton,
     SaveFileDialog,
     FolderBrowserDialog,
 )
@@ -77,16 +71,43 @@ def collect_schedules(doc):
     return schedules
 
 
+def element_id_value(elem_id):
+    if elem_id is None:
+        return -1
+    if hasattr(elem_id, "IntegerValue"):
+        return elem_id.IntegerValue
+    if hasattr(elem_id, "Value"):
+        return elem_id.Value
+    try:
+        return int(elem_id)
+    except Exception:
+        return -1
+
+
 class ScheduleItem(object):
     def __init__(self, view):
         self.view = view
-        self.display_name = "{} [id:{}]".format(view.Name, view.Id.IntegerValue)
+        self.display_name = "{} [id:{}]".format(view.Name, element_id_value(view.Id))
 
 
 def add_lib_path():
     lib_path = os.path.join(os.path.dirname(__file__), "lib")
     if lib_path not in sys.path:
         sys.path.append(lib_path)
+
+
+def load_uiutils():
+    script_dir = os.path.dirname(__file__)
+    lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+    if lib_path not in sys.path:
+        sys.path.append(lib_path)
+    import WWP_uiUtils as ui
+    if not hasattr(ui, "uiUtils_select_items_with_mode"):
+        try:
+            ui = importlib.reload(ui)
+        except Exception:
+            pass
+    return ui
 
 
 def read_csv_rows(path):
@@ -138,8 +159,9 @@ def get_body_row_element_ids(view):
                 elem_id = section.GetCellElementId(row, col)
             except Exception:
                 elem_id = None
-            if elem_id and getattr(elem_id, "IntegerValue", -1) != -1:
-                elem_value = str(elem_id.IntegerValue)
+            elem_int = element_id_value(elem_id)
+            if elem_int != -1:
+                elem_value = str(elem_int)
                 break
         ids.append(elem_value)
     return ids
@@ -283,75 +305,10 @@ def export_to_csv(doc, schedules, folder):
     return True
 
 
-class ExportSchedulesForm(Form):
-    def __init__(self, items, prechecked_ids):
-        Form.__init__(self)
-        self.Text = "Export Schedules"
-        self.Size = Size(680, 620)
-        self.MinimumSize = Size(620, 520)
-        self.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
-        self.selected_items = []
-        self._items = list(items)
-        self.export_mode = None
-        self.result = DialogResult.Cancel
-
-        title = Label()
-        title.Text = "Select schedules to export:"
-        title.Location = Point(12, 12)
-        title.AutoSize = True
-        self.Controls.Add(title)
-
-        self.listbox = CheckedListBox()
-        self.listbox.CheckOnClick = True
-        self.listbox.Location = Point(12, 36)
-        self.listbox.Size = Size(640, 420)
-        for idx, item in enumerate(self._items):
-            self.listbox.Items.Add(item.display_name)
-            if item.view.Id.IntegerValue in prechecked_ids:
-                self.listbox.SetItemChecked(idx, True)
-        self.Controls.Add(self.listbox)
-
-        self.rb_excel = RadioButton()
-        self.rb_excel.Text = "Export to Excel"
-        self.rb_excel.Location = Point(12, 468)
-        self.rb_excel.Checked = True
-        self.Controls.Add(self.rb_excel)
-
-        self.rb_csv = RadioButton()
-        self.rb_csv.Text = "Export to CSV"
-        self.rb_csv.Location = Point(160, 468)
-        self.Controls.Add(self.rb_csv)
-
-        export_btn = Button()
-        export_btn.Text = "Export"
-        export_btn.Location = Point(474, 520)
-        export_btn.Click += self.on_export
-        self.Controls.Add(export_btn)
-
-        cancel_btn = Button()
-        cancel_btn.Text = "Cancel"
-        cancel_btn.Location = Point(566, 520)
-        cancel_btn.Click += self.on_cancel
-        self.Controls.Add(cancel_btn)
-
-    def on_export(self, sender, args):
-        checked = [self._items[i] for i in self.listbox.CheckedIndices]
-        if not checked:
-            MessageBox.Show("Select at least one schedule.", "Multiple Schedules Exporter")
-            return
-        self.selected_items = checked
-        self.export_mode = "excel" if self.rb_excel.Checked else "csv"
-        self.result = DialogResult.OK
-        self.Close()
-
-    def on_cancel(self, sender, args):
-        self.result = DialogResult.Cancel
-        self.Close()
-
-
 def main():
     doc = revit.doc
     config = script.get_config()
+    ui = load_uiutils()
 
     schedules = collect_schedules(doc)
     if not schedules:
@@ -364,15 +321,37 @@ def main():
         prechecked_ids = set(int(x) for x in last_ids)
     except Exception:
         prechecked_ids = set()
-    form = ExportSchedulesForm(items, prechecked_ids)
-    form.ShowDialog()
-    if form.result != DialogResult.OK:
+    prechecked_indices = [
+        idx for idx, item in enumerate(items)
+        if element_id_value(item.view.Id) in prechecked_ids
+    ]
+    if hasattr(ui, "uiUtils_select_items_with_mode"):
+        selected_indices, mode = ui.uiUtils_select_items_with_mode(
+            [item.display_name for item in items],
+            title="Export Schedules",
+            prompt="Select schedules to export:",
+            mode_labels=("Export to Excel", "Export to CSV"),
+            default_mode=0,
+            prechecked_indices=prechecked_indices,
+            width=680,
+            height=620,
+        )
+    else:
+        MessageBox.Show(
+            "UI helper uiUtils_select_items_with_mode is unavailable. Restart pyRevit or update WWP_uiUtils.",
+            "Multiple Schedules Exporter",
+        )
         return
-    selected_views = [item.view for item in form.selected_items]
-    config.last_schedule_ids = [v.Id.IntegerValue for v in selected_views]
+    if mode is None:
+        return
+    if not selected_indices:
+        MessageBox.Show("Select at least one schedule.", "Multiple Schedules Exporter")
+        return
+    selected_views = [items[i].view for i in selected_indices]
+    config.last_schedule_ids = [element_id_value(v.Id) for v in selected_views]
 
     default_dir = get_default_dir(doc)
-    if form.export_mode == "excel":
+    if mode == 0:
         last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
         init_dir = os.path.dirname(last_excel_path) if last_excel_path else default_dir
         dialog = SaveFileDialog()

@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installer License Agreement dialog UI errors (first active control and tab order)
 - MSI build step now patches dialog metadata after banner removal
 
+## [1.1.4] - 2026-01-16
+
+### Added
+- CPython versions of the Sheet Manager tools (delete sheets, delete sheet views, duplicate sheets)
+- Sheet Duplicator UI with duplicate options, prefix/suffix, and view duplication controls
+- Replace View Name CPython tool with find/replace/prefix/suffix inputs
+- Delete Unused Views CPython tool with confirmation prompt
+
+### Changed
+- Renumber Sheets now uses a single dialog for selection and starting number
+- Sheet Manager Dynamo graphs moved into archive folders
+
+### Fixed
+- UI helper now handles null/non-iterable inputs for sheet renumber selection
+
 ## [1.1.2] - 2026-01-09
 
 ### Changed
@@ -67,8 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revit Cleanup tools
 - Views Sheet Manager tools
 
-[1.1.2]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.2
+[1.1.4]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.4
 [1.1.3]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.3
+[1.1.2]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.2
 [1.1.1]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.1
 [1.1.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.0
 [1.0.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.0.0
