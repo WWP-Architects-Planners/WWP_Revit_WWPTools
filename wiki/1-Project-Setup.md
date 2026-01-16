@@ -1,133 +1,231 @@
-# 1. Project Setup
+﻿---
+description: >-
+  This tab of WWPTools is mainly focused on setting up the project and get all
+  the required parameters loaded to your project.
+icon: gear
+---
 
-This page documents setup steps and tools found under the WWPTools add-on tab.
+# 1 Project Setup
 
-## Prerequisites and setup
+<figure><img src="../../../../.gitbook/assets/image (267).png" alt=""><figcaption></figcaption></figure>
 
-### Install pyRevit (required)
-Location: Revit installer
-Screenshot: ![Install pyRevit](assets/WWP-tools-page-03.png)
-Purpose: Required host for WWPTools and WWPTool extensions.
-How to use:
-1. Run the installer from `N:\Library\Design Software\Autodesk\Revit\! Add-Ins\pyRevit\pyRevit_4.8.12.22247_signed.exe`.
-2. Accept the agreement and continue through all prompts.
-3. Open Revit and click "Always Load" on the security prompt.
-
-### Install WWPTools MSI
-Location: GitHub Releases
-Screenshot: (Add later)
-Purpose: Install the WWPTools add-in via the official MSI.
-How to use:
-1. Download the latest MSI from `https://github.com/WWP-Architects-Planners/WWPTools/releases/latest`.
-   - Current release: `WWPTools-v1.1.4.msi`
-2. Run the MSI and follow the prompts.
-3. Open Revit and verify the WWPTools tab is visible.
-
-### Register WWPTool extensions in pyRevit (legacy)
-Location: Revit > pyRevit tab > pyRevit panel > Settings
-Screenshot: ![pyRevit Settings](assets/WWP-tools-page-04.png)
-Purpose: Add the WWPTool extension folder so the tab appears in Revit.
-How to use:
-1. In pyRevit Settings, under Custom Extension Directories, click "Add folder".
-2. Add `N:\Library\Design Software\Autodesk\Revit\Dynamo\WWP Tool`.
-3. Click "Save Settings and Reload".
-
-### Dynamo first-time setup (legacy)
-Location: Revit > Manage tab > Dynamo
-Screenshot: ![Dynamo first-time setup](assets/WWP-tools-page-06.png)
-Purpose: Accept the Dynamo license and install core components.
-How to use:
-1. Launch Dynamo from Revit and accept the terms.
-2. When prompted, choose "Install on C drive".
-
-### Install WWPTool Dynamo packages (legacy)
-Location: WWPTool tab > Install Packages
-Screenshot: ![WWPTool Dynamo packages](assets/WWP-tools-page-06.png)
-Purpose: Install required Dynamo packages for all tools.
-How to use:
-1. In WWPTool, use Install Packages and select "Install on C drive".
-2. In Dynamo, go to Preferences and open the Package Manager settings.
-3. Add package path `C:\dynpackages\All Version`.
-4. Close Dynamo to apply settings.
-
-### Optional: enable EF_Tools extension (legacy)
-Location: Revit > pyRevit tab > Extensions
-Screenshot: ![EF_Tools extension](assets/WWP-tools-page-07.png)
-Purpose: Enable EF_Tools add-on features.
-How to use:
-1. Select "EF-Tools" and click "Enable Extension".
-2. If prompted, install to the C drive.
-3. In Dynamo Preferences, set Default Python Engine to IronPython2.
-4. Verify packages are installed:
-   - Archi-lab.net
-   - bimorphNodes
-   - Clockwork for Dynamo 2.x
-   - Crumple
-   - Data-Shapes
-   - DynamoIronPython 2.7
-   - Elk
-   - Genius Loci
-   - Rhythm
-   - spring nodes
-   - WWP Packages
+***
 
 ## Tool reference
 
+<figure><img src="../../../../.gitbook/assets/image (268).png" alt=""><figcaption></figcaption></figure>
+
 ### Line Type Tool
-Location: WWPTools > 1. Project Setup > Line Type Tool
-Screenshot: ![Line Type Tool](assets/WWP-tools-page-38.png)
+
+Location: `WWPTools > 1. Project Setup > Line Type Tool`\
 Purpose: Import and standardize line types in the project.
-Source file: `N:\Library\Design Software\Autodesk\Revit\Standards\Line Type\Linetypes.xlsx`
-How to use:
-1. Run the tool and follow prompts.
-2. Review the results and undo if needed.
+
+Use this to bulk-load office-standard line types into an existing model.\
+The tool audits line types, imports missing types, and replaces mismatched names.
+
+For one-off line types, use Revit:
+
+`Manage > Additional Settings > Line Styles`
+
+<figure><img src="../../../../.gitbook/assets/image (270).png" alt=""><figcaption></figcaption></figure>
+
+<figure><img src="../../../../.gitbook/assets/image (273).png" alt=""><figcaption></figcaption></figure>
+
+Source file: `N:\Library\Design Software\Autodesk\Revit\Standards\Line Type\Linetypes.xlsx`\
+(Planned move to GitHub in the future.)
+
+#### How to use
+
+{% stepper %}
+{% step %}
+### Run
+
+Run the tool and follow the prompts.
+{% endstep %}
+
+{% step %}
+### Review
+
+Review the results.\
+Undo if needed.
+{% endstep %}
+{% endstepper %}
+
+{% hint style="info" %}
+If you are using the WWP Revit Template V3+, you usually do not need this tool.\
+Line styles should already be preloaded.
+{% endhint %}
+
+***
 
 ### Add Project Parameter (Pulldown)
-Purpose: Import standard shared parameters or build a template.
 
-#### Create Template
-Location: WWPTools > 1. Project Setup > Add Project Parameter > Create Template
-Screenshot: ![Import Project Parameter](assets/WWP-tools-page-05.png)
-Purpose: Create an Excel template with shared parameters listed in the Variables sheet.
-How to use:
-1. Have the target sheet(s) available or selected as prompted.
-2. Run the tool and follow prompts.
-3. Review the results and undo if needed.
+Purpose: Import standard shared parameters, or generate an import template.
+
+<figure><img src="../../../../.gitbook/assets/image (269).png" alt=""><figcaption></figcaption></figure>
 
 #### Import from Excel
-Location: WWPTools > 1. Project Setup > Add Project Parameter > Import from Excel
-Screenshot: ![Import Project Parameter](assets/WWP-tools-page-05.png)
+
+Location: `WWPTools > 1. Project Setup > Add Project Parameter > Import from Excel`\
 Purpose: Import shared parameters from a workbook.
+
 Source file: `N:\Library\Design Software\Autodesk\Revit\Shared Parameters\Shared Parameters Import.xlsx`
-How to use:
-1. Prepare the Excel file you want to import.
-2. Run the tool and follow prompts.
-3. Review the results and undo if needed.
+
+Use this tool to bulk-load office-standard shared parameters into an existing project.\
+It audits project parameters, then imports any missing ones.
+
+For one-off parameters, use Revit:
+
+`Manage > Project Parameters`
+
+<figure><img src="../../../../.gitbook/assets/image (274).png" alt=""><figcaption></figcaption></figure>
+
+{% hint style="info" %}
+If a project needs new standards (consultant BEP requirements, shared standards, etc.), contact the BIM team.
+{% endhint %}
+
+**How to use**
+
+{% stepper %}
+{% step %}
+### Prepare
+
+Have the workbook available.\
+Select the sheet(s) when prompted.
+{% endstep %}
+
+{% step %}
+### Run
+
+Run the tool and follow the prompts.
+{% endstep %}
+
+{% step %}
+### Review
+
+Review the results.\
+Undo if needed.
+{% endstep %}
+{% endstepper %}
+
+<figure><img src="../../../../.gitbook/assets/image (275).png" alt=""><figcaption></figcaption></figure>
+
+#### Create Template
+
+Location: `WWPTools > 1. Project Setup > Add Project Parameter > Create Template`\
+Purpose: Create an Excel template with shared parameters listed in the `Variables` sheet.
+
+Use this when you do not have an import workbook.\
+It creates a template file for bulk parameter import.
+
+**How to use**
+
+{% stepper %}
+{% step %}
+### Run
+
+Run the tool and follow the prompts.
+{% endstep %}
+
+{% step %}
+### Fill
+
+Fill in the template workbook as needed.
+{% endstep %}
+{% endstepper %}
+
+***
 
 ### Levels Setup (Pulldown)
+
+<figure><img src="../../../../.gitbook/assets/image (277).png" alt="" width="355"><figcaption></figcaption></figure>
+
 Purpose: Manage levels and generate views.
 
 #### Levels Setup
-Location: WWPTools > 1. Project Setup > Levels Setup > Levels Setup
-Screenshot: ![Levels Setup](assets/WWP-tools-page-09.png)
+
+Location: `WWPTools > 1. Project Setup > Levels Setup > Levels Setup`\
+![](<../../../../.gitbook/assets/image (276).png>)\
 Purpose: Add or remove levels based on a target floor count.
-How to use:
-1. Enter the desired number of floors.
-2. Confirm the list of levels being added or deleted.
+
+**How to use**
+
+{% stepper %}
+{% step %}
+### Enter floors
+
+Enter the desired number of floors.
+{% endstep %}
+
+{% step %}
+### Confirm
+
+Confirm the list of levels being added or deleted.
+{% endstep %}
+{% endstepper %}
 
 #### Views Creator
-Location: WWPTools > 1. Project Setup > Levels Setup > Views Creator
-Screenshot: ![Views Creator](assets/WWP-tools-page-08.png)
+
+<figure><img src="../../../../.gitbook/assets/image (278).png" alt="" width="355"><figcaption></figcaption></figure>
+
+Location: `WWPTools > 1. Project Setup > Levels Setup > Views Creator`\
+Screenshot:\
 Purpose: Create Area Plans, Floor Plans, and RCPs for selected levels.
-How to use:
-1. Choose categories and view types (Area Plan, Floor Plan, or RCP).
-2. Select the floors to create.
-3. Click "Set Value" and wait for results.
+
+**How to use**
+
+{% stepper %}
+{% step %}
+### Choose types
+
+Choose categories and view types (Area Plan, Floor Plan, or RCP).
+
+<figure><img src="../../../../.gitbook/assets/image (280).png" alt=""><figcaption></figcaption></figure>
+
+<figure><img src="../../../../.gitbook/assets/image (281).png" alt=""><figcaption></figcaption></figure>
+{% endstep %}
+
+{% step %}
+### Select levels
+
+Select the floors to create.
+
+<figure><img src="../../../../.gitbook/assets/image (282).png" alt=""><figcaption></figcaption></figure>
+{% endstep %}
+
+{% step %}
+### Create
+
+Click "Set Value" and wait for results.
+
+<figure><img src="../../../../.gitbook/assets/image (286).png" alt=""><figcaption></figcaption></figure>
+{% endstep %}
+{% endstepper %}
+
+***
 
 ### Project Upgrader
-Location: WWPTools > 1. Project Setup > Project Upgrader
-Screenshot: ![Project Upgrader](assets/WWP-tools-page-09.png)
+
+<figure><img src="../../../../.gitbook/assets/image (283).png" alt=""><figcaption></figcaption></figure>
+
+Location: `WWPTools > 1. Project Setup > Project Upgrader`\
 Purpose: Batch-upgrade families or models to the current Revit version.
-How to use:
-1. Select the source folder and click Select Folder.
-2. Wait for the tool to process and rename upgraded files.
+
+#### How to use
+
+{% stepper %}
+{% step %}
+### Select source
+
+Select the source folder and click Select Folder.
+{% endstep %}
+
+{% step %}
+### Wait
+
+Wait for the tool to process and rename upgraded files.
+{% endstep %}
+{% endstepper %}
+
+<figure><img src="../../../../.gitbook/assets/image (285).png" alt=""><figcaption></figcaption></figure>
+

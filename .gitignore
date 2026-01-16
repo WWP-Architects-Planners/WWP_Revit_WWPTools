@@ -2,4 +2,8 @@
 release_assets/
 installer/*.msi
 installer/*.wixpdb
-!installer/WWPTools-v1.1.2.msi
+**/archive/
+**/Archive/
+**/ARCHIVE/
+**/archived/
+**/ARCHIVED/
