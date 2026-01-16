@@ -30,39 +30,82 @@ def _unique_scheme_name(existing_names, desired_name):
 	return name
 
 
-def _try_set_element_name(element, new_name):
-	# Many Revit elements allow setting .Name directly
+def _call_if_exists(obj, method_name, *args):
+	method = getattr(obj, method_name, None)
+	if callable(method):
+		return method(*args)
+	return None
+
+
+def _scheme_display_name(doc, scheme):
 	try:
-		element.Name = new_name
-		return True
+		cat = doc.GetElement(scheme.CategoryId)
+		cat_name = getattr(cat, "Name", "") if cat else ""
+	except Exception:
+		cat_name = ""
+	scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
+	if cat_name:
+		return "{} - {}".format(cat_name, scheme_name)
+	return scheme_name
+
+
+class _SchemeOption(object):
+	def __init__(self, name, scheme):
+		self.name = name
+		self.scheme = scheme
+
+
+def _copy_scheme_data(source, target):
+	try:
+		if hasattr(source, "CategoryId") and hasattr(target, "CategoryId"):
+			if source.CategoryId != target.CategoryId:
+				return False, "Source and target schemes use different categories."
 	except Exception:
 		pass
 
-	# Fallback: try common name parameters
-	for bip in (
-		getattr(DB.BuiltInParameter, "SYMBOL_NAME_PARAM", None),
-		getattr(DB.BuiltInParameter, "ALL_MODEL_TYPE_NAME", None),
-		getattr(DB.BuiltInParameter, "DATUM_TEXT", None),
-	):
-		if bip is None:
-			continue
+	for attr in ("Title", "IsByRange", "IsByValue", "IsByPercentage"):
+		if hasattr(source, attr) and hasattr(target, attr):
+			try:
+				setattr(target, attr, getattr(source, attr))
+			except Exception:
+				pass
+
+	try:
+		source_entries = list(source.GetEntries())
+	except Exception:
+		return False, "Unable to read entries from the source scheme."
+
+	if _call_if_exists(target, "ClearEntries") is None:
 		try:
-			p = element.get_Parameter(bip)
-			if p and (not p.IsReadOnly):
-				p.Set(new_name)
-				return True
+			for entry in list(target.GetEntries()):
+				_call_if_exists(target, "RemoveEntry", entry)
 		except Exception:
 			pass
 
 	try:
-		p = element.LookupParameter("Name")
-		if p and (not p.IsReadOnly):
-			p.Set(new_name)
-			return True
+		if List is not None:
+			entry_list = List[DB.ColorFillSchemeEntry](source_entries)
+		else:
+			entry_list = list(source_entries)
+		if _call_if_exists(target, "SetEntries", entry_list) is not None:
+			return True, None
 	except Exception:
 		pass
 
-	return False
+	for entry in source_entries:
+		try:
+			new_entry = entry
+			clone = getattr(entry, "Clone", None)
+			if callable(clone):
+				try:
+					new_entry = clone()
+				except Exception:
+					new_entry = entry
+			_call_if_exists(target, "AddEntry", new_entry)
+		except Exception:
+			pass
+
+	return True, None
 
 doc = revit.doc
 
@@ -71,51 +114,51 @@ if not schemes:
 	forms.alert("No Color Fill Schemes found in this model.", title="Copy Color Scheme")
 	raise SystemExit
 
-source = forms.SelectFromList.show(
-	schemes,
-	name_attr="Name",
+source_options = [_SchemeOption(_scheme_display_name(doc, s), s) for s in schemes]
+source_option = forms.SelectFromList.show(
+	source_options,
+	name_attr="name",
 	multiselect=False,
 	title="Source Color Scheme",
 	button_name="Select Source",
 )
-if not source:
+if not source_option:
+	raise SystemExit
+source = source_option.scheme
+
+targets = [scheme for scheme in schemes if scheme.Id != source.Id]
+if not targets:
+	forms.alert("No other Color Fill Scheme found to copy into.", title="Copy Color Scheme")
 	raise SystemExit
 
-existing_names = set((getattr(s, "Name", "") or "").lower() for s in schemes)
-default_name = "{} (Copy)".format(getattr(source, "Name", "Color Scheme"))
-desired_name = forms.ask_for_string(
-	default=default_name,
-	prompt="New Color Scheme name",
-	title="Copy Color Scheme",
+target_options = [_SchemeOption(_scheme_display_name(doc, s), s) for s in targets]
+target_option = forms.SelectFromList.show(
+	target_options,
+	name_attr="name",
+	multiselect=False,
+	title="Target Color Scheme",
+	button_name="Select Target",
 )
-if desired_name is None:
+if not target_option:
 	raise SystemExit
-
-new_name = _unique_scheme_name(existing_names, desired_name)
-
-new_scheme = None
-error = None
+target = target_option.scheme
 
 with revit.Transaction("Copy Color Scheme"):
 	try:
-		# Most robust: duplicate the element inside the same document
-		new_ids = DB.ElementTransformUtils.CopyElement(doc, source.Id, DB.XYZ(0, 0, 0))
-		new_id = list(new_ids)[0]
-		new_scheme = doc.GetElement(new_id)
-		# Ensure name is set/unique
-		if not _try_set_element_name(new_scheme, new_name):
-			raise Exception("Created scheme but could not rename it")
+		ok, error = _copy_scheme_data(source, target)
+		if not ok:
+			raise Exception(error or "Copy failed")
 	except Exception as ex:
 		error = str(ex)
+		target = None
 
-if not new_scheme:
-	forms.alert("Failed to create new Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
+if not target:
+	forms.alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
 	raise SystemExit
 
 try:
-	# Select the new scheme for convenience
-	revit.get_selection().set_to([new_scheme.Id])
+	revit.get_selection().set_to([target.Id])
 except Exception:
 	pass
 
-forms.alert("Created new scheme: {}".format(new_name), title="Copy Color Scheme")
+forms.alert("Updated scheme: {}".format(getattr(target, "Name", "Color Scheme")), title="Copy Color Scheme")

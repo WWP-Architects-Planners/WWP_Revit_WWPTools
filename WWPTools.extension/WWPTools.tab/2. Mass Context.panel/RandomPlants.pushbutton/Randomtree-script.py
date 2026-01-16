@@ -152,10 +152,10 @@ class RandomTreesForm(Form):
         self._percent_label.Width = 140
 
         self._percent_input = NumericUpDown()
-        self._percent_input.Minimum = PERCENT_MIN
-        self._percent_input.Maximum = PERCENT_MAX
-        self._percent_input.Increment = PERCENT_STEP
-        self._percent_input.Value = DEFAULT_PERCENT
+        self._percent_input.Minimum = System.Decimal(PERCENT_MIN)
+        self._percent_input.Maximum = System.Decimal(PERCENT_MAX)
+        self._percent_input.Increment = System.Decimal(PERCENT_STEP)
+        self._percent_input.Value = System.Decimal(DEFAULT_PERCENT)
         self._percent_input.Location = Point(165, 78)
         self._percent_input.Width = 120
 
@@ -189,7 +189,7 @@ class RandomTreesForm(Form):
 
     @property
     def percent(self):
-        return float(self._percent_input.Value)
+        return float(System.Decimal.ToDouble(self._percent_input.Value))
 
 
 def _ask_for_settings():
