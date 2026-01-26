@@ -1,186 +1,150 @@
 # import libraries
 import clr
 import os
+import ctypes
+import shutil
+from System import String, Int32
+from System.Collections.Generic import List
 
-clr.AddReference("System.Windows.Forms")
-clr.AddReference("System.Drawing")
+_DLL_LOADED = False
+_DIALOGS = None
+_LAST_ERROR = None
+_LAST_PATH = None
 
-from System.Drawing import Bitmap, Icon, Point, Size
-from System.Windows.Forms import (
-	AnchorStyles,
-	Button,
-	CheckedListBox,
-	CheckBox,
-	DialogResult,
-	Form,
-	FormStartPosition,
-	Label,
-	ListBox,
-	PictureBox,
-	PictureBoxSizeMode,
-	RadioButton,
-	TextBox,
-	ComboBox,
-	SelectionMode,
-)
 
-_LOGO_ICON = None
-_LOGO_BITMAP = None
+def _revit_version_number():
+	try:
+		return int(str(__revit__.Application.VersionNumber))
+	except Exception:
+		return None
 
-def _logo_path():
+
+def _dll_path():
 	cur_dir = os.path.dirname(os.path.abspath(__file__))
-	return os.path.abspath(os.path.join(cur_dir, "WWPtools-logo.png"))
+	version = _revit_version_number()
+	if version and version >= 2025:
+		return os.path.join(cur_dir, "WWPTools.WpfUI.net8.0-windows.dll")
+	return os.path.join(cur_dir, "WWPTools.WpfUI.net48.dll")
 
-def _load_logo_icon():
-	global _LOGO_ICON
-	global _LOGO_BITMAP
-	if _LOGO_ICON is not None:
-		return _LOGO_ICON
-	logo_path = _logo_path()
-	if not os.path.isfile(logo_path):
-		return None
+
+def _is_remote_path(path):
+	if not path:
+		return False
+	if path.startswith("\\\\"):
+		return True
+	drive, _ = os.path.splitdrive(path)
+	if not drive:
+		return False
 	try:
-		_LOGO_BITMAP = Bitmap(logo_path)
-		_LOGO_ICON = Icon.FromHandle(_LOGO_BITMAP.GetHicon())
-		return _LOGO_ICON
+		drive_root = drive + "\\"
+		drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive_root)
+		return drive_type == 4  # DRIVE_REMOTE
 	except Exception:
-		return None
+		return False
 
-def _load_logo_bitmap():
-	global _LOGO_BITMAP
-	if _LOGO_BITMAP is not None:
-		return _LOGO_BITMAP
-	logo_path = _logo_path()
-	if not os.path.isfile(logo_path):
-		return None
+
+def _copy_local(dll_path):
+	temp_root = os.environ.get("TEMP") or os.environ.get("TMP") or os.getcwd()
+	temp_dir = os.path.join(temp_root, "WWPTools.WpfUI")
 	try:
-		_LOGO_BITMAP = Bitmap(logo_path)
-		return _LOGO_BITMAP
+		if not os.path.isdir(temp_dir):
+			os.makedirs(temp_dir)
 	except Exception:
+		return dll_path
+
+	local_dll = os.path.join(temp_dir, os.path.basename(dll_path))
+	try:
+		if not os.path.isfile(local_dll) or os.path.getmtime(local_dll) < os.path.getmtime(dll_path):
+			shutil.copy2(dll_path, local_dll)
+	except Exception:
+		return dll_path
+
+	logo_src = os.path.join(os.path.dirname(dll_path), "WWPtools-logo.png")
+	logo_dst = os.path.join(temp_dir, "WWPtools-logo.png")
+	try:
+		if os.path.isfile(logo_src):
+			if not os.path.isfile(logo_dst) or os.path.getmtime(logo_dst) < os.path.getmtime(logo_src):
+				shutil.copy2(logo_src, logo_dst)
+	except Exception:
+		pass
+
+	return local_dll
+
+
+def _load_wpf():
+	global _DLL_LOADED
+	global _DIALOGS
+	global _LAST_ERROR
+	global _LAST_PATH
+	if _DLL_LOADED:
+		return _DIALOGS is not None
+	_DLL_LOADED = True
+	dll_path = _dll_path()
+	if not os.path.isfile(dll_path):
+		_LAST_ERROR = "Missing WPF DLL at " + dll_path
+		_LAST_PATH = dll_path
+		return False
+	try:
+		load_path = _copy_local(dll_path) if _is_remote_path(dll_path) else dll_path
+		_LAST_PATH = load_path
+		if hasattr(clr, "AddReferenceToFileAndPath"):
+			clr.AddReferenceToFileAndPath(load_path)
+		else:
+			clr.AddReference(load_path)
+		from WWPTools.WpfUI import DialogService
+		_DIALOGS = DialogService
+		return True
+	except Exception as ex:
+		_LAST_ERROR = str(ex)
+		_DIALOGS = None
+		return False
+
+
+def _ensure_wpf():
+	if not _load_wpf():
+		message = "WPF UI library not available. Build WWPTools.WpfUI and ensure the DLL is in WWPTools.extension\\lib."
+		if _LAST_PATH:
+			message += "\nTried to load: " + _LAST_PATH
+		if _LAST_ERROR:
+			message += "\nLoad error: " + _LAST_ERROR
+		raise Exception(message)
+
+def _to_net_string_list(items):
+	if items is None:
 		return None
+	net_list = List[String]()
+	for item in items:
+		net_list.Add("" if item is None else str(item))
+	return net_list
 
-def _apply_logo(form, show_inline=True):
-	icon = _load_logo_icon()
-	if icon:
-		form.Icon = icon
-	if show_inline:
-		bitmap = _load_logo_bitmap()
-		if bitmap:
-			pic = PictureBox()
-			pic.Image = bitmap
-			pic.SizeMode = PictureBoxSizeMode.Zoom
-			pic.Size = Size(40, 40)
-			pic.Location = Point(form.Width - 74, 8)
-			pic.Anchor = AnchorStyles.Top | AnchorStyles.Right
-			form.Controls.Add(pic)
 
-def _message_form(message, title, show_cancel=False, width=520, height=220):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form)
+def _to_net_int_list(items):
+	if items is None:
+		return None
+	net_list = List[Int32]()
+	for item in items:
+		try:
+			net_list.Add(int(item))
+		except Exception:
+			continue
+	return net_list
 
-	label = Label()
-	label.Text = message
-	label.Location = Point(12, 12)
-	label.Size = Size(width - 40, height - 90)
-	label.AutoSize = False
-	label.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-	form.Controls.Add(label)
 
-	ok_btn = Button()
-	ok_btn.Text = "OK"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	if show_cancel:
-		cancel_btn = Button()
-		cancel_btn.Text = "Cancel"
-		cancel_btn.DialogResult = DialogResult.Cancel
-		cancel_btn.Location = Point(width - 112, height - 72)
-		form.Controls.Add(cancel_btn)
-		form.CancelButton = cancel_btn
-
-	form.AcceptButton = ok_btn
-	return form
-
-# show a simple alert dialog
 def uiUtils_alert(message, title="Message"):
-	form = _message_form(message, title, show_cancel=False)
-	form.ShowDialog()
+	_ensure_wpf()
+	_DIALOGS.Alert(message, title)
 
-# show a confirm dialog
+
 def uiUtils_confirm(message, title="Confirm"):
-	form = _message_form(message, title, show_cancel=True)
-	return form.ShowDialog() == DialogResult.OK
+	_ensure_wpf()
+	return bool(_DIALOGS.Confirm(message, title))
 
-# show a list picker and return selected indices
+
 def uiUtils_select_indices(items, title="Select Items", prompt="Select items:", multiselect=True, width=980, height=540):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	info = Label()
-	info.Text = prompt
-	info.Location = Point(12, 12)
-	info.AutoSize = True
-	form.Controls.Add(info)
-
-	listbox = None
-	checklist = None
-	if multiselect:
-		checklist = CheckedListBox()
-		checklist.Location = Point(12, 36)
-		checklist.Size = Size(width - 40, height - 120)
-		checklist.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-		checklist.CheckOnClick = True
-		for item in items:
-			checklist.Items.Add(item)
-		form.Controls.Add(checklist)
-	else:
-		listbox = ListBox()
-		listbox.Location = Point(12, 36)
-		listbox.Size = Size(width - 40, height - 120)
-		listbox.SelectionMode = SelectionMode.One
-		listbox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-		for item in items:
-			listbox.Items.Add(item)
-		form.Controls.Add(listbox)
-
-	ok_btn = Button()
-	ok_btn.Text = "OK"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 72)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
-		return []
-
-	selected = []
-	if multiselect and checklist:
-		for index in checklist.CheckedIndices:
-			selected.append(index)
-	elif listbox:
-		for index in listbox.SelectedIndices:
-			selected.append(index)
-	return selected
+	_ensure_wpf()
+	items_list = _to_net_string_list(items) or List[String]()
+	selected = _DIALOGS.SelectIndices(items_list, title, prompt, multiselect, int(width), int(height))
+	return list(selected) if selected is not None else []
 
 
 def uiUtils_select_items_with_mode(
@@ -193,77 +157,44 @@ def uiUtils_select_items_with_mode(
 	width=720,
 	height=620,
 ):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	info = Label()
-	info.Text = prompt
-	info.Location = Point(12, 12)
-	info.AutoSize = True
-	form.Controls.Add(info)
-
-	checklist = CheckedListBox()
-	checklist.Location = Point(12, 36)
-	checklist.Size = Size(width - 40, height - 180)
-	checklist.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-	checklist.CheckOnClick = True
-	for item in items:
-		checklist.Items.Add(item)
-	if prechecked_indices:
-		for idx in prechecked_indices:
-			if 0 <= idx < checklist.Items.Count:
-				checklist.SetItemChecked(idx, True)
-	form.Controls.Add(checklist)
-
-	rb_left = RadioButton()
-	rb_left.Text = mode_labels[0] if mode_labels else "Option A"
-	rb_left.Location = Point(12, height - 132)
-	rb_left.Checked = default_mode == 0
-	form.Controls.Add(rb_left)
-
-	rb_right = RadioButton()
-	rb_right.Text = mode_labels[1] if len(mode_labels or []) > 1 else "Option B"
-	rb_right.Location = Point(160, height - 132)
-	rb_right.Checked = default_mode == 1
-	form.Controls.Add(rb_right)
-
-	ok_btn = Button()
-	ok_btn.Text = "Export"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 72)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
+	_ensure_wpf()
+	items_list = _to_net_string_list(items) or List[String]()
+	labels = list(mode_labels) if mode_labels is not None else []
+	label_a = labels[0] if len(labels) > 0 else "Option A"
+	label_b = labels[1] if len(labels) > 1 else "Option B"
+	prechecked = _to_net_int_list(prechecked_indices) or List[Int32]()
+	result = _DIALOGS.SelectItemsWithMode(items_list, title, prompt, label_a, label_b, int(default_mode), prechecked, int(width), int(height))
+	if result is None:
 		return [], None
-
-	selected = []
-	for index in checklist.CheckedIndices:
-		selected.append(index)
-	mode = 0 if rb_left.Checked else 1
-	return selected, mode
+	return list(result.SelectedIndices), int(result.Mode)
 
 
-def _safe_iter(items):
-	if items is None:
-		return []
-	try:
-		return list(items)
-	except TypeError:
-		return []
+def uiUtils_project_upgrader_options(
+	title="Project Upgrader",
+	description="Select folder containing Revit files",
+	include_subfolders_label="Include subfolders",
+	cancel_text="Cancel",
+	width=520,
+	height=260,
+	initial_folder="",
+):
+	_ensure_wpf()
+	result = _DIALOGS.ProjectUpgraderOptions(
+		title,
+		description,
+		include_subfolders_label,
+		"OK",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+		initial_folder or "",
+	)
+	if result is None:
+		return None
+	return {
+		"folder": result.Folder or "",
+		"include_subfolders": bool(result.IncludeSubfolders),
+	}
 
 
 def uiUtils_select_sheet_renumber_inputs(
@@ -277,95 +208,27 @@ def uiUtils_select_sheet_renumber_inputs(
 	width=520,
 	height=320,
 ):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	current_y = 20
-
-	category_items = _safe_iter(categories)
-	printset_items = _safe_iter(print_sets)
-
-	category_combo = None
-	if categories is not None:
-		label_category = Label()
-		label_category.Text = category_label
-		label_category.Location = Point(12, current_y)
-		label_category.AutoSize = True
-		form.Controls.Add(label_category)
-
-		category_combo = ComboBox()
-		category_combo.Location = Point(12, current_y + 24)
-		category_combo.Size = Size(width - 40, 24)
-		for item in category_items:
-			category_combo.Items.Add(item)
-		if category_combo.Items.Count > 0:
-			category_combo.SelectedIndex = 0
-		form.Controls.Add(category_combo)
-		current_y += 64
-
-	printset_combo = None
-	if print_sets is not None:
-		label_printset = Label()
-		label_printset.Text = printset_label
-		label_printset.Location = Point(12, current_y)
-		label_printset.AutoSize = True
-		form.Controls.Add(label_printset)
-
-		printset_combo = ComboBox()
-		printset_combo.Location = Point(12, current_y + 24)
-		printset_combo.Size = Size(width - 40, 24)
-		for item in printset_items:
-			printset_combo.Items.Add(item)
-		if printset_combo.Items.Count > 0:
-			printset_combo.SelectedIndex = 0
-		form.Controls.Add(printset_combo)
-		current_y += 64
-
-	label_start = Label()
-	label_start.Text = starting_label
-	label_start.Location = Point(12, current_y)
-	label_start.AutoSize = True
-	form.Controls.Add(label_start)
-
-	start_input = TextBox()
-	start_input.Location = Point(12, current_y + 24)
-	start_input.Size = Size(width - 40, 24)
-	form.Controls.Add(start_input)
-
-	ok_btn = Button()
-	ok_btn.Text = "Set Values"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = cancel_text or "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 72)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
+	_ensure_wpf()
+	categories_list = _to_net_string_list(categories)
+	print_sets_list = _to_net_string_list(print_sets)
+	result = _DIALOGS.SelectSheetRenumberInputs(
+		categories_list,
+		print_sets_list,
+		title,
+		category_label,
+		printset_label,
+		starting_label,
+		"Set Values",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
 		return None
-
-	category_value = ""
-	if category_combo is not None:
-		category_value = category_combo.SelectedItem if category_combo.SelectedItem else ""
-	printset_value = ""
-	if printset_combo is not None:
-		printset_value = printset_combo.SelectedItem if printset_combo.SelectedItem else ""
-	starting_value = start_input.Text or ""
 	return {
-		"category": category_value,
-		"printset": printset_value,
-		"starting_number": starting_value,
+		"category": result.Category or "",
+		"printset": result.PrintSet or "",
+		"starting_number": result.StartingNumber or "",
 	}
 
 
@@ -378,65 +241,23 @@ def uiUtils_select_sheet_renumber_inputs_with_list(
 	width=980,
 	height=620,
 ):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	info = Label()
-	info.Text = prompt
-	info.Location = Point(12, 12)
-	info.AutoSize = True
-	form.Controls.Add(info)
-
-	checklist = CheckedListBox()
-	checklist.Location = Point(12, 36)
-	checklist.Size = Size(width - 40, height - 190)
-	checklist.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-	checklist.CheckOnClick = True
-	for item in _safe_iter(items):
-		checklist.Items.Add(item)
-	form.Controls.Add(checklist)
-
-	label_start = Label()
-	label_start.Text = starting_label
-	label_start.Location = Point(12, height - 136)
-	label_start.AutoSize = True
-	form.Controls.Add(label_start)
-
-	start_input = TextBox()
-	start_input.Location = Point(12, height - 112)
-	start_input.Size = Size(width - 40, 24)
-	form.Controls.Add(start_input)
-
-	ok_btn = Button()
-	ok_btn.Text = "Set Values"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = cancel_text or "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 72)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
+	_ensure_wpf()
+	items_list = _to_net_string_list(items) or List[String]()
+	result = _DIALOGS.SelectSheetRenumberInputsWithList(
+		items_list,
+		title,
+		prompt,
+		starting_label,
+		"Set Values",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
 		return None
-
-	selected = []
-	for index in checklist.CheckedIndices:
-		selected.append(index)
-
 	return {
-		"selected_indices": selected,
-		"starting_number": start_input.Text or "",
+		"selected_indices": list(result.SelectedIndices),
+		"starting_number": result.StartingNumber or "",
 	}
 
 
@@ -450,86 +271,25 @@ def uiUtils_viewname_replace_inputs(
 	width=520,
 	height=320,
 ):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	current_y = 20
-
-	label_find = Label()
-	label_find.Text = find_label
-	label_find.Location = Point(12, current_y)
-	label_find.AutoSize = True
-	form.Controls.Add(label_find)
-
-	find_input = TextBox()
-	find_input.Location = Point(12, current_y + 24)
-	find_input.Size = Size(width - 40, 24)
-	form.Controls.Add(find_input)
-	current_y += 56
-
-	label_replace = Label()
-	label_replace.Text = replace_label
-	label_replace.Location = Point(12, current_y)
-	label_replace.AutoSize = True
-	form.Controls.Add(label_replace)
-
-	replace_input = TextBox()
-	replace_input.Location = Point(12, current_y + 24)
-	replace_input.Size = Size(width - 40, 24)
-	form.Controls.Add(replace_input)
-	current_y += 56
-
-	label_prefix = Label()
-	label_prefix.Text = prefix_label
-	label_prefix.Location = Point(12, current_y)
-	label_prefix.AutoSize = True
-	form.Controls.Add(label_prefix)
-
-	prefix_input = TextBox()
-	prefix_input.Location = Point(12, current_y + 24)
-	prefix_input.Size = Size(width - 40, 24)
-	form.Controls.Add(prefix_input)
-	current_y += 56
-
-	label_suffix = Label()
-	label_suffix.Text = suffix_label
-	label_suffix.Location = Point(12, current_y)
-	label_suffix.AutoSize = True
-	form.Controls.Add(label_suffix)
-
-	suffix_input = TextBox()
-	suffix_input.Location = Point(12, current_y + 24)
-	suffix_input.Size = Size(width - 40, 24)
-	form.Controls.Add(suffix_input)
-
-	ok_btn = Button()
-	ok_btn.Text = "Apply"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 72)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = cancel_text or "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 72)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
+	_ensure_wpf()
+	result = _DIALOGS.ViewnameReplaceInputs(
+		title,
+		find_label,
+		replace_label,
+		prefix_label,
+		suffix_label,
+		"Apply",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
 		return None
-
 	return {
-		"find": find_input.Text or "",
-		"replace": replace_input.Text or "",
-		"prefix": prefix_input.Text or "",
-		"suffix": suffix_input.Text or "",
+		"find": result.Find or "",
+		"replace": result.Replace or "",
+		"prefix": result.Prefix or "",
+		"suffix": result.Suffix or "",
 	}
 
 
@@ -545,98 +305,261 @@ def uiUtils_duplicate_sheet_inputs(
 	width=980,
 	height=700,
 ):
-	form = Form()
-	form.Text = title
-	form.StartPosition = FormStartPosition.CenterScreen
-	form.Size = Size(width, height)
-	form.MinimizeBox = False
-	form.MaximizeBox = False
-	_apply_logo(form, show_inline=True)
-
-	info = Label()
-	info.Text = prompt
-	info.Location = Point(12, 12)
-	info.AutoSize = True
-	form.Controls.Add(info)
-
-	checklist = CheckedListBox()
-	checklist.Location = Point(12, 36)
-	checklist.Size = Size(width - 40, height - 300)
-	checklist.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-	checklist.CheckOnClick = True
-	for item in _safe_iter(items):
-		checklist.Items.Add(item)
-	form.Controls.Add(checklist)
-
-	views_checkbox = CheckBox()
-	views_checkbox.Text = duplicate_with_views_label
-	views_checkbox.Location = Point(12, height - 250)
-	views_checkbox.Checked = True
-	form.Controls.Add(views_checkbox)
-
-	label_options = Label()
-	label_options.Text = options_label
-	label_options.Location = Point(12, height - 220)
-	label_options.AutoSize = True
-	form.Controls.Add(label_options)
-
-	options_combo = ComboBox()
-	options_combo.Location = Point(12, height - 196)
-	options_combo.Size = Size(width - 40, 24)
-	for item in ("Duplicate Views", "Duplicate Views w/Details", "Duplicate Views AsDependent"):
-		options_combo.Items.Add(item)
-	if options_combo.Items.Count > 0:
-		options_combo.SelectedIndex = 0
-	form.Controls.Add(options_combo)
-
-	label_prefix = Label()
-	label_prefix.Text = prefix_label
-	label_prefix.Location = Point(12, height - 164)
-	label_prefix.AutoSize = True
-	form.Controls.Add(label_prefix)
-
-	prefix_input = TextBox()
-	prefix_input.Location = Point(12, height - 140)
-	prefix_input.Size = Size(width - 40, 24)
-	form.Controls.Add(prefix_input)
-
-	label_suffix = Label()
-	label_suffix.Text = suffix_label
-	label_suffix.Location = Point(12, height - 108)
-	label_suffix.AutoSize = True
-	form.Controls.Add(label_suffix)
-
-	suffix_input = TextBox()
-	suffix_input.Location = Point(12, height - 84)
-	suffix_input.Size = Size(width - 40, 24)
-	form.Controls.Add(suffix_input)
-
-	ok_btn = Button()
-	ok_btn.Text = "Duplicate"
-	ok_btn.DialogResult = DialogResult.OK
-	ok_btn.Location = Point(width - 204, height - 52)
-	form.Controls.Add(ok_btn)
-
-	cancel_btn = Button()
-	cancel_btn.Text = cancel_text or "Cancel"
-	cancel_btn.DialogResult = DialogResult.Cancel
-	cancel_btn.Location = Point(width - 112, height - 52)
-	form.Controls.Add(cancel_btn)
-
-	form.AcceptButton = ok_btn
-	form.CancelButton = cancel_btn
-
-	if form.ShowDialog() != DialogResult.OK:
+	_ensure_wpf()
+	items_list = _to_net_string_list(items) or List[String]()
+	result = _DIALOGS.DuplicateSheetInputs(
+		items_list,
+		title,
+		prompt,
+		options_label,
+		duplicate_with_views_label,
+		prefix_label,
+		suffix_label,
+		"Duplicate",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
 		return None
-
-	selected = []
-	for index in checklist.CheckedIndices:
-		selected.append(index)
-
 	return {
-		"selected_indices": selected,
-		"duplicate_with_views": views_checkbox.Checked,
-		"duplicate_option": options_combo.SelectedIndex if options_combo.SelectedIndex >= 0 else 0,
-		"prefix": prefix_input.Text or "",
-		"suffix": suffix_input.Text or "",
+		"selected_indices": list(result.SelectedIndices),
+		"duplicate_with_views": bool(result.DuplicateWithViews),
+		"duplicate_option": int(result.DuplicateOption),
+		"prefix": result.Prefix or "",
+		"suffix": result.Suffix or "",
+	}
+
+
+def uiUtils_open_file_dialog(title="Open File", filter_text="All files (*.*)|*.*", multiselect=False, initial_directory=""):
+	_ensure_wpf()
+	result = _DIALOGS.OpenFileDialog(
+		title,
+		filter_text,
+		bool(multiselect),
+		initial_directory or "",
+	)
+	if not result:
+		return [] if multiselect else None
+	if multiselect:
+		return [path for path in str(result).split("|") if path]
+	return result
+
+
+def uiUtils_save_file_dialog(title="Save File", filter_text="All files (*.*)|*.*", default_extension="", initial_directory="", file_name=""):
+	_ensure_wpf()
+	return _DIALOGS.SaveFileDialog(
+		title,
+		filter_text,
+		default_extension or "",
+		initial_directory or "",
+		file_name or "",
+	)
+
+
+def uiUtils_select_folder_dialog(title="Select Folder", initial_directory=""):
+	_ensure_wpf()
+	return _DIALOGS.SelectFolderDialog(
+		title,
+		initial_directory or "",
+	)
+
+
+def uiUtils_prompt_text(title="Input", prompt="Enter value:", default_value="", ok_text="OK", cancel_text="Cancel", width=420, height=220):
+	_ensure_wpf()
+	return _DIALOGS.PromptText(
+		title,
+		prompt,
+		default_value or "",
+		ok_text or "OK",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+
+
+def uiUtils_show_text_report(title, text, ok_text="OK", cancel_text=None, width=700, height=520):
+	_ensure_wpf()
+	return bool(_DIALOGS.ShowTextReport(
+		title,
+		text,
+		ok_text or "OK",
+		cancel_text,
+		int(width),
+		int(height),
+	))
+
+
+def uiUtils_find_replace(title="Find and Replace", find_label="Find", replace_label="Replace", ok_text="OK", cancel_text="Cancel", width=420, height=200):
+	_ensure_wpf()
+	result = _DIALOGS.FindReplaceDialog(
+		title,
+		find_label,
+		replace_label,
+		ok_text or "OK",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"find": result.FindText or "",
+		"replace": result.ReplaceText or "",
+	}
+
+
+def uiUtils_random_tree_settings(title="Random Tree", rotation_label="Random Rotation", size_label="Random Size", percent_label="Size variance (%)", default_percent=30, width=320, height=220):
+	_ensure_wpf()
+	result = _DIALOGS.RandomTreeSettings(
+		title,
+		rotation_label,
+		size_label,
+		percent_label,
+		float(default_percent),
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"random_rotation": bool(result.RandomRotation),
+		"random_size": bool(result.RandomSize),
+		"percent": float(result.Percent),
+	}
+
+
+def uiUtils_parameter_copy_inputs(param_names, title="Copy and Transform Parameter", source_default="", target_default="", find_default="", replace_default="", prefix_default="", suffix_default="", width=460, height=420):
+	_ensure_wpf()
+	names = _to_net_string_list(param_names) or List[String]()
+	result = _DIALOGS.ParameterCopyInputs(
+		names,
+		title,
+		source_default or "",
+		target_default or "",
+		find_default or "",
+		replace_default or "",
+		prefix_default or "",
+		suffix_default or "",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"source_param": result.SourceParam or "",
+		"target_param": result.TargetParam or "",
+		"find_text": result.FindText or "",
+		"replace_text": result.ReplaceText or "",
+		"prefix": result.Prefix or "",
+		"suffix": result.Suffix or "",
+	}
+
+
+def uiUtils_duplicate_view_options(option_labels, option_values, default_index=0, title="Duplicate Views", description="", prefix_default="", suffix_default="", ok_text="Set Values", width=520, height=360):
+	_ensure_wpf()
+	labels = _to_net_string_list(option_labels) or List[String]()
+	values = _to_net_string_list(option_values) or List[String]()
+	result = _DIALOGS.DuplicateViewOptions(
+		labels,
+		values,
+		int(default_index),
+		title,
+		description or "",
+		prefix_default or "",
+		suffix_default or "",
+		ok_text or "Set Values",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"prefix": result.Prefix or "",
+		"suffix": result.Suffix or "",
+		"duplicate_option": result.OptionValue or "",
+	}
+
+
+def uiUtils_marketing_view_options(
+	sheet_params,
+	template_names,
+	titleblock_names,
+	keyplan_template_names,
+	fill_type_names,
+	title="Make Marketing View",
+	area_label="(not selected)",
+	door_label="",
+	keyplan_enabled=False,
+	overwrite_existing=False,
+	template_index=0,
+	titleblock_index=0,
+	keyplan_template_index=0,
+	fill_type_index=0,
+	sheet_number_param="",
+	sheet_name_param="",
+	width=720,
+	height=660,
+):
+	_ensure_wpf()
+	result = _DIALOGS.MarketingViewOptions(
+		_to_net_string_list(sheet_params) or List[String](),
+		_to_net_string_list(template_names) or List[String](),
+		_to_net_string_list(titleblock_names) or List[String](),
+		_to_net_string_list(keyplan_template_names) or List[String](),
+		_to_net_string_list(fill_type_names) or List[String](),
+		title,
+		area_label,
+		door_label,
+		bool(keyplan_enabled),
+		bool(overwrite_existing),
+		int(template_index),
+		int(titleblock_index),
+		int(keyplan_template_index),
+		int(fill_type_index),
+		sheet_number_param or "",
+		sheet_name_param or "",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"sheet_number_param": result.SheetNumberParam or "",
+		"sheet_name_param": result.SheetNameParam or "",
+		"template_index": int(result.TemplateIndex),
+		"titleblock_index": int(result.TitleblockIndex),
+		"keyplan_enabled": bool(result.KeyplanEnabled),
+		"keyplan_template_index": int(result.KeyplanTemplateIndex),
+		"fill_type_index": int(result.FillTypeIndex),
+		"overwrite_existing": bool(result.OverwriteExisting),
+	}
+
+
+def uiUtils_keyplan_options(
+	template_names,
+	fill_type_names,
+	title="Make Keyplans",
+	area_label="(not selected)",
+	template_index=0,
+	fill_type_index=0,
+	width=640,
+	height=360,
+):
+	_ensure_wpf()
+	result = _DIALOGS.KeyplanOptions(
+		_to_net_string_list(template_names) or List[String](),
+		_to_net_string_list(fill_type_names) or List[String](),
+		title,
+		area_label,
+		int(template_index),
+		int(fill_type_index),
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"template_index": int(result.TemplateIndex),
+		"fill_type_index": int(result.FillTypeIndex),
 	}

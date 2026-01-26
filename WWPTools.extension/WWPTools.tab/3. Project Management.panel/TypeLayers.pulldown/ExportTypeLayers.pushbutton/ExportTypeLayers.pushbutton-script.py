@@ -5,7 +5,6 @@ import os
 import sys
 
 from pyrevit import DB, revit, script
-from System.Windows.Forms import DialogResult, MessageBox, SaveFileDialog
 
 
 def add_lib_path():
@@ -91,20 +90,22 @@ def convert_length_mm(value):
         return value
 
 
-def pick_export_path(doc):
-    dialog = SaveFileDialog()
-    dialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx"
-    dialog.DefaultExt = "xlsx"
-    dialog.AddExtension = True
-    dialog.FileName = "Type_Layers.xlsx"
+def pick_export_path(doc, ui):
+    initial_dir = ""
     try:
         if doc.PathName:
-            dialog.InitialDirectory = os.path.dirname(doc.PathName)
+            initial_dir = os.path.dirname(doc.PathName)
     except Exception:
-        pass
-    if dialog.ShowDialog() != DialogResult.OK:
+        initial_dir = ""
+    path = ui.uiUtils_save_file_dialog(
+        title="Export Type Layers",
+        filter_text="Excel Workbook (*.xlsx)|*.xlsx",
+        default_extension="xlsx",
+        initial_directory=initial_dir,
+        file_name="Type_Layers.xlsx",
+    )
+    if not path:
         return None
-    path = dialog.FileName
     if not path.lower().endswith(".xlsx"):
         path = "{}.xlsx".format(path)
     return path
@@ -235,12 +236,12 @@ def collect_type_rows(doc, category_label, types):
     return rows
 
 
-def export_to_excel(doc, selections, file_path):
+def export_to_excel(doc, selections, file_path, ui):
     add_lib_path()
     try:
         import openpyxl
     except Exception as exc:
-        MessageBox.Show("openpyxl is not available.\n{}".format(exc), "Export Type Layers")
+        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title="Export Type Layers")
         return False
 
     workbook = openpyxl.Workbook()
@@ -315,12 +316,12 @@ def main():
     if not selections:
         return
 
-    file_path = pick_export_path(doc)
+    file_path = pick_export_path(doc, ui)
     if not file_path:
         return
 
-    if export_to_excel(doc, selections, file_path):
-        MessageBox.Show("Export complete:\n{}".format(file_path), "Export Type Layers")
+    if export_to_excel(doc, selections, file_path, ui):
+        ui.uiUtils_alert("Export complete:\n{}".format(file_path), title="Export Type Layers")
 
 
 if __name__ == "__main__":

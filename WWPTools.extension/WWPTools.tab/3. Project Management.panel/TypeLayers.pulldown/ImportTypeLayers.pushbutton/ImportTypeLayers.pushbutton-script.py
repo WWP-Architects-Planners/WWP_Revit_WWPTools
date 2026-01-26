@@ -6,7 +6,6 @@ import re
 import sys
 
 from pyrevit import DB, revit
-from System.Windows.Forms import DialogResult, MessageBox, OpenFileDialog
 
 
 def add_lib_path():
@@ -35,19 +34,19 @@ def element_id_value(elem_id):
         return -1
 
 
-def pick_excel_path(doc):
-    dlg = OpenFileDialog()
-    dlg.Title = "Select Type Layers Excel Workbook"
-    dlg.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
-    dlg.Multiselect = False
+def pick_excel_path(doc, ui):
+    initial_dir = ""
     try:
         if doc.PathName:
-            dlg.InitialDirectory = os.path.dirname(doc.PathName)
+            initial_dir = os.path.dirname(doc.PathName)
     except Exception:
-        pass
-    if dlg.ShowDialog() != DialogResult.OK:
-        return None
-    return dlg.FileName
+        initial_dir = ""
+    return ui.uiUtils_open_file_dialog(
+        title="Select Type Layers Excel Workbook",
+        filter_text="Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir,
+    )
 
 
 def get_length_unit_id(doc):
@@ -164,17 +163,17 @@ def find_material_id(doc, mat_id_value, mat_name):
     return DB.ElementId.InvalidElementId
 
 
-def read_workbook(path):
+def read_workbook(path, ui):
     add_lib_path()
     try:
         import openpyxl
     except Exception as exc:
-        MessageBox.Show("openpyxl is not available.\n{}".format(exc), "Import Type Layers")
+        ui.uiUtils_alert("openpyxl is not available.\n{}".format(exc), title="Import Type Layers")
         return None
     try:
         return openpyxl.load_workbook(path, data_only=True)
     except Exception as exc:
-        MessageBox.Show("Failed to open workbook.\n{}".format(exc), "Import Type Layers")
+        ui.uiUtils_alert("Failed to open workbook.\n{}".format(exc), title="Import Type Layers")
         return None
 
 
@@ -403,11 +402,11 @@ def group_rows(rows):
 def main():
     doc = revit.doc
     ui = load_uiutils()
-    path = pick_excel_path(doc)
+    path = pick_excel_path(doc, ui)
     if not path:
         return
 
-    workbook = read_workbook(path)
+    workbook = read_workbook(path, ui)
     if workbook is None:
         return
 
@@ -422,7 +421,7 @@ def main():
             category_data.append((label, type_class, rows))
 
     if not category_data:
-        MessageBox.Show("No matching category sheets found.", "Import Type Layers")
+        ui.uiUtils_alert("No matching category sheets found.", title="Import Type Layers")
         return
 
     updated = 0
@@ -571,7 +570,7 @@ def main():
         summary += "\n\nErrors:\n" + "\n".join(errors[:10])
         if len(errors) > 10:
             summary += "\n... ({}) more".format(len(errors) - 10)
-    MessageBox.Show(summary, "Import Type Layers")
+    ui.uiUtils_alert(summary, title="Import Type Layers")
 
 
 if __name__ == "__main__":

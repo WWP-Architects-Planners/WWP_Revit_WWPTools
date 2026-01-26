@@ -7,21 +7,7 @@ from pyrevit import revit, DB, script
 import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
-
-clr.AddReference("System.Windows.Forms")
-clr.AddReference("System.Drawing")
-from System.Drawing import Point, Size
 from System.Collections.Generic import List
-from System.Windows.Forms import (
-    Button,
-    ComboBox,
-    ComboBoxStyle,
-    DialogResult,
-    Form,
-    FormStartPosition,
-    Label,
-    CheckBox,
-)
 
 
 doc = revit.doc
@@ -88,308 +74,6 @@ def pick_elements(bic, prompt):
                 view.DisableTemporaryViewMode(DB.TemporaryViewMode.TemporaryHideIsolate)
             except Exception:
                 pass
-
-
-class MarketingViewForm(Form):
-    def __init__(self, base_view, templates, keyplan_templates, fill_types, titleblocks, state):
-        super(MarketingViewForm, self).__init__()
-        self.Text = "Make Marketing View"
-        self.StartPosition = FormStartPosition.CenterScreen
-        self.Size = Size(720, 620)
-        self.MinimizeBox = False
-        self.MaximizeBox = False
-
-        self._base_view = base_view
-        self._templates = templates
-        self._titleblocks = titleblocks
-        self._keyplan_templates = keyplan_templates
-        self._fill_types = fill_types
-        self._state = state
-
-        self.selected_area = self._state.get("area")
-        self.selected_door = self._state.get("door")
-        self.selected_sheet_number_param = None
-        self.selected_sheet_name_param = None
-        self.selected_template = None
-        self.selected_keyplan_template = None
-        self.selected_fill_type = None
-        self.selected_titleblock = None
-        self.selected_overwrite = False
-        self.selected_create_keyplan = False
-        self.request_action = None
-
-        current_y = 16
-
-        info = Label()
-        info.Text = "Active view: {}".format(base_view.Name)
-        info.Location = Point(12, current_y)
-        info.Size = Size(680, 20)
-        self.Controls.Add(info)
-
-        current_y += 32
-        self._area_label = Label()
-        area_label = self._state.get("area_label") or "(not selected)"
-        self._area_label.Text = "Area: {}".format(area_label)
-        self._area_label.Location = Point(12, current_y)
-        self._area_label.Size = Size(520, 20)
-        self.Controls.Add(self._area_label)
-
-        self._area_btn = Button()
-        self._area_btn.Text = "Pick Area"
-        self._area_btn.Location = Point(560, current_y - 2)
-        self._area_btn.Size = Size(120, 26)
-        self._area_btn.Click += self._on_pick_area
-        self.Controls.Add(self._area_btn)
-
-        current_y += 40
-        number_label = Label()
-        number_label.Text = "Sheet number parameter:"
-        number_label.Location = Point(12, current_y)
-        number_label.Size = Size(260, 20)
-        self.Controls.Add(number_label)
-
-        self._sheet_number_combo = ComboBox()
-        self._sheet_number_combo.Location = Point(280, current_y - 2)
-        self._sheet_number_combo.Size = Size(400, 26)
-        self._sheet_number_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self._sheet_number_combo.Enabled = False
-        self.Controls.Add(self._sheet_number_combo)
-
-        current_y += 36
-        name_label = Label()
-        name_label.Text = "Sheet name parameter:"
-        name_label.Location = Point(12, current_y)
-        name_label.Size = Size(260, 20)
-        self.Controls.Add(name_label)
-
-        self._sheet_name_combo = ComboBox()
-        self._sheet_name_combo.Location = Point(280, current_y - 2)
-        self._sheet_name_combo.Size = Size(400, 26)
-        self._sheet_name_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self._sheet_name_combo.Enabled = False
-        self.Controls.Add(self._sheet_name_combo)
-
-        current_y += 36
-        template_label = Label()
-        template_label.Text = "Marketing view template:"
-        template_label.Location = Point(12, current_y)
-        template_label.Size = Size(260, 20)
-        self.Controls.Add(template_label)
-
-        self._template_combo = ComboBox()
-        self._template_combo.Location = Point(280, current_y - 2)
-        self._template_combo.Size = Size(400, 26)
-        self._template_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._template_combo)
-
-        current_y += 36
-        titleblock_label = Label()
-        titleblock_label.Text = "Titleblock:"
-        titleblock_label.Location = Point(12, current_y)
-        titleblock_label.Size = Size(260, 20)
-        self.Controls.Add(titleblock_label)
-
-        self._titleblock_combo = ComboBox()
-        self._titleblock_combo.Location = Point(280, current_y - 2)
-        self._titleblock_combo.Size = Size(400, 26)
-        self._titleblock_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._titleblock_combo)
-
-        current_y += 36
-        self._keyplan_checkbox = CheckBox()
-        self._keyplan_checkbox.Text = "Create Keyplan"
-        self._keyplan_checkbox.Location = Point(12, current_y)
-        self._keyplan_checkbox.Size = Size(200, 22)
-        self._keyplan_checkbox.Checked = bool(self._state.get("keyplan_enabled"))
-        self._keyplan_checkbox.CheckedChanged += self._on_keyplan_toggle
-        self.Controls.Add(self._keyplan_checkbox)
-
-        current_y += 30
-        keyplan_template_label = Label()
-        keyplan_template_label.Text = "Keyplan view template:"
-        keyplan_template_label.Location = Point(12, current_y)
-        keyplan_template_label.Size = Size(260, 20)
-        self.Controls.Add(keyplan_template_label)
-
-        self._keyplan_template_combo = ComboBox()
-        self._keyplan_template_combo.Location = Point(280, current_y - 2)
-        self._keyplan_template_combo.Size = Size(400, 26)
-        self._keyplan_template_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._keyplan_template_combo)
-
-        current_y += 36
-        fill_label = Label()
-        fill_label.Text = "Keyplan filled region type:"
-        fill_label.Location = Point(12, current_y)
-        fill_label.Size = Size(260, 20)
-        self.Controls.Add(fill_label)
-
-        self._fill_combo = ComboBox()
-        self._fill_combo.Location = Point(280, current_y - 2)
-        self._fill_combo.Size = Size(400, 26)
-        self._fill_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._fill_combo)
-
-        current_y += 36
-        self._overwrite_checkbox = CheckBox()
-        self._overwrite_checkbox.Text = "Overwrite existing sheet if sheet number exists"
-        self._overwrite_checkbox.Location = Point(12, current_y)
-        self._overwrite_checkbox.Size = Size(640, 22)
-        self._overwrite_checkbox.Checked = bool(self._state.get("overwrite_existing"))
-        self.Controls.Add(self._overwrite_checkbox)
-
-        current_y += 40
-        self._create_btn = Button()
-        self._create_btn.Text = "Create"
-        self._create_btn.Location = Point(480, current_y)
-        self._create_btn.Size = Size(90, 30)
-        self._create_btn.Click += self._on_create
-        self.Controls.Add(self._create_btn)
-
-        self._cancel_btn = Button()
-        self._cancel_btn.Text = "Cancel"
-        self._cancel_btn.Location = Point(590, current_y)
-        self._cancel_btn.Size = Size(90, 30)
-        self._cancel_btn.Click += self._on_cancel
-        self.Controls.Add(self._cancel_btn)
-
-        self._load_template_choices()
-        self._load_keyplan_template_choices()
-        self._load_fill_choices()
-        self._load_titleblock_choices()
-        self._load_param_choices(self._state.get("area"))
-        self._sync_keyplan_state()
-
-    def _load_template_choices(self):
-        self._template_combo.Items.Clear()
-        for template in self._templates:
-            self._template_combo.Items.Add(template.Name)
-        if self._templates:
-            index = self._state.get("template_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._templates):
-                self._template_combo.SelectedIndex = index
-            else:
-                self._template_combo.SelectedIndex = 0
-
-    def _load_titleblock_choices(self):
-        self._titleblock_combo.Items.Clear()
-        for titleblock in self._titleblocks:
-            self._titleblock_combo.Items.Add("{}: {}".format(titleblock.FamilyName, titleblock.Name))
-        if self._titleblocks:
-            index = self._state.get("titleblock_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._titleblocks):
-                self._titleblock_combo.SelectedIndex = index
-            else:
-                self._titleblock_combo.SelectedIndex = 0
-
-    def _load_keyplan_template_choices(self):
-        self._keyplan_template_combo.Items.Clear()
-        for template in self._keyplan_templates:
-            self._keyplan_template_combo.Items.Add(template.Name)
-        if self._keyplan_templates:
-            index = self._state.get("keyplan_template_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._keyplan_templates):
-                self._keyplan_template_combo.SelectedIndex = index
-            else:
-                self._keyplan_template_combo.SelectedIndex = 0
-
-    def _load_fill_choices(self):
-        self._fill_combo.Items.Clear()
-        for fill_type in self._fill_types:
-            self._fill_combo.Items.Add(fill_type.Name)
-        if self._fill_types:
-            index = self._state.get("fill_type_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._fill_types):
-                self._fill_combo.SelectedIndex = index
-            else:
-                self._fill_combo.SelectedIndex = 0
-
-    def _sync_keyplan_state(self):
-        enabled = bool(self._keyplan_checkbox.Checked)
-        self._keyplan_template_combo.Enabled = enabled
-        self._fill_combo.Enabled = enabled
-
-    def _on_keyplan_toggle(self, sender, args):
-        self._sync_keyplan_state()
-
-    def _load_param_choices(self, area):
-        names = get_parameter_names(area) if area else []
-        self._sheet_number_combo.Items.Clear()
-        self._sheet_name_combo.Items.Clear()
-        for name in names:
-            self._sheet_number_combo.Items.Add(name)
-            self._sheet_name_combo.Items.Add(name)
-        if names:
-            number_name = self._state.get("sheet_number_param")
-            name_name = self._state.get("sheet_name_param")
-            if number_name in names:
-                self._sheet_number_combo.SelectedItem = number_name
-            else:
-                self._sheet_number_combo.SelectedIndex = 0
-            if name_name in names:
-                self._sheet_name_combo.SelectedItem = name_name
-            else:
-                self._sheet_name_combo.SelectedIndex = 0
-        self._sheet_number_combo.Enabled = bool(names)
-        self._sheet_name_combo.Enabled = bool(names)
-
-    def _on_pick_area(self, sender, args):
-        if self._template_combo.SelectedIndex >= 0:
-            self._state["template_index"] = self._template_combo.SelectedIndex
-        if self._keyplan_template_combo.SelectedIndex >= 0:
-            self._state["keyplan_template_index"] = self._keyplan_template_combo.SelectedIndex
-        if self._fill_combo.SelectedIndex >= 0:
-            self._state["fill_type_index"] = self._fill_combo.SelectedIndex
-        self._state["keyplan_enabled"] = bool(self._keyplan_checkbox.Checked)
-        if self._titleblock_combo.SelectedIndex >= 0:
-            self._state["titleblock_index"] = self._titleblock_combo.SelectedIndex
-        if self._sheet_number_combo.SelectedIndex >= 0:
-            self._state["sheet_number_param"] = self._sheet_number_combo.SelectedItem
-        if self._sheet_name_combo.SelectedIndex >= 0:
-            self._state["sheet_name_param"] = self._sheet_name_combo.SelectedItem
-        self.request_action = "area"
-        self.DialogResult = DialogResult.Retry
-        self.Close()
-
-    def _on_create(self, sender, args):
-        if not self.selected_area and not self._state.get("areas"):
-            uiutils.uiUtils_alert("Please pick at least one area.")
-            return
-        if self._sheet_number_combo.SelectedIndex < 0 or self._sheet_name_combo.SelectedIndex < 0:
-            uiutils.uiUtils_alert("Please select sheet parameter mappings.")
-            return
-        if self._template_combo.SelectedIndex < 0:
-            uiutils.uiUtils_alert("Please select a marketing view template.")
-            return
-        if self._titleblock_combo.SelectedIndex < 0:
-            uiutils.uiUtils_alert("Please select a titleblock.")
-            return
-        if self._keyplan_checkbox.Checked:
-            if self._keyplan_template_combo.SelectedIndex < 0:
-                uiutils.uiUtils_alert("Please select a keyplan view template.")
-                return
-            if self._fill_combo.SelectedIndex < 0:
-                uiutils.uiUtils_alert("Please select a keyplan filled region type.")
-                return
-
-        self.selected_sheet_number_param = self._sheet_number_combo.SelectedItem
-        self.selected_sheet_name_param = self._sheet_name_combo.SelectedItem
-        self.selected_template = self._templates[self._template_combo.SelectedIndex]
-        if self._keyplan_checkbox.Checked:
-            self.selected_keyplan_template = self._keyplan_templates[
-                self._keyplan_template_combo.SelectedIndex
-            ]
-            self.selected_fill_type = self._fill_types[self._fill_combo.SelectedIndex]
-        self.selected_titleblock = self._titleblocks[self._titleblock_combo.SelectedIndex]
-        self.selected_overwrite = bool(self._overwrite_checkbox.Checked)
-        self.selected_create_keyplan = bool(self._keyplan_checkbox.Checked)
-
-        self.DialogResult = DialogResult.OK
-        self.Close()
-
-    def _on_cancel(self, sender, args):
-        self.DialogResult = DialogResult.Cancel
-        self.Close()
 
 
 def get_param_value(elem, name):
@@ -949,69 +633,124 @@ def main():
                 state["fill_type_index"] = idx
                 break
 
-    while True:
-        form = MarketingViewForm(
-            base_view,
-            templates_sorted,
-            keyplan_templates_sorted,
-            fill_types_sorted,
-            titleblocks_sorted,
-            state,
+    if state["areas"]:
+        use_last = uiutils.uiUtils_confirm(
+            "Use previously selected area(s)?", title="Make Marketing View"
         )
-        result = form.ShowDialog()
-        if result == DialogResult.Retry:
-            if form.request_action == "area":
-                try:
-                    areas = pick_elements(DB.BuiltInCategory.OST_Areas, "Select suite areas")
-                except OperationCanceledException:
-                    continue
-                area = areas[0] if areas else None
-                state["areas"] = areas
-                state["area"] = area
-                state["area_label"] = (
-                    "{} areas selected".format(len(areas))
-                    if areas and len(areas) > 1
-                    else (area.Name or area.Id.IntegerValue if area else "(not selected)")
-                )
-                state["sheet_number_param"] = None
-                state["sheet_name_param"] = None
-                door = find_entry_door_in_area(area, base_view) if area else None
-                state["door"] = door
-                state["door_label"] = door.Name if door else "(not selected)"
-            continue
-        if result != DialogResult.OK:
+        if not use_last:
+            state["areas"] = []
+            state["area"] = None
+
+    if not state["areas"]:
+        try:
+            areas = pick_elements(DB.BuiltInCategory.OST_Areas, "Select suite areas")
+        except OperationCanceledException:
             return
+        state["areas"] = areas
 
-        areas = state.get("areas") or []
-        if not areas:
-            area = state.get("area")
-            if area:
-                areas = [area]
-        sheet_number_param = form.selected_sheet_number_param
-        sheet_name_param = form.selected_sheet_name_param
-        view_template = form.selected_template
-        keyplan_template = form.selected_keyplan_template
-        keyplan_fill_type = form.selected_fill_type
-        titleblock_type = form.selected_titleblock
-        overwrite_existing = form.selected_overwrite
-        create_keyplan = form.selected_create_keyplan
+    areas = state.get("areas") or []
+    if not areas:
+        uiutils.uiUtils_alert("Please pick at least one area.", title="Make Marketing View")
+        return
 
-        area_for_config = areas[0] if areas else None
-        door_for_config = find_entry_door_in_area(area_for_config, base_view) if area_for_config else None
-        config.last_area_id = element_id_value(area_for_config.Id) if area_for_config else None
-        config.last_door_id = element_id_value(door_for_config.Id) if door_for_config else None
-        config.last_template_id = element_id_value(view_template.Id) if view_template else None
-        config.last_titleblock_id = element_id_value(titleblock_type.Id) if titleblock_type else None
-        config.last_keyplan_enabled = bool(create_keyplan)
-        config.last_keyplan_template_id = (
-            element_id_value(keyplan_template.Id) if keyplan_template else None
-        )
-        config.last_fill_type_id = element_id_value(keyplan_fill_type.Id) if keyplan_fill_type else None
-        config.last_sheet_number_param = sheet_number_param or ""
-        config.last_sheet_name_param = sheet_name_param or ""
-        config.last_overwrite_existing = bool(overwrite_existing)
-        script.save_config()
-        break
+    area = areas[0]
+    state["area"] = area
+    state["area_label"] = (
+        "{} areas selected".format(len(areas))
+        if len(areas) > 1
+        else (area.Name or area.Id.IntegerValue)
+    )
+    door = find_entry_door_in_area(area, base_view) if area else None
+    state["door"] = door
+    state["door_label"] = door.Name if door else "(not selected)"
+
+    sheet_param_label = "(Use Area Number/Name)"
+    sheet_params = [sheet_param_label]
+    if area:
+        for name in get_parameter_names(area):
+            if name not in sheet_params:
+                sheet_params.append(name)
+
+    sheet_number_param = state.get("sheet_number_param") or ""
+    sheet_name_param = state.get("sheet_name_param") or ""
+    if sheet_number_param and sheet_number_param not in sheet_params:
+        sheet_params.append(sheet_number_param)
+    if sheet_name_param and sheet_name_param not in sheet_params:
+        sheet_params.append(sheet_name_param)
+
+    result = uiutils.uiUtils_marketing_view_options(
+        sheet_params,
+        [t.Name for t in templates_sorted],
+        ["{}: {}".format(t.FamilyName, t.Name) for t in titleblocks_sorted],
+        [t.Name for t in keyplan_templates_sorted],
+        [t.Name for t in fill_types_sorted],
+        title="Make Marketing View",
+        area_label=state.get("area_label") or "(not selected)",
+        door_label=state.get("door_label") or "",
+        keyplan_enabled=state.get("keyplan_enabled", False),
+        overwrite_existing=state.get("overwrite_existing", False),
+        template_index=state.get("template_index", 0),
+        titleblock_index=state.get("titleblock_index", 0),
+        keyplan_template_index=state.get("keyplan_template_index", 0),
+        fill_type_index=state.get("fill_type_index", 0),
+        sheet_number_param=sheet_number_param or sheet_param_label,
+        sheet_name_param=sheet_name_param or sheet_param_label,
+        width=720,
+        height=660,
+    )
+    if result is None:
+        return
+
+    sheet_number_param = result.get("sheet_number_param") or ""
+    sheet_name_param = result.get("sheet_name_param") or ""
+    if sheet_number_param == sheet_param_label:
+        sheet_number_param = ""
+    if sheet_name_param == sheet_param_label:
+        sheet_name_param = ""
+
+    template_index = result.get("template_index", 0)
+    titleblock_index = result.get("titleblock_index", 0)
+    keyplan_template_index = result.get("keyplan_template_index", 0)
+    fill_type_index = result.get("fill_type_index", 0)
+    overwrite_existing = bool(result.get("overwrite_existing"))
+    create_keyplan = bool(result.get("keyplan_enabled"))
+
+    view_template = (
+        templates_sorted[template_index]
+        if 0 <= template_index < len(templates_sorted)
+        else templates_sorted[0]
+    )
+    titleblock_type = (
+        titleblocks_sorted[titleblock_index]
+        if 0 <= titleblock_index < len(titleblocks_sorted)
+        else titleblocks_sorted[0]
+    )
+    keyplan_template = (
+        keyplan_templates_sorted[keyplan_template_index]
+        if 0 <= keyplan_template_index < len(keyplan_templates_sorted)
+        else None
+    )
+    keyplan_fill_type = (
+        fill_types_sorted[fill_type_index]
+        if 0 <= fill_type_index < len(fill_types_sorted)
+        else None
+    )
+
+    area_for_config = areas[0] if areas else None
+    door_for_config = find_entry_door_in_area(area_for_config, base_view) if area_for_config else None
+    config.last_area_id = element_id_value(area_for_config.Id) if area_for_config else None
+    config.last_door_id = element_id_value(door_for_config.Id) if door_for_config else None
+    config.last_template_id = element_id_value(view_template.Id) if view_template else None
+    config.last_titleblock_id = element_id_value(titleblock_type.Id) if titleblock_type else None
+    config.last_keyplan_enabled = bool(create_keyplan)
+    config.last_keyplan_template_id = (
+        element_id_value(keyplan_template.Id) if keyplan_template else None
+    )
+    config.last_fill_type_id = element_id_value(keyplan_fill_type.Id) if keyplan_fill_type else None
+    config.last_sheet_number_param = sheet_number_param or ""
+    config.last_sheet_name_param = sheet_name_param or ""
+    config.last_overwrite_existing = bool(overwrite_existing)
+    script.save_config()
 
     results = []
     with revit.Transaction("Make Marketing View"):

@@ -8,9 +8,7 @@ from Autodesk.Revit.UI import TaskDialog
 import os
 import datetime
 import traceback
-
-clr.AddReference('System.Windows.Forms')
-from System.Windows.Forms import OpenFileDialog, DialogResult
+import WWP_uiUtils as ui
 
 clr.AddReference('System')
 from System import Enum
@@ -74,51 +72,33 @@ def _pick_first_existing_path(paths):
 
 
 def _choose_excel_workbook(default_path):
-    dlg = OpenFileDialog()
-    dlg.Title = "Select Project Parameters Excel Workbook"
-    dlg.Filter = "Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*"
-    dlg.Multiselect = False
-
+    initial_dir = ""
     try:
         if default_path:
-            default_dir = os.path.dirname(default_path)
-            if default_dir and os.path.isdir(default_dir):
-                dlg.InitialDirectory = default_dir
-            dlg.FileName = os.path.basename(default_path)
+            initial_dir = os.path.dirname(default_path)
     except Exception:
         pass
-
-    result = dlg.ShowDialog()
-    if result == DialogResult.OK:
-        try:
-            return str(dlg.FileName)
-        except Exception:
-            return dlg.FileName
-    return None
+    return ui.uiUtils_open_file_dialog(
+        title="Select Project Parameters Excel Workbook",
+        filter_text="Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir or "",
+    )
 
 
 def _choose_shared_parameter_file(default_path):
-    dlg = OpenFileDialog()
-    dlg.Title = "Select Shared Parameters File"
-    dlg.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
-    dlg.Multiselect = False
-
+    initial_dir = ""
     try:
         if default_path:
-            default_dir = os.path.dirname(default_path)
-            if default_dir and os.path.isdir(default_dir):
-                dlg.InitialDirectory = default_dir
-            dlg.FileName = os.path.basename(default_path)
+            initial_dir = os.path.dirname(default_path)
     except Exception:
         pass
-
-    result = dlg.ShowDialog()
-    if result == DialogResult.OK:
-        try:
-            return str(dlg.FileName)
-        except Exception:
-            return dlg.FileName
-    return None
+    return ui.uiUtils_open_file_dialog(
+        title="Select Shared Parameters File",
+        filter_text="Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir or "",
+    )
 
 
 def _iter_excel_rows(path, worksheet_name=None):

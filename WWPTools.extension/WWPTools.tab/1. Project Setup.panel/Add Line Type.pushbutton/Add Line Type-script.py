@@ -8,9 +8,7 @@ import os
 import datetime
 import traceback
 from System.Collections.Generic import List
-
-clr.AddReference('System.Windows.Forms')
-from System.Windows.Forms import OpenFileDialog, DialogResult
+import WWP_uiUtils as ui
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -57,27 +55,20 @@ def _pick_first_existing_path(paths):
 
 def _choose_excel_workbook(default_path):
     """Prompt user to select an Excel workbook. Returns selected path or None."""
-    dlg = OpenFileDialog()
-    dlg.Title = "Select Line Types Excel Workbook"
-    dlg.Filter = "Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*"
-    dlg.Multiselect = False
-
+    initial_dir = ""
+    file_name = ""
     try:
         if default_path:
-            default_dir = os.path.dirname(default_path)
-            if default_dir and os.path.isdir(default_dir):
-                dlg.InitialDirectory = default_dir
-            dlg.FileName = os.path.basename(default_path)
+            initial_dir = os.path.dirname(default_path)
+            file_name = os.path.basename(default_path)
     except Exception:
         pass
-
-    result = dlg.ShowDialog()
-    if result == DialogResult.OK:
-        try:
-            return str(dlg.FileName)
-        except Exception:
-            return dlg.FileName
-    return None
+    return ui.uiUtils_open_file_dialog(
+        title="Select Line Types Excel Workbook",
+        filter_text="Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir or "",
+    )
 
 
 PATTERN_DATA_PATH = None

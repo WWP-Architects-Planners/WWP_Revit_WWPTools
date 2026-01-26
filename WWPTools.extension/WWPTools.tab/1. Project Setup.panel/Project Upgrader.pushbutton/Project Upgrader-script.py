@@ -8,24 +8,9 @@ import WWP_uiUtils as ui
 
 SILENT_MODE = True
 
-try:
-    clr.AddReference('RevitAPI')
-    clr.AddReference('RevitAPIUI')
-    clr.AddReference('RevitServices')
-    import System
-    from System.Windows.Forms import (
-        Button,
-        CheckBox,
-        DialogResult,
-        Form,
-        FormBorderStyle,
-        FormStartPosition,
-        FolderBrowserDialog,
-        Label,
-        TextBox,
-    )
-except Exception:
-    Button = None
+clr.AddReference('RevitAPI')
+clr.AddReference('RevitAPIUI')
+clr.AddReference('RevitServices')
 
 
 app = __revit__.Application
@@ -33,86 +18,21 @@ uidoc = __revit__.ActiveUIDocument
 active_doc = uidoc.Document if uidoc else None
 
 
-class ProjectUpgraderForm(Form):
-    def __init__(self):
-        Form.__init__(self)
-        self.Text = "Project Upgrader"
-        self.Width = 520
-        self.Height = 210
-        self.StartPosition = FormStartPosition.CenterScreen
-        self.FormBorderStyle = FormBorderStyle.FixedDialog
-        self.MaximizeBox = False
-        self.MinimizeBox = False
-
-        label = Label()
-        label.Text = "Folder"
-        label.Location = System.Drawing.Point(12, 20)
-        label.Width = 60
-
-        self._folder_input = TextBox()
-        self._folder_input.Location = System.Drawing.Point(80, 16)
-        self._folder_input.Width = 340
-
-        browse = Button()
-        browse.Text = "Browse"
-        browse.Location = System.Drawing.Point(430, 14)
-        browse.Click += self._browse
-
-        self._subfolders_cb = CheckBox()
-        self._subfolders_cb.Text = "Include subfolders"
-        self._subfolders_cb.Location = System.Drawing.Point(80, 50)
-        self._subfolders_cb.Width = 200
-        self._subfolders_cb.Checked = True
-
-        ok = Button()
-        ok.Text = "OK"
-        ok.Location = System.Drawing.Point(320, 120)
-        ok.DialogResult = DialogResult.OK
-
-        cancel = Button()
-        cancel.Text = "Cancel"
-        cancel.Location = System.Drawing.Point(400, 120)
-        cancel.DialogResult = DialogResult.Cancel
-
-        self.AcceptButton = ok
-        self.CancelButton = cancel
-
-        self.Controls.Add(label)
-        self.Controls.Add(self._folder_input)
-        self.Controls.Add(browse)
-        self.Controls.Add(self._subfolders_cb)
-        self.Controls.Add(ok)
-        self.Controls.Add(cancel)
-
-    def _browse(self, sender, args):
-        dialog = FolderBrowserDialog()
-        dialog.Description = "Select folder containing Revit files"
-        if dialog.ShowDialog() == DialogResult.OK:
-            self._folder_input.Text = dialog.SelectedPath
-
-    @property
-    def folder(self):
-        return self._folder_input.Text.strip()
-
-    @property
-    def include_subfolders(self):
-        return bool(self._subfolders_cb.Checked)
-
-
 def _pick_options():
-    if Button is None:
+    try:
+        return ui.uiUtils_project_upgrader_options(
+            title="Project Upgrader",
+            description="Select folder containing Revit files",
+            include_subfolders_label="Include subfolders",
+            cancel_text="Cancel",
+            width=520,
+            height=260,
+            initial_folder="",
+        )
+    except Exception as exc:
         if not SILENT_MODE:
-            ui.uiUtils_alert("Windows Forms is unavailable on this system.", title="Project Upgrader")
+            ui.uiUtils_alert(str(exc), title="Project Upgrader")
         return None
-
-    form = ProjectUpgraderForm()
-    if form.ShowDialog() != DialogResult.OK:
-        return None
-
-    return {
-        "folder": form.folder,
-        "include_subfolders": form.include_subfolders,
-    }
 
 
 def _collect_files(folder, include_subfolders):

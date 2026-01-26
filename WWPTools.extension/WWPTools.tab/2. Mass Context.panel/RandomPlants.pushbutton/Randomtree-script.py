@@ -6,6 +6,7 @@ import traceback
 
 from pyrevit import revit, DB
 from Autodesk.Revit import UI
+import WWP_uiUtils as ui
 
 
 PARAM_NAME = "DIM_PlantDiameter"
@@ -14,22 +15,6 @@ PERCENT_MIN = 0
 PERCENT_MAX = 100
 PERCENT_STEP = 5
 
-
-try:
-    import System
-    from System.Drawing import Point, Size
-    from System.Windows.Forms import (
-        Button,
-        CheckBox,
-        DialogResult,
-        Form,
-        FormBorderStyle,
-        Label,
-        NumericUpDown,
-        FormStartPosition,
-    )
-except Exception:
-    System = None
 
 
 def _get_selected_elements():
@@ -123,89 +108,17 @@ def _set_rotation(doc, element, degrees):
         return False
 
 
-class RandomTreesForm(Form):
-    def __init__(self):
-        Form.__init__(self)
-        self.Text = "Random Tree"
-        self.Width = 320
-        self.Height = 210
-        self.StartPosition = FormStartPosition.CenterScreen
-        self.FormBorderStyle = FormBorderStyle.FixedDialog
-        self.MaximizeBox = False
-        self.MinimizeBox = False
-
-        self._rotation_cb = CheckBox()
-        self._rotation_cb.Text = "Random Rotation"
-        self._rotation_cb.Checked = True
-        self._rotation_cb.Location = Point(15, 15)
-        self._rotation_cb.Width = 260
-
-        self._size_cb = CheckBox()
-        self._size_cb.Text = "Random Size"
-        self._size_cb.Checked = True
-        self._size_cb.Location = Point(15, 45)
-        self._size_cb.Width = 260
-
-        self._percent_label = Label()
-        self._percent_label.Text = "Size variance (%)"
-        self._percent_label.Location = Point(15, 80)
-        self._percent_label.Width = 140
-
-        self._percent_input = NumericUpDown()
-        self._percent_input.Minimum = System.Decimal(PERCENT_MIN)
-        self._percent_input.Maximum = System.Decimal(PERCENT_MAX)
-        self._percent_input.Increment = System.Decimal(PERCENT_STEP)
-        self._percent_input.Value = System.Decimal(DEFAULT_PERCENT)
-        self._percent_input.Location = Point(165, 78)
-        self._percent_input.Width = 120
-
-        ok = Button()
-        ok.Text = "OK"
-        ok.Location = Point(130, 120)
-        ok.DialogResult = DialogResult.OK
-
-        cancel = Button()
-        cancel.Text = "Cancel"
-        cancel.Location = Point(210, 120)
-        cancel.DialogResult = DialogResult.Cancel
-
-        self.AcceptButton = ok
-        self.CancelButton = cancel
-
-        self.Controls.Add(self._rotation_cb)
-        self.Controls.Add(self._size_cb)
-        self.Controls.Add(self._percent_label)
-        self.Controls.Add(self._percent_input)
-        self.Controls.Add(ok)
-        self.Controls.Add(cancel)
-
-    @property
-    def random_rotation(self):
-        return bool(self._rotation_cb.Checked)
-
-    @property
-    def random_size(self):
-        return bool(self._size_cb.Checked)
-
-    @property
-    def percent(self):
-        return float(System.Decimal.ToDouble(self._percent_input.Value))
-
-
 def _ask_for_settings():
-    if System is None:
-        UI.TaskDialog.Show("Random Tree", "Unable to load input dialog.")
-        return None
-
-    form = RandomTreesForm()
-    if form.ShowDialog() != DialogResult.OK:
-        return None
-
-    return {
-        "random_rotation": form.random_rotation,
-        "random_size": form.random_size,
-        "percent": form.percent,
-    }
+    result = ui.uiUtils_random_tree_settings(
+        title="Random Tree",
+        rotation_label="Random Rotation",
+        size_label="Random Size",
+        percent_label="Size variance (%)",
+        default_percent=DEFAULT_PERCENT,
+        width=320,
+        height=240,
+    )
+    return result
 
 
 def main():

@@ -2,7 +2,8 @@
 import clr
 import os
 import csv
-from pyrevit import revit,DB,forms,script
+from pyrevit import revit,DB,script
+import WWP_uiUtils as ui
 
 # verify if settings exist
 def shareUtils_workshared(myDoc):
@@ -44,10 +45,12 @@ def shareUtils_getEditable(elements,curDoc,report = False):
 	opt = "None"
 	if report and eleOut:
 		items = ["Proceed with what is editable","Proceed with what is editable, report what was not","Cancel the script (at this point)"]
-		opt = forms.ask_for_one_item(items, default=None, prompt="How would you like to proceed? If you cancel this dialogue, the script will proceed with all editable elements.", title="Non-editable items found")
+		indices = ui.uiUtils_select_indices(items, title="Non-editable items found", prompt="How would you like to proceed? If you cancel this dialogue, the script will proceed with all editable elements.", multiselect=False, width=720, height=420)
+		if indices:
+			opt = items[indices[0]]
 	# Use the option chosen
 	if opt != "None" and "Cancel" in opt:
-		forms.alert("Script cancelled by user.", title= "Option chosen")
+		ui.uiUtils_alert("Script cancelled by user.", title= "Option chosen")
 		script.exit()
 	elif opt != "None" and "report" in opt:
 		output = script.get_output()

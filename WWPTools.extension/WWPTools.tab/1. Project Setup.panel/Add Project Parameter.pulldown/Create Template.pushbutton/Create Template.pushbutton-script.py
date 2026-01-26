@@ -7,9 +7,7 @@ from Autodesk.Revit.UI import TaskDialog
 import os
 import datetime
 import traceback
-
-clr.AddReference('System.Windows.Forms')
-from System.Windows.Forms import OpenFileDialog, SaveFileDialog, DialogResult
+import WWP_uiUtils as ui
 
 doc = __revit__.ActiveUIDocument.Document
 app = doc.Application
@@ -34,61 +32,32 @@ def _pick_first_existing_path(paths):
 
 
 def _choose_shared_parameter_file(default_path):
-    dlg = OpenFileDialog()
-    dlg.Title = "Select Shared Parameters File"
-    dlg.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
-    dlg.Multiselect = False
-
+    initial_dir = ""
     try:
         if default_path:
-            default_dir = os.path.dirname(default_path)
-            if default_dir and os.path.isdir(default_dir):
-                dlg.InitialDirectory = default_dir
-            dlg.FileName = os.path.basename(default_path)
+            initial_dir = os.path.dirname(default_path)
     except Exception:
         pass
-
-    result = dlg.ShowDialog()
-    if result == DialogResult.OK:
-        try:
-            return str(dlg.FileName)
-        except Exception:
-            return dlg.FileName
-    return None
+    return ui.uiUtils_open_file_dialog(
+        title="Select Shared Parameters File",
+        filter_text="Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir or "",
+    )
 
 
 def _choose_save_excel_file():
-    dlg = SaveFileDialog()
-    dlg.Title = "Save Project Parameter Template"
-    dlg.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
-    dlg.DefaultExt = "xlsx"
-    dlg.AddExtension = True
-    dlg.CheckPathExists = True
-    
-    # Set default directory to network location
     default_dir = r"N:\Library\Design Software\Autodesk\Revit\Shared Parameters"
-    try:
-        if os.path.isdir(default_dir):
-            dlg.InitialDirectory = default_dir
-            # Set full path with filename
-            default_filename = "Project_Parameters_Template_{}.xlsx".format(
-                datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            )
-            dlg.FileName = os.path.join(default_dir, default_filename)
-    except Exception as e:
-        print("Failed to set default path: {}".format(str(e)))
-        # Fallback to just filename
-        dlg.FileName = "Project_Parameters_Template_{}.xlsx".format(
-            datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        )
-
-    result = dlg.ShowDialog()
-    if result == DialogResult.OK:
-        try:
-            return str(dlg.FileName)
-        except Exception:
-            return dlg.FileName
-    return None
+    default_filename = "Project_Parameters_Template_{}.xlsx".format(
+        datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    )
+    return ui.uiUtils_save_file_dialog(
+        title="Save Project Parameter Template",
+        filter_text="Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*",
+        default_extension="xlsx",
+        initial_directory=default_dir if os.path.isdir(default_dir) else "",
+        file_name=default_filename,
+    )
 
 
 # ============================================================
