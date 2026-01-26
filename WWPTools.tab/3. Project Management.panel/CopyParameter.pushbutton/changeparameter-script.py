@@ -1,6 +1,7 @@
 #! python3
 from pyrevit import revit, DB, script
 from Autodesk.Revit import UI
+import WWP_uiUtils as ui
 # Get the active document
 doc = revit.doc
 output = script.get_output()
@@ -9,91 +10,21 @@ output = script.get_output()
 def ask_for_inputs(param_names):
     """Single form for parameter mapping and text transforms."""
     try:
-        import System
-        from System.Drawing import Size
-        from System.Windows.Forms import Form, Label, TextBox, Button, DialogResult, ComboBox, ComboBoxStyle
+        return ui.uiUtils_parameter_copy_inputs(
+            param_names=param_names or [],
+            title="Copy and Transform Parameter",
+            source_default="View Name",
+            target_default="Title on Sheet",
+            find_default="",
+            replace_default="",
+            prefix_default="",
+            suffix_default="",
+            width=480,
+            height=460,
+        )
     except Exception as e:
-        UI.TaskDialog.Show("Copy Parameter", f"Unable to load input dialog: {str(e)}")
+        UI.TaskDialog.Show("Copy Parameter", "Unable to load input dialog: {}".format(str(e)))
         return None
-
-    form = Form()
-    form.Text = "Copy and Transform Parameter"
-    form.Width = 420
-    form.Height = 320
-    form.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
-    form.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
-    form.MaximizeBox = False
-    form.MinimizeBox = False
-
-    labels = [
-        ("Source Parameter", "View Name"),
-        ("Target Parameter", "Title on Sheet"),
-        ("Find Text", ""),
-        ("Replace Text", ""),
-        ("Prefix", ""),
-        ("Suffix", ""),
-    ]
-
-    inputs = []
-    top = 10
-    for index, (label_text, default_value) in enumerate(labels):
-        label = Label()
-        label.Left = 10
-        label.Top = top
-        label.Width = 120
-        label.Text = label_text
-
-        if index in (0, 1):
-            control = ComboBox()
-            control.Left = 140
-            control.Top = top - 2
-            control.Width = 250
-            control.DropDownStyle = ComboBoxStyle.DropDown
-            if param_names:
-                control.Items.AddRange(list(param_names))
-            control.Text = default_value
-        else:
-            control = TextBox()
-            control.Left = 140
-            control.Top = top - 2
-            control.Width = 250
-            control.Text = default_value
-
-        form.Controls.Add(label)
-        form.Controls.Add(control)
-        inputs.append(control)
-        top += 30
-
-    ok = Button()
-    ok.Text = "OK"
-    ok.Left = 230
-    ok.Top = top + 10
-    ok.DialogResult = DialogResult.OK
-
-    cancel = Button()
-    cancel.Text = "Cancel"
-    cancel.Left = 310
-    cancel.Top = top + 10
-    cancel.DialogResult = DialogResult.Cancel
-
-    form.AcceptButton = ok
-    form.CancelButton = cancel
-
-    form.Controls.Add(ok)
-    form.Controls.Add(cancel)
-
-    result = form.ShowDialog()
-    if result != DialogResult.OK:
-        return None
-
-    return {
-        "source_param": inputs[0].Text,
-        "target_param": inputs[1].Text,
-        "find_text": inputs[2].Text,
-        "replace_text": inputs[3].Text,
-        "prefix": inputs[4].Text,
-        "suffix": inputs[5].Text,
-    }
 
 def get_all_parameter_names(elements):
     """Return a sorted list of parameter names across all selected elements."""

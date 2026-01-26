@@ -5,20 +5,7 @@ from pyrevit import revit, DB, script
 import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
-
-clr.AddReference("System.Windows.Forms")
-clr.AddReference("System.Drawing")
-from System.Drawing import Point, Size
 from System.Collections.Generic import List
-from System.Windows.Forms import (
-    Button,
-    ComboBox,
-    ComboBoxStyle,
-    DialogResult,
-    Form,
-    FormStartPosition,
-    Label,
-)
 
 
 doc = revit.doc
@@ -152,144 +139,6 @@ def _rect_loop_from_bbox(bbox):
     return loop
 
 
-class KeyplanForm(Form):
-    def __init__(self, base_view, templates, fill_types, state):
-        super(KeyplanForm, self).__init__()
-        self.Text = "Make Keyplans"
-        self.StartPosition = FormStartPosition.CenterScreen
-        self.Size = Size(640, 320)
-        self.MinimizeBox = False
-        self.MaximizeBox = False
-
-        self._base_view = base_view
-        self._templates = templates
-        self._fill_types = fill_types
-        self._state = state
-
-        self.selected_keyplan_template = None
-        self.selected_fill_type = None
-        self.request_action = None
-
-        current_y = 16
-
-        info = Label()
-        info.Text = "Active view: {}".format(base_view.Name)
-        info.Location = Point(12, current_y)
-        info.Size = Size(600, 20)
-        self.Controls.Add(info)
-
-        current_y += 32
-        self._area_label = Label()
-        area_label = self._state.get("area_label") or "(not selected)"
-        self._area_label.Text = "Areas: {}".format(area_label)
-        self._area_label.Location = Point(12, current_y)
-        self._area_label.Size = Size(420, 20)
-        self.Controls.Add(self._area_label)
-
-        self._area_btn = Button()
-        self._area_btn.Text = "Pick Areas"
-        self._area_btn.Location = Point(460, current_y - 2)
-        self._area_btn.Size = Size(140, 26)
-        self._area_btn.Click += self._on_pick_area
-        self.Controls.Add(self._area_btn)
-
-        current_y += 40
-        template_label = Label()
-        template_label.Text = "Keyplan view template:"
-        template_label.Location = Point(12, current_y)
-        template_label.Size = Size(220, 20)
-        self.Controls.Add(template_label)
-
-        self._keyplan_template_combo = ComboBox()
-        self._keyplan_template_combo.Location = Point(240, current_y - 2)
-        self._keyplan_template_combo.Size = Size(360, 26)
-        self._keyplan_template_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._keyplan_template_combo)
-
-        current_y += 36
-        fill_label = Label()
-        fill_label.Text = "Keyplan filled region type:"
-        fill_label.Location = Point(12, current_y)
-        fill_label.Size = Size(220, 20)
-        self.Controls.Add(fill_label)
-
-        self._fill_combo = ComboBox()
-        self._fill_combo.Location = Point(240, current_y - 2)
-        self._fill_combo.Size = Size(360, 26)
-        self._fill_combo.DropDownStyle = ComboBoxStyle.DropDownList
-        self.Controls.Add(self._fill_combo)
-
-        current_y += 40
-        self._create_btn = Button()
-        self._create_btn.Text = "Create"
-        self._create_btn.Location = Point(420, current_y)
-        self._create_btn.Size = Size(90, 30)
-        self._create_btn.Click += self._on_create
-        self.Controls.Add(self._create_btn)
-
-        self._cancel_btn = Button()
-        self._cancel_btn.Text = "Cancel"
-        self._cancel_btn.Location = Point(520, current_y)
-        self._cancel_btn.Size = Size(90, 30)
-        self._cancel_btn.Click += self._on_cancel
-        self.Controls.Add(self._cancel_btn)
-
-        self._load_template_choices()
-        self._load_fill_choices()
-
-    def _load_template_choices(self):
-        self._keyplan_template_combo.Items.Clear()
-        for template in self._templates:
-            self._keyplan_template_combo.Items.Add(template.Name)
-        if self._templates:
-            index = self._state.get("keyplan_template_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._templates):
-                self._keyplan_template_combo.SelectedIndex = index
-            else:
-                self._keyplan_template_combo.SelectedIndex = 0
-
-    def _load_fill_choices(self):
-        self._fill_combo.Items.Clear()
-        for fill_type in self._fill_types:
-            self._fill_combo.Items.Add(fill_type.Name)
-        if self._fill_types:
-            index = self._state.get("fill_type_index", 0)
-            if isinstance(index, int) and 0 <= index < len(self._fill_types):
-                self._fill_combo.SelectedIndex = index
-            else:
-                self._fill_combo.SelectedIndex = 0
-
-    def _on_pick_area(self, sender, args):
-        if self._keyplan_template_combo.SelectedIndex >= 0:
-            self._state["keyplan_template_index"] = self._keyplan_template_combo.SelectedIndex
-        if self._fill_combo.SelectedIndex >= 0:
-            self._state["fill_type_index"] = self._fill_combo.SelectedIndex
-        self.request_action = "area"
-        self.DialogResult = DialogResult.Retry
-        self.Close()
-
-    def _on_create(self, sender, args):
-        if not self._state.get("areas"):
-            uiutils.uiUtils_alert("Please pick at least one area.")
-            return
-        if self._keyplan_template_combo.SelectedIndex < 0:
-            uiutils.uiUtils_alert("Please select a keyplan view template.")
-            return
-        if self._fill_combo.SelectedIndex < 0:
-            uiutils.uiUtils_alert("Please select a keyplan filled region type.")
-            return
-
-        self.selected_keyplan_template = self._templates[self._keyplan_template_combo.SelectedIndex]
-        self.selected_fill_type = self._fill_types[self._fill_combo.SelectedIndex]
-
-        self.DialogResult = DialogResult.OK
-        self.Close()
-
-    def _on_cancel(self, sender, args):
-        self.DialogResult = DialogResult.Cancel
-        self.Close()
-
-
 def main():
     base_view = doc.ActiveView
     if not isinstance(base_view, DB.ViewPlan):
@@ -345,41 +194,64 @@ def main():
                 state["fill_type_index"] = idx
                 break
 
-    while True:
-        form = KeyplanForm(base_view, templates_sorted, fill_types_sorted, state)
-        result = form.ShowDialog()
-        if result == DialogResult.Retry:
-            try:
-                areas = pick_elements(DB.BuiltInCategory.OST_Areas, "Select suite areas")
-            except OperationCanceledException:
-                continue
-            if not areas:
-                state["areas"] = []
-                state["area_label"] = "(not selected)"
-            else:
-                state["areas"] = areas
-                if len(areas) > 1:
-                    state["area_label"] = "{} areas selected".format(len(areas))
-                else:
-                    state["area_label"] = areas[0].Name or areas[0].Id.IntegerValue
-            continue
-        if result != DialogResult.OK:
+    if state["areas"]:
+        use_last = uiutils.uiUtils_confirm("Use previously selected area(s)?", title="Make Keyplans")
+        if not use_last:
+            state["areas"] = []
+
+    if not state["areas"]:
+        try:
+            areas = pick_elements(DB.BuiltInCategory.OST_Areas, "Select suite areas")
+        except OperationCanceledException:
             return
+        state["areas"] = areas
 
-        areas = state.get("areas") or []
-        keyplan_template = form.selected_keyplan_template
-        keyplan_fill_type = form.selected_fill_type
+    areas = state.get("areas") or []
+    if not areas:
+        uiutils.uiUtils_alert("Please pick at least one area.", title="Make Keyplans")
+        return
 
-        area_for_config = areas[0] if areas else None
-        config.last_area_id = element_id_value(area_for_config.Id) if area_for_config else None
-        config.last_keyplan_template_id = (
-            element_id_value(keyplan_template.Id) if keyplan_template else None
-        )
-        config.last_fill_type_id = (
-            element_id_value(keyplan_fill_type.Id) if keyplan_fill_type else None
-        )
-        script.save_config()
-        break
+    if len(areas) > 1:
+        state["area_label"] = "{} areas selected".format(len(areas))
+    else:
+        state["area_label"] = areas[0].Name or areas[0].Id.IntegerValue
+
+    result = uiutils.uiUtils_keyplan_options(
+        [t.Name for t in templates_sorted],
+        [f.Name for f in fill_types_sorted],
+        title="Make Keyplans",
+        area_label=state.get("area_label") or "(not selected)",
+        template_index=state.get("keyplan_template_index", 0),
+        fill_type_index=state.get("fill_type_index", 0),
+        width=640,
+        height=360,
+    )
+    if result is None:
+        return
+
+    template_index = result.get("template_index", 0)
+    fill_type_index = result.get("fill_type_index", 0)
+
+    keyplan_template = (
+        templates_sorted[template_index]
+        if 0 <= template_index < len(templates_sorted)
+        else templates_sorted[0]
+    )
+    keyplan_fill_type = (
+        fill_types_sorted[fill_type_index]
+        if 0 <= fill_type_index < len(fill_types_sorted)
+        else fill_types_sorted[0]
+    )
+
+    area_for_config = areas[0] if areas else None
+    config.last_area_id = element_id_value(area_for_config.Id) if area_for_config else None
+    config.last_keyplan_template_id = (
+        element_id_value(keyplan_template.Id) if keyplan_template else None
+    )
+    config.last_fill_type_id = (
+        element_id_value(keyplan_fill_type.Id) if keyplan_fill_type else None
+    )
+    script.save_config()
 
     results = []
     with revit.Transaction("Create Keyplan Views"):

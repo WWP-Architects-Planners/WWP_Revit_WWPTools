@@ -11,12 +11,6 @@ import tempfile
 
 from pyrevit import DB, revit, script
 
-from System.Windows.Forms import (
-    DialogResult,
-    MessageBox,
-    SaveFileDialog,
-    FolderBrowserDialog,
-)
 
 
 CONFIG_LAST_EXCEL_PATH = "last_excel_path"
@@ -226,12 +220,15 @@ def make_unique_name(base, used, max_len=None):
         idx += 1
 
 
-def export_to_excel(doc, schedules, file_path):
+def export_to_excel(doc, schedules, file_path, ui):
     add_lib_path()
     try:
         import openpyxl
     except Exception as exc:
-        MessageBox.Show("openpyxl is not available.\n{}".format(exc), "Multiple Schedules Exporter")
+        ui.uiUtils_alert(
+            "openpyxl is not available.\n{}".format(exc),
+            title="Multiple Schedules Exporter",
+        )
         return False
 
     used_names = set()
@@ -312,7 +309,7 @@ def main():
 
     schedules = collect_schedules(doc)
     if not schedules:
-        MessageBox.Show("No schedules found.", "Multiple Schedules Exporter")
+        ui.uiUtils_alert("No schedules found.", title="Multiple Schedules Exporter")
         return
 
     items = [ScheduleItem(v) for v in schedules]
@@ -337,15 +334,15 @@ def main():
             height=620,
         )
     else:
-        MessageBox.Show(
+        ui.uiUtils_alert(
             "UI helper uiUtils_select_items_with_mode is unavailable. Restart pyRevit or update WWP_uiUtils.",
-            "Multiple Schedules Exporter",
+            title="Multiple Schedules Exporter",
         )
         return
     if mode is None:
         return
     if not selected_indices:
-        MessageBox.Show("Select at least one schedule.", "Multiple Schedules Exporter")
+        ui.uiUtils_alert("Select at least one schedule.", title="Multiple Schedules Exporter")
         return
     selected_views = [items[i].view for i in selected_indices]
     config.last_schedule_ids = [element_id_value(v.Id) for v in selected_views]
@@ -354,37 +351,35 @@ def main():
     if mode == 0:
         last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
         init_dir = os.path.dirname(last_excel_path) if last_excel_path else default_dir
-        dialog = SaveFileDialog()
-        dialog.Filter = "Excel Workbook (*.xlsx)|*.xlsx"
-        dialog.DefaultExt = "xlsx"
-        dialog.AddExtension = True
-        dialog.CheckPathExists = True
-        dialog.ValidateNames = True
-        dialog.FileName = os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx"
-        dialog.InitialDirectory = init_dir
-        dialog.OverwritePrompt = False
-        if dialog.ShowDialog() != DialogResult.OK:
+        file_path = ui.uiUtils_save_file_dialog(
+            title="Export Schedules",
+            filter_text="Excel Workbook (*.xlsx)|*.xlsx",
+            default_extension="xlsx",
+            initial_directory=init_dir,
+            file_name=os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx",
+        )
+        if not file_path:
             return
-        file_path = dialog.FileName
         if not file_path.lower().endswith(".xlsx"):
             file_path = "{}.xlsx".format(file_path)
-        success = export_to_excel(doc, selected_views, file_path)
+        success = export_to_excel(doc, selected_views, file_path, ui)
         if not success:
             return
         config.last_excel_path = file_path
     else:
         last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
         init_dir = last_csv_dir or default_dir
-        dialog = FolderBrowserDialog()
-        dialog.SelectedPath = init_dir
-        if dialog.ShowDialog() != DialogResult.OK:
+        folder = ui.uiUtils_select_folder_dialog(
+            title="Select CSV Folder",
+            initial_directory=init_dir,
+        )
+        if not folder:
             return
-        folder = dialog.SelectedPath
         export_to_csv(doc, selected_views, folder)
         config.last_csv_dir = folder
 
     script.save_config()
-    MessageBox.Show("Export complete.", "Multiple Schedules Exporter")
+    ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
 
 
 if __name__ == "__main__":

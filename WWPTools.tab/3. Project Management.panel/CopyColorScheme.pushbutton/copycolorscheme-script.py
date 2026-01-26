@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from pyrevit import revit, DB, forms
+from pyrevit import revit, DB
+import WWP_uiUtils as ui
 
 try:
 	import clr
@@ -111,37 +112,39 @@ doc = revit.doc
 
 schemes = _collect_color_fill_schemes(doc)
 if not schemes:
-	forms.alert("No Color Fill Schemes found in this model.", title="Copy Color Scheme")
+	ui.uiUtils_alert("No Color Fill Schemes found in this model.", title="Copy Color Scheme")
 	raise SystemExit
 
-source_options = [_SchemeOption(_scheme_display_name(doc, s), s) for s in schemes]
-source_option = forms.SelectFromList.show(
-	source_options,
-	name_attr="name",
-	multiselect=False,
+source_names = [_scheme_display_name(doc, s) for s in schemes]
+source_indices = ui.uiUtils_select_indices(
+	source_names,
 	title="Source Color Scheme",
-	button_name="Select Source",
+	prompt="Select source scheme:",
+	multiselect=False,
+	width=720,
+	height=520,
 )
-if not source_option:
+if not source_indices:
 	raise SystemExit
-source = source_option.scheme
+source = schemes[source_indices[0]]
 
 targets = [scheme for scheme in schemes if scheme.Id != source.Id]
 if not targets:
-	forms.alert("No other Color Fill Scheme found to copy into.", title="Copy Color Scheme")
+	ui.uiUtils_alert("No other Color Fill Scheme found to copy into.", title="Copy Color Scheme")
 	raise SystemExit
 
-target_options = [_SchemeOption(_scheme_display_name(doc, s), s) for s in targets]
-target_option = forms.SelectFromList.show(
-	target_options,
-	name_attr="name",
-	multiselect=False,
+target_names = [_scheme_display_name(doc, s) for s in targets]
+target_indices = ui.uiUtils_select_indices(
+	target_names,
 	title="Target Color Scheme",
-	button_name="Select Target",
+	prompt="Select target scheme:",
+	multiselect=False,
+	width=720,
+	height=520,
 )
-if not target_option:
+if not target_indices:
 	raise SystemExit
-target = target_option.scheme
+target = targets[target_indices[0]]
 
 with revit.Transaction("Copy Color Scheme"):
 	try:
@@ -153,7 +156,7 @@ with revit.Transaction("Copy Color Scheme"):
 		target = None
 
 if not target:
-	forms.alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
+	ui.uiUtils_alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
 	raise SystemExit
 
 try:
@@ -161,4 +164,4 @@ try:
 except Exception:
 	pass
 
-forms.alert("Updated scheme: {}".format(getattr(target, "Name", "Color Scheme")), title="Copy Color Scheme")
+ui.uiUtils_alert("Updated scheme: {}".format(getattr(target, "Name", "Color Scheme")), title="Copy Color Scheme")

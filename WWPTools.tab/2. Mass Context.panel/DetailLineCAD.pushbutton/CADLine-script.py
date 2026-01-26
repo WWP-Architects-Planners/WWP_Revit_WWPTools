@@ -1,6 +1,7 @@
 #! python3
 import collections
 from collections import defaultdict
+import os
 
 try:
     from collections.abc import Callable as _Callable
@@ -20,31 +21,17 @@ import sys
 
 from pyrevit import DB, revit, script
 
-try:
-    from pyrevit import forms
-    _HAS_PYREVIT_FORMS = True
-except Exception:
-    forms = None
-    _HAS_PYREVIT_FORMS = False
-
 clr.AddReference("RevitAPIUI")
-clr.AddReference("System.Windows.Forms")
-clr.AddReference("System.Drawing")
 from Autodesk.Revit import UI
-from System.Windows.Forms import (
-    Form,
-    Button,
-    ListBox,
-    CheckedListBox,
-    ComboBox,
-    TextBox,
-    ComboBoxStyle,
-    DialogResult,
-    FormStartPosition,
-    FormBorderStyle,
-    SelectionMode,
-)
-from System.Drawing import Point, Size
+
+
+def _load_uiutils():
+    script_dir = os.path.dirname(__file__)
+    lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+    if lib_path not in sys.path:
+        sys.path.append(lib_path)
+    import WWP_uiUtils as ui
+    return ui
 
 
 def _pick_import_instance(uidoc):
@@ -73,7 +60,7 @@ def _pick_import_instance(uidoc):
     return uidoc.Document.GetElement(ref.ElementId)
 
 
-def _choose_import_instance(doc, view):
+def _choose_import_instance(doc, view, ui):
     uidoc = revit.uidoc
     picked = _pick_import_instance(uidoc)
     if picked:
@@ -95,15 +82,7 @@ def _choose_import_instance(doc, view):
 
     options = {e.Name: e for e in candidates}
     options_list = sorted(options.keys())
-    if _HAS_PYREVIT_FORMS:
-        chosen = forms.SelectFromList.show(
-            options_list,
-            multiselect=False,
-            title="Select CAD Import",
-            button_name="Select",
-        )
-    else:
-        chosen = _select_single("Select CAD Import", options_list)
+    chosen = _select_single("Select CAD Import", options_list, ui)
     if not chosen:
         return None
     return options[chosen]
@@ -209,45 +188,38 @@ def _unique_group_type_name(doc, base_name):
 def main():
     doc = revit.doc
     view = doc.ActiveView
+    ui = _load_uiutils()
     if view.ViewType in (DB.ViewType.ThreeD, DB.ViewType.DrawingSheet):
-        _show_alert("Detail Lines", "Open a plan/section/detail view before running.")
+        _show_alert("Detail Lines", "Open a plan/section/detail view before running.", ui)
         return
 
-    import_instance = _choose_import_instance(doc, view)
+    import_instance = _choose_import_instance(doc, view, ui)
     if not import_instance:
-        _show_alert("Detail Lines", "No CAD import/link selected.")
+        _show_alert("Detail Lines", "No CAD import/link selected.", ui)
         return
 
     layer_names = _get_layer_names(import_instance)
     if not layer_names:
-        _show_alert("Detail Lines", "No layers found on the selected CAD import.")
+        _show_alert("Detail Lines", "No layers found on the selected CAD import.", ui)
         return
 
-    if _HAS_PYREVIT_FORMS:
-        selected_layers = forms.SelectFromList.show(
-            layer_names,
-            multiselect=True,
-            title="Select CAD Layers",
-            button_name="Convert",
-        )
-    else:
-        selected_layers = _select_multi("Select CAD Layers", layer_names)
+    selected_layers = _select_multi("Select CAD Layers", layer_names, ui)
     if not selected_layers:
         return
 
     line_styles = _get_line_styles(doc)
     if not line_styles:
-        _show_alert("Detail Lines", "No line styles found in this document.")
+        _show_alert("Detail Lines", "No line styles found in this document.", ui)
         return
 
     style_names = _order_line_style_names(line_styles.keys())
-    layer_style_map = _map_layers_to_styles(selected_layers, style_names)
+    layer_style_map = _map_layers_to_styles(selected_layers, style_names, ui)
     if not layer_style_map:
         return
 
     curves_by_layer = _collect_curves_by_layer(doc, import_instance, set(selected_layers))
     if not curves_by_layer:
-        _show_alert("Detail Lines", "No curves found for the selected layers.")
+        _show_alert("Detail Lines", "No curves found for the selected layers.", ui)
         return
 
     created_counts = {}
@@ -298,8 +270,8 @@ def main():
     _report_results(created_counts, skipped, ungrouped, skipped_short)
 
 
-def _show_alert(title, message):
-    UI.TaskDialog.Show(title, message)
+def _show_alert(title, message, ui):
+    ui.uiUtils_alert(message, title=title)
 
 
 def _get_line_styles(doc):
@@ -338,117 +310,30 @@ def _order_line_style_names(style_names):
     return names
 
 
-def _map_layers_to_styles(layers, style_names):
+def _map_layers_to_styles(layers, style_names, ui):
     if not layers or not style_names:
         return None
+    use_single = ui.uiUtils_confirm(
+        "Use a single line style for all selected layers?",
+        title="Map CAD Layers to Line Styles",
+    )
+    if use_single:
+        selected = _select_single("Select Line Style", style_names, ui)
+        if not selected:
+            return None
+        return {layer: selected for layer in layers}
 
-    class _MapForm(Form):
-        def __init__(self, layer_items, style_items):
-            Form.__init__(self)
-            self.Text = "Map CAD Layers to Line Styles"
-            self.StartPosition = FormStartPosition.CenterScreen
-            self.ClientSize = Size(640, 420)
-            self.FormBorderStyle = FormBorderStyle.FixedDialog
-            self.MinimizeBox = False
-            self.MaximizeBox = False
-
-            self.mapping = {}
-            default_style = style_items[0] if style_items else None
-            for layer in layer_items:
-                self.mapping[layer] = default_style
-
-            self.layer_list = ListBox()
-            self.layer_list.Location = Point(10, 10)
-            self.layer_list.Size = Size(260, 340)
-            self.layer_list.SelectionMode = SelectionMode.MultiExtended
-            for item in layer_items:
-                self.layer_list.Items.Add(item)
-
-            self.style_combo = ComboBox()
-            self.style_combo.Location = Point(290, 10)
-            self.style_combo.Size = Size(330, 21)
-            self.style_combo.DropDownStyle = ComboBoxStyle.DropDownList
-            for item in style_items:
-                self.style_combo.Items.Add(item)
-            if self.style_combo.Items.Count > 0:
-                self.style_combo.SelectedIndex = 0
-
-            self.btn_set_selected = Button()
-            self.btn_set_selected.Text = "Set for Selected"
-            self.btn_set_selected.Location = Point(290, 45)
-            self.btn_set_selected.Size = Size(140, 25)
-            self.btn_set_selected.Click += self._on_set_selected
-
-            self.btn_set_all = Button()
-            self.btn_set_all.Text = "Set All"
-            self.btn_set_all.Location = Point(440, 45)
-            self.btn_set_all.Size = Size(80, 25)
-            self.btn_set_all.Click += self._on_set_all
-
-            self.summary = TextBox()
-            self.summary.Location = Point(290, 80)
-            self.summary.Size = Size(330, 270)
-            self.summary.Multiline = True
-            self.summary.ReadOnly = True
-            self.summary.WordWrap = False
-
-            self.btn_ok = Button()
-            self.btn_ok.Text = "OK"
-            self.btn_ok.Location = Point(464, 370)
-            self.btn_ok.Size = Size(75, 25)
-            self.btn_ok.DialogResult = DialogResult.OK
-
-            self.btn_cancel = Button()
-            self.btn_cancel.Text = "Cancel"
-            self.btn_cancel.Location = Point(545, 370)
-            self.btn_cancel.Size = Size(75, 25)
-            self.btn_cancel.DialogResult = DialogResult.Cancel
-
-            self.AcceptButton = self.btn_ok
-            self.CancelButton = self.btn_cancel
-
-            self.Controls.Add(self.layer_list)
-            self.Controls.Add(self.style_combo)
-            self.Controls.Add(self.btn_set_selected)
-            self.Controls.Add(self.btn_set_all)
-            self.Controls.Add(self.summary)
-            self.Controls.Add(self.btn_ok)
-            self.Controls.Add(self.btn_cancel)
-
-            self._render_summary()
-
-        def _selected_style(self):
-            try:
-                return self.style_combo.SelectedItem
-            except Exception:
-                return None
-
-        def _on_set_selected(self, sender, args):
-            style = self._selected_style()
-            if not style:
-                return
-            for item in self.layer_list.SelectedItems:
-                self.mapping[item] = style
-            self._render_summary()
-
-        def _on_set_all(self, sender, args):
-            style = self._selected_style()
-            if not style:
-                return
-            for item in self.layer_list.Items:
-                self.mapping[item] = style
-            self._render_summary()
-
-        def _render_summary(self):
-            lines = []
-            for layer in sorted(self.mapping.keys()):
-                lines.append("{} -> {}".format(layer, self.mapping[layer]))
-            self.summary.Text = "\r\n".join(lines)
-
-    dlg = _MapForm(layers, style_names)
-    if dlg.ShowDialog() != DialogResult.OK:
-        return None
-    return dlg.mapping
+    mapping = {}
+    for layer in layers:
+        style = _select_single(
+            "Map Layer: {}".format(layer),
+            style_names,
+            ui,
+        )
+        if not style:
+            return None
+        mapping[layer] = style
+    return mapping
 
 
 def _report_results(created_counts, skipped, ungrouped, skipped_short):
@@ -476,89 +361,37 @@ def _report_results(created_counts, skipped, ungrouped, skipped_short):
         print(line)
 
 
-def _select_single(title, options):
-    class _SelectSingle(Form):
-        def __init__(self, items):
-            Form.__init__(self)
-            self.Text = title
-            self.StartPosition = FormStartPosition.CenterScreen
-            self.ClientSize = Size(420, 420)
-            self.FormBorderStyle = FormBorderStyle.FixedDialog
-            self.MinimizeBox = False
-            self.MaximizeBox = False
-
-            self.listbox = ListBox()
-            self.listbox.Location = Point(10, 10)
-            self.listbox.Size = Size(400, 340)
-            for item in items:
-                self.listbox.Items.Add(item)
-
-            btn_ok = Button()
-            btn_ok.Text = "OK"
-            btn_ok.Location = Point(254, 370)
-            btn_ok.Size = Size(75, 25)
-            btn_ok.DialogResult = DialogResult.OK
-
-            btn_cancel = Button()
-            btn_cancel.Text = "Cancel"
-            btn_cancel.Location = Point(335, 370)
-            btn_cancel.Size = Size(75, 25)
-            btn_cancel.DialogResult = DialogResult.Cancel
-
-            self.AcceptButton = btn_ok
-            self.CancelButton = btn_cancel
-
-            self.Controls.Add(self.listbox)
-            self.Controls.Add(btn_ok)
-            self.Controls.Add(btn_cancel)
-
-    dlg = _SelectSingle(options)
-    if dlg.ShowDialog() != DialogResult.OK:
+def _select_single(title, options, ui):
+    if not options:
         return None
-    return dlg.listbox.SelectedItem
-
-
-def _select_multi(title, options):
-    class _SelectMulti(Form):
-        def __init__(self, items):
-            Form.__init__(self)
-            self.Text = title
-            self.StartPosition = FormStartPosition.CenterScreen
-            self.ClientSize = Size(420, 420)
-            self.FormBorderStyle = FormBorderStyle.FixedDialog
-            self.MinimizeBox = False
-            self.MaximizeBox = False
-
-            self.listbox = CheckedListBox()
-            self.listbox.Location = Point(10, 10)
-            self.listbox.Size = Size(400, 340)
-            self.listbox.CheckOnClick = True
-            for item in items:
-                self.listbox.Items.Add(item)
-
-            btn_ok = Button()
-            btn_ok.Text = "OK"
-            btn_ok.Location = Point(254, 370)
-            btn_ok.Size = Size(75, 25)
-            btn_ok.DialogResult = DialogResult.OK
-
-            btn_cancel = Button()
-            btn_cancel.Text = "Cancel"
-            btn_cancel.Location = Point(335, 370)
-            btn_cancel.Size = Size(75, 25)
-            btn_cancel.DialogResult = DialogResult.Cancel
-
-            self.AcceptButton = btn_ok
-            self.CancelButton = btn_cancel
-
-            self.Controls.Add(self.listbox)
-            self.Controls.Add(btn_ok)
-            self.Controls.Add(btn_cancel)
-
-    dlg = _SelectMulti(options)
-    if dlg.ShowDialog() != DialogResult.OK:
+    indices = ui.uiUtils_select_indices(
+        options,
+        title=title,
+        prompt="Select an option:",
+        multiselect=False,
+        width=520,
+        height=540,
+    )
+    if not indices:
         return None
-    return [x for x in dlg.listbox.CheckedItems]
+    index = indices[0]
+    if 0 <= index < len(options):
+        return options[index]
+    return None
+
+
+def _select_multi(title, options, ui):
+    if not options:
+        return []
+    indices = ui.uiUtils_select_indices(
+        options,
+        title=title,
+        prompt="Select items:",
+        multiselect=True,
+        width=520,
+        height=540,
+    )
+    return [options[i] for i in indices if 0 <= i < len(options)]
 
 
 if __name__ == "__main__":
