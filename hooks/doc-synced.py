@@ -10,6 +10,7 @@ if msgUtils_muted():
 from pyrevit import forms
 from datetime import datetime
 import math
+import os
 
 # get the time
 time = datetime.now()
@@ -51,19 +52,20 @@ try:
 	e_secs  = elapsed % 60
 	if e_mins < 1:
 		msg_time = "Only " + timeToString(e_secs) + " secs"
-		msg_title = "Completed, it synced faster than Lightning!!"
+		msg_title = "Sync complete"
 	elif e_mins > 5:
 		msg_time = timeToString(e_mins) + " mins & " + timeToString(e_secs) + " secs"
-		msg_title = "Synced but it took too long(check your model)"
+		msg_title = "Sync complete (slow)"
 	else:
 		msg_time = timeToString(e_mins) + " mins & " + timeToString(e_secs) + " secs"
-		msg_title = "Sync Completed"
+		msg_title = "Sync complete"
 	# Show toast message
+	icon_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "lib", "WWPtools-logo.png"))
 	forms.toaster.send_toast(
         msg_time, 
         title = msg_title, 
         appid=None, 
-        icon="N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\PYREVIT\\WWP LOGO.jpg", 
+        icon=icon_path, 
         click=None, 
         actions=None
        )

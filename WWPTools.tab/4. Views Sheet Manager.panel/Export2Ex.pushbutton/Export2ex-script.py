@@ -46,6 +46,14 @@ def get_default_dir(doc):
     return os.path.expanduser("~")
 
 
+def ensure_existing_dir(path, fallback=""):
+    if path and os.path.isdir(path):
+        return path
+    if fallback and os.path.isdir(fallback):
+        return fallback
+    return ""
+
+
 def collect_schedules(doc):
     schedules = []
     for view in DB.FilteredElementCollector(doc).OfClass(DB.ViewSchedule):
@@ -81,7 +89,8 @@ def element_id_value(elem_id):
 class ScheduleItem(object):
     def __init__(self, view):
         self.view = view
-        self.display_name = "{} [id:{}]".format(view.Name, element_id_value(view.Id))
+        display_name = "{} [id:{}]".format(view.Name, element_id_value(view.Id))
+        self.display_name = display_name.replace("_", "__")
 
 
 def add_lib_path():
@@ -188,16 +197,137 @@ def inject_element_id_column(data, view):
 
 
 
-def write_table_to_sheet(sheet, data, start_row):
+def write_table_to_sheet(sheet, data, start_row, header_rows=0, column_specs=None, doc=None):
     if not data:
         return
+    has_specs = bool(column_specs) and any(spec is not None for spec in column_specs)
     row_idx = start_row
-    for row in data:
+    for row_offset, row in enumerate(data):
         col_idx = 1
         for value in row:
-            sheet.cell(row=row_idx, column=col_idx, value=value)
+            spec = None
+            if has_specs and column_specs and (col_idx - 1) < len(column_specs):
+                spec = column_specs[col_idx - 1]
+            if row_offset < header_rows:
+                cell_value = value
+            elif has_specs:
+                if spec is None:
+                    cell_value = value
+                else:
+                    cell_value = coerce_cell_value(value, spec=spec, doc=doc, numeric_fallback=True)
+            else:
+                cell_value = coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True)
+            sheet.cell(row=row_idx, column=col_idx, value=cell_value)
             col_idx += 1
         row_idx += 1
+
+
+_NUMERIC_RE = re.compile(r"^-?\d+(\.\d+)?$")
+_NUMERIC_WITH_UNIT_RE = re.compile(r"^\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*[A-Za-z%]+)?\s*$")
+
+
+def _try_parse_with_spec(doc, spec, text):
+    if doc is None or spec is None:
+        return None
+    if not any(ch.isdigit() for ch in text):
+        return None
+    try:
+        from System import Double
+        from clr import Reference
+        parsed = Reference[Double](0.0)
+        if DB.UnitFormatUtils.TryParse(doc.GetUnits(), spec, text, parsed):
+            value = float(parsed.Value)
+            if abs(value - round(value)) < 1e-9:
+                return int(round(value))
+            return value
+    except Exception:
+        pass
+    return None
+
+
+def coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text == "":
+            return ""
+        parsed = _try_parse_with_spec(doc, spec, text)
+        if parsed is not None:
+            return parsed
+        if not numeric_fallback:
+            return value
+        if "'" in text or '"' in text or "/" in text:
+            return value
+        if _NUMERIC_RE.match(text):
+            if spec is None:
+                if text.startswith("0") and len(text) > 1 and not text.startswith("0."):
+                    return value
+                if text.startswith("-0") and len(text) > 2 and not text.startswith("-0."):
+                    return value
+            try:
+                return int(text)
+            except Exception:
+                pass
+            try:
+                return float(text)
+            except Exception:
+                return value
+        match = _NUMERIC_WITH_UNIT_RE.match(text)
+        if match:
+            number_text = match.group(1).replace(",", "")
+            try:
+                return int(number_text)
+            except Exception:
+                try:
+                    return float(number_text)
+                except Exception:
+                    return value
+    return value
+
+
+def get_column_specs(view):
+    section = get_section_data(view, DB.SectionType.Body)
+    if section is None:
+        return []
+    try:
+        col_count = int(section.NumberOfColumns)
+    except Exception:
+        col_count = 0
+    specs = [None] * col_count
+    try:
+        definition = view.Definition
+        field_ids = list(definition.GetFieldOrder())
+        col = 0
+        for field_id in field_ids:
+            try:
+                field = definition.GetField(field_id)
+            except Exception:
+                continue
+            try:
+                if field.IsHidden:
+                    continue
+            except Exception:
+                pass
+            if col >= col_count:
+                break
+            spec = None
+            try:
+                spec = field.GetSpecTypeId()
+            except Exception:
+                pass
+            if spec is None:
+                try:
+                    spec = field.UnitType
+                except Exception:
+                    pass
+            specs[col] = spec
+            col += 1
+    except Exception:
+        pass
+    return specs
 
 
 def make_unique_name(base, used, max_len=None):
@@ -261,9 +391,9 @@ def export_to_excel(doc, schedules, file_path, ui):
                     sheet_name = make_unique_name(base_name, used_pool, max_len=31)
             used_names.add(sheet_name)
             if sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
-                if sheet.max_row:
-                    sheet.delete_rows(1, sheet.max_row)
+                existing = workbook[sheet_name]
+                workbook.remove(existing)
+                sheet = workbook.create_sheet(title=sheet_name)
             else:
                 sheet = workbook.create_sheet(title=sheet_name)
 
@@ -271,7 +401,16 @@ def export_to_excel(doc, schedules, file_path, ui):
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
             data = normalize_table_data(read_csv_rows(csv_path))
-            write_table_to_sheet(sheet, data, 1)
+            header_rows = get_section_row_count(view, DB.SectionType.Header)
+            column_specs = get_column_specs(view)
+            write_table_to_sheet(
+                sheet,
+                data,
+                1,
+                header_rows=header_rows,
+                column_specs=column_specs,
+                doc=doc,
+            )
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -350,7 +489,8 @@ def main():
     default_dir = get_default_dir(doc)
     if mode == 0:
         last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
-        init_dir = os.path.dirname(last_excel_path) if last_excel_path else default_dir
+        last_excel_dir = os.path.dirname(last_excel_path) if last_excel_path else ""
+        init_dir = ensure_existing_dir(last_excel_dir, default_dir)
         file_path = ui.uiUtils_save_file_dialog(
             title="Export Schedules",
             filter_text="Excel Workbook (*.xlsx)|*.xlsx",
@@ -366,9 +506,13 @@ def main():
         if not success:
             return
         config.last_excel_path = file_path
+        try:
+            os.startfile(file_path)
+        except Exception:
+            pass
     else:
         last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
-        init_dir = last_csv_dir or default_dir
+        init_dir = ensure_existing_dir(last_csv_dir, default_dir)
         folder = ui.uiUtils_select_folder_dialog(
             title="Select CSV Folder",
             initial_directory=init_dir,
