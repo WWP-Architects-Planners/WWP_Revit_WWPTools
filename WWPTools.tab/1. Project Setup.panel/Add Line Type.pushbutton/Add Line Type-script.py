@@ -3,6 +3,7 @@ import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
 from Autodesk.Revit.DB import *
+from Autodesk.Revit.DB import Transaction as RevitTransaction
 from Autodesk.Revit.UI import TaskDialog, TaskDialogCommandLinkId, TaskDialogResult
 import os
 import datetime
@@ -12,6 +13,7 @@ import WWP_uiUtils as ui
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
+
 
 # ============================================================
 # Configuration
@@ -601,11 +603,11 @@ if not selected_workbook:
     selected_workbook = default_workbook
 
 if not selected_workbook or not os.path.exists(selected_workbook):
-    TaskDialog.Show(
-        "Error",
+    ui.uiUtils_alert(
         "Excel workbook not found.\n\nDefault:\n{}\n\nYou can browse to a custom workbook in the file dialog.".format(
             default_workbook or MASTER_XLSX_PATH
         ),
+        title="Error"
     )
     raise Exception("Excel workbook not found")
 
@@ -701,7 +703,7 @@ try:
     # Import line patterns
     if line_patterns_data:
         print("\nStarting transaction for line patterns...")
-        t_pattern = Transaction(doc, "Import Line Patterns")
+        t_pattern = RevitTransaction(doc, "Import Line Patterns")
         t_pattern.Start()
         
         pattern_added_count = 0
@@ -747,7 +749,7 @@ try:
             print("Pattern transaction failed: {}".format(str(e)))
             t_pattern.RollBack()
             print("Pattern rollback complete")
-            TaskDialog.Show("Error", "Pattern import failed:\n{}".format(str(e)))
+            ui.uiUtils_alert("Pattern import failed:\n{}".format(str(e)), title="Error")
             raise
     else:
         print("No line patterns to import")
@@ -798,13 +800,13 @@ try:
         raise
     
     if not line_types_data:
-        TaskDialog.Show("Warning", "No line type data found in source file")
+        ui.uiUtils_alert("No line type data found in source file", title="Warning")
         raise Exception("No line type data found")
     
     # Start transaction
     print("Starting transaction in document: {}".format(doc.Title))
     
-    t = Transaction(doc, "Import Line Types")
+    t = RevitTransaction(doc, "Import Line Types")
     t.Start()
     print("Transaction started")
     print("Processing {} line types...".format(len(line_types_data)))
@@ -910,7 +912,7 @@ try:
         print("Transaction failed: {}".format(str(e)))
         t.RollBack()
         print("Rollback complete")
-        TaskDialog.Show("Error", "Transaction failed:\n{}".format(str(e)))
+        ui.uiUtils_alert("Transaction failed:\n{}".format(str(e)), title="Error")
         raise
     
 except Exception as e:
