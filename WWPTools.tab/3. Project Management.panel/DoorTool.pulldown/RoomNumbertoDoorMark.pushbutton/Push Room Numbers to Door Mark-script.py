@@ -2,7 +2,7 @@
 from __future__ import division
 
 import math
-from pyrevit import revit, DB, script
+from pyrevit import revit, DB
 
 from WWP_uiUtils import (
     uiUtils_alert,
@@ -13,7 +13,6 @@ from WWP_uiUtils import (
 
 
 doc = revit.doc
-output = script.get_output()
 
 
 def get_active_phase(document):
@@ -308,18 +307,14 @@ def main():
                 else:
                     failed += 1
 
-    output.print_md("## Push Room Numbers to Door Mark")
-    output.print_md("- Updated: **{}**".format(updated))
-    output.print_md("- Unchanged: **{}**".format(unchanged))
-    output.print_md("- Failed: **{}**".format(failed))
-    output.print_md("- Skipped (no ToRoom/number): **{}**".format(len(skipped)))
-
-    uiUtils_alert(
-        "Updated: {}\nUnchanged: {}\nFailed: {}\nSkipped (no ToRoom/number): {}".format(
-            updated, unchanged, failed, len(skipped)
-        ),
-        title="Push Room Numbers to Door Mark",
-    )
+    summary = (
+        "Push Room Numbers to Door Mark\n"
+        "Updated: {}\n"
+        "Unchanged: {}\n"
+        "Failed: {}\n"
+        "Skipped (no ToRoom/number): {}"
+    ).format(updated, unchanged, failed, len(skipped))
+    print(summary)
 
 
 if __name__ == "__main__":
