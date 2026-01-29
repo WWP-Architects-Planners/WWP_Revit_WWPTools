@@ -2,7 +2,14 @@
 from __future__ import division
 
 import math
-from pyrevit import revit, DB, script, forms
+from pyrevit import revit, DB, script
+
+from WWP_uiUtils import (
+    uiUtils_alert,
+    uiUtils_confirm,
+    uiUtils_prompt_text,
+    uiUtils_select_indices,
+)
 
 
 doc = revit.doc
@@ -191,7 +198,7 @@ def main():
         "Doors to the same room are ordered clockwise when possible.\n\n"
         "Continue?"
     )
-    if not forms.alert(message, title="Push Room Numbers to Door Mark", ok=False, yes=True, no=True):
+    if not uiUtils_confirm(message, title="Push Room Numbers to Door Mark"):
         return
 
     phase = get_active_phase(doc)
@@ -204,25 +211,36 @@ def main():
     )
 
     if not doors:
-        forms.alert("No door instances found.", title="Push Room Numbers to Door Mark")
+        uiUtils_alert("No door instances found.", title="Push Room Numbers to Door Mark")
         return
 
-    filter_choice = forms.CommandSwitchWindow.show(
-        ["No filter", "Include", "Exclude"],
-        message="Filter doors by family/type name?",
+    filter_options = ["No filter", "Include", "Exclude"]
+    filter_indices = uiUtils_select_indices(
+        filter_options,
+        title="Push Room Numbers to Door Mark",
+        prompt="Filter doors by family/type name?",
+        multiselect=False,
+        width=520,
+        height=420,
     )
+    filter_choice = filter_options[filter_indices[0]] if filter_indices else None
     filter_mode = None
     filter_tokens = None
     if filter_choice in ["Include", "Exclude"]:
         filter_mode = filter_choice.lower()
-        filter_tokens = forms.ask_for_string(
-            prompt="Enter comma-separated keywords to {} (family/type name).".format(filter_mode),
+        filter_tokens = uiUtils_prompt_text(
             title="Door Name Filter",
+            prompt="Enter comma-separated keywords to {} (family/type name).".format(filter_mode),
+            default_value="",
+            ok_text="OK",
+            cancel_text="Cancel",
+            width=520,
+            height=240,
         )
 
     doors = apply_name_filter(doors, filter_mode, filter_tokens)
     if not doors:
-        forms.alert("No doors matched the name filter.", title="Push Room Numbers to Door Mark")
+        uiUtils_alert("No doors matched the name filter.", title="Push Room Numbers to Door Mark")
         return
 
     by_room_id = {}
@@ -240,7 +258,7 @@ def main():
         entry["doors"].append(door)
 
     if not by_room_id:
-        forms.alert("No doors with valid ToRoom found.", title="Push Room Numbers to Door Mark")
+        uiUtils_alert("No doors with valid ToRoom found.", title="Push Room Numbers to Door Mark")
         return
 
     updated = 0
@@ -296,7 +314,7 @@ def main():
     output.print_md("- Failed: **{}**".format(failed))
     output.print_md("- Skipped (no ToRoom/number): **{}**".format(len(skipped)))
 
-    forms.alert(
+    uiUtils_alert(
         "Updated: {}\nUnchanged: {}\nFailed: {}\nSkipped (no ToRoom/number): {}".format(
             updated, unchanged, failed, len(skipped)
         ),
