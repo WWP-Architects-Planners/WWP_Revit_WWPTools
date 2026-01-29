@@ -1,0 +1,12 @@
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\bin\Release\net8.0-windows\WWPTools.WpfUI.deps.json
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\bin\Release\net8.0-windows\WWPTools.WpfUI.dll
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\bin\Release\net8.0-windows\WWPTools.WpfUI.pdb
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.GeneratedMSBuildEditorConfig.editorconfig
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.AssemblyInfoInputs.cache
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.AssemblyInfo.cs
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.csproj.CoreCompileInputs.cache
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.sourcelink.json
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.dll
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\refint\WWPTools.WpfUI.dll
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\WWPTools.WpfUI.pdb
+N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\obj\Release\net8.0-windows\ref\WWPTools.WpfUI.dll

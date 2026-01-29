@@ -563,3 +563,59 @@ def uiUtils_keyplan_options(
 		"template_index": int(result.TemplateIndex),
 		"fill_type_index": int(result.FillTypeIndex),
 	}
+
+
+def uiUtils_level_setup_inputs(
+	title="Level Setup",
+	level_count_label="How many levels are needed?",
+	height12_label="Level 1 to Level 2 height (mm):",
+	height23_label="Level 2 to Level 3 height (mm):",
+	typical_height_label="Typical floor-to-floor height after Level 3 (mm):",
+	underground_count_label="How many underground levels?",
+	height_p1_to_l1_label="Floor-to-floor height from P1 to Level 1 (mm):",
+	typical_depth_label="Typical depth below (P2-P3, P3-P4...) (mm):",
+	default_level_count="50",
+	default_height12="4500",
+	default_height23="4500",
+	default_typical_height="3000",
+	default_underground_count="3",
+	default_height_p1_to_l1="3000",
+	default_typical_depth="3000",
+	ok_text="OK",
+	cancel_text="Cancel",
+	width=520,
+	height=520,
+):
+	_ensure_wpf()
+	result = _DIALOGS.LevelSetupInputs(
+		title,
+		level_count_label,
+		height12_label,
+		height23_label,
+		typical_height_label,
+		underground_count_label,
+		height_p1_to_l1_label,
+		typical_depth_label,
+		default_level_count or "",
+		default_height12 or "",
+		default_height23 or "",
+		default_typical_height or "",
+		default_underground_count or "",
+		default_height_p1_to_l1 or "",
+		default_typical_depth or "",
+		ok_text or "OK",
+		cancel_text or "Cancel",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"level_count": result.LevelCount or "",
+		"height12": result.Height12 or "",
+		"height23": result.Height23 or "",
+		"typical_height": result.TypicalHeight or "",
+		"underground_count": result.UndergroundCount or "",
+		"height_p1_to_l1": result.HeightP1ToL1 or "",
+		"typical_depth": result.TypicalDepth or "",
+	}

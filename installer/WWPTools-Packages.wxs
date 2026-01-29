@@ -1,37 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="WW+P Tools Installer"
+  <Package Name="WW+P Tools Dynamo Packages"
            Manufacturer="WW+P"
-           Version="1.1.5.0"
-           UpgradeCode="{F0C6E339-6C9E-4A3A-9D2A-59F8E3D1B8B9}"
+           Version="1.0.0.0"
+           UpgradeCode="{9E2B4D73-3C4C-4A26-BB17-8E9E7D6BB2E3}"
            Scope="perUser"
            Compressed="yes">
     <Icon Id="WWPToolsIcon" SourceFile="WWPTools.ico" />
     <Property Id="ARPPRODUCTICON" Value="WWPToolsIcon" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of WWPTools is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of WWPTools packages is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="AppDataFolder">
-      <Directory Id="PyRevitDir" Name="pyRevit">
-        <Directory Id="ExtensionsDir" Name="Extensions">
-          <Directory Id="INSTALLFOLDER" Name="WWPTools.extension" />
-        </Directory>
-      </Directory>
+      <Directory Id="WWPToolsAppData" Name="WWPTools" />
     </StandardDirectory>
-    <Component Id="RegistryMarker" Directory="INSTALLFOLDER" Guid="*">
+    <Component Id="RegistryMarker" Directory="WWPToolsAppData" Guid="*">
       <RegistryValue Root="HKCU"
-                     Key="Software\\WWP\\WWPTools"
-                     Name="Installed"
+                     Key="Software\WWP\WWPTools"
+                     Name="PackagesInstalled"
                      Type="integer"
                      Value="1"
                      KeyPath="yes" />
     </Component>
-    <Feature Id="MainFeature" Title="WWPTools" Level="1">
+    <Feature Id="MainFeature" Title="WWPTools Packages" Level="1">
       <ComponentRef Id="RegistryMarker" />
     </Feature>
 
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="WIXUI_INSTALLDIR" Value="WWPToolsAppData" />
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
     <WixVariable Id="WixUIBannerBmp" Value="WWPTools-banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="WWPTools-dialog.png" />
@@ -39,9 +35,6 @@
       <ui:WixUI Id="WixUI_InstallDir" />
     </UI>
 
-    <!-- Run the pre-install Revit check at UI time before the actual install executes so the user
-         is informed and the install is prevented if Revit is running. This reuses the existing
-         SetWixQuietExecCmdLine custom action (which pops up a message and aborts when Revit is found). -->
     <InstallUISequence>
       <Custom Action="SetWixQuietExecCmdLineInstall" Before="ExecuteAction" Condition="NOT REMOVE~=&quot;ALL&quot;" />
     </InstallUISequence>
@@ -49,10 +42,10 @@
     <Property Id="WixQuietExecCmdLine" Hidden="yes" />
     <CustomAction Id="SetWixQuietExecCmdLineInstall"
                   Property="WixQuietExecCmdLine"
-                  Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_INSTALL_BASE64__" />
+                  Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_INSTALL_BASE64__" />
     <CustomAction Id="SetWixQuietExecCmdLineUninstall"
                   Property="WixQuietExecCmdLine"
-                  Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_UNINSTALL_BASE64__" />
+                  Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_UNINSTALL_BASE64__" />
     <CustomActionRef Id="Wix4QuietExec_X64" />
 
     <InstallExecuteSequence>
@@ -62,11 +55,3 @@
     </InstallExecuteSequence>
   </Package>
 </Wix>
-
-
-
-
-
-
-
-

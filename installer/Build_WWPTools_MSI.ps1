@@ -133,48 +133,82 @@ function Get-EncodedCommand {
     return [Convert]::ToBase64String($bytes)
 }
 
+function Build-WwpToolsMsi {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WxsPath,
+        [Parameter(Mandatory = $true)]
+        [string]$InstallScriptPath,
+        [Parameter(Mandatory = $true)]
+        [string]$UninstallScriptPath,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPrefix
+    )
+
+    if (-not (Test-Path -LiteralPath $WxsPath)) {
+        throw "Expected Wix source at $WxsPath."
+    }
+    if (-not (Test-Path -LiteralPath $InstallScriptPath)) {
+        throw "Install script not found at $InstallScriptPath."
+    }
+    if (-not (Test-Path -LiteralPath $UninstallScriptPath)) {
+        throw "Uninstall script not found at $UninstallScriptPath."
+    }
+
+    $encodedInstall = Get-EncodedCommand -ScriptPath $InstallScriptPath
+    $encodedUninstall = Get-EncodedCommand -ScriptPath $UninstallScriptPath
+    $wxsBuildPath = Join-Path $PSScriptRoot ((Split-Path -Leaf $WxsPath) + ".generated")
+    $wxsContent = Get-Content -LiteralPath $WxsPath -Raw
+    if ($wxsContent -notmatch "__WWPTOOLS_PS_INSTALL_BASE64__") {
+        throw "Placeholder __WWPTOOLS_PS_INSTALL_BASE64__ not found in $WxsPath."
+    }
+    if ($wxsContent -notmatch "__WWPTOOLS_PS_UNINSTALL_BASE64__") {
+        throw "Placeholder __WWPTOOLS_PS_UNINSTALL_BASE64__ not found in $WxsPath."
+    }
+    $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_INSTALL_BASE64__", $encodedInstall)
+    $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_UNINSTALL_BASE64__", $encodedUninstall)
+    Set-Content -LiteralPath $wxsBuildPath -Value $wxsContent -Encoding Ascii
+
+    $version = Get-PackageVersion -WxsPath $WxsPath
+    $msiPath = Join-Path $PSScriptRoot ("{0}-v{1}.msi" -f $OutputPrefix, $version)
+
+    Write-Host ("Building {0} installer v{1}..." -f $OutputPrefix, $version)
+    Push-Location $PSScriptRoot
+    try {
+        & $wixExe build $wxsBuildPath -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -bindpath $PSScriptRoot -o $msiPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "WiX build failed with exit code $LASTEXITCODE."
+        }
+    } finally {
+        Pop-Location
+        if (Test-Path -LiteralPath $wxsBuildPath) {
+            Remove-Item -LiteralPath $wxsBuildPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $fixCount = Patch-MsiDialogMetadata -MsiPath $msiPath
+    if ($fixCount -gt 0) {
+        Write-Host ("Patched dialog metadata on {0} dialog(s)." -f $fixCount)
+    }
+
+    if (-not (Test-Path -LiteralPath $msiPath)) {
+        throw "Build completed but MSI was not found at $msiPath."
+    }
+
+    Write-Host ("MSI ready: {0}" -f $msiPath)
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$wxsPath = Join-Path $PSScriptRoot "WWPTools.wxs"
-if (-not (Test-Path -LiteralPath $wxsPath)) {
-    throw "Expected Wix source at $wxsPath."
-}
-
-$installScriptPath = Join-Path $PSScriptRoot "WWPTools-install.ps1"
-$encodedCommand = Get-EncodedCommand -ScriptPath $installScriptPath
-$wxsBuildPath = Join-Path $PSScriptRoot "WWPTools.wxs.generated"
-$wxsContent = Get-Content -LiteralPath $wxsPath -Raw
-if ($wxsContent -notmatch "__WWPTOOLS_PS_BASE64__") {
-    throw "Placeholder __WWPTOOLS_PS_BASE64__ not found in $wxsPath."
-}
-$wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_BASE64__", $encodedCommand)
-Set-Content -LiteralPath $wxsBuildPath -Value $wxsContent -Encoding Ascii
-
-$version = Get-PackageVersion -WxsPath $wxsPath
-$msiPath = Join-Path $PSScriptRoot ("WWPTools-v{0}.msi" -f $version)
-
 $wixExe = Ensure-Wix
 
-Write-Host ("Building WWPTools installer v{0}..." -f $version)
-Push-Location $PSScriptRoot
-try {
-    & $wixExe build $wxsBuildPath -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -bindpath $PSScriptRoot -o $msiPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "WiX build failed with exit code $LASTEXITCODE."
-    }
-} finally {
-    Pop-Location
-    if (Test-Path -LiteralPath $wxsBuildPath) {
-        Remove-Item -LiteralPath $wxsBuildPath -Force -ErrorAction SilentlyContinue
-    }
-}
+Build-WwpToolsMsi `
+    -WxsPath (Join-Path $PSScriptRoot "WWPTools.wxs") `
+    -InstallScriptPath (Join-Path $PSScriptRoot "WWPTools-install-scripts.ps1") `
+    -UninstallScriptPath (Join-Path $PSScriptRoot "WWPTools-uninstall-scripts.ps1") `
+    -OutputPrefix "WWPTools"
 
-$fixCount = Patch-MsiDialogMetadata -MsiPath $msiPath
-if ($fixCount -gt 0) {
-    Write-Host ("Patched dialog metadata on {0} dialog(s)." -f $fixCount)
-}
-
-if (-not (Test-Path -LiteralPath $msiPath)) {
-    throw "Build completed but MSI was not found at $msiPath."
-}
-
-Write-Host ("MSI ready: {0}" -f $msiPath)
+Build-WwpToolsMsi `
+    -WxsPath (Join-Path $PSScriptRoot "WWPTools-Packages.wxs") `
+    -InstallScriptPath (Join-Path $PSScriptRoot "WWPTools-install-packages.ps1") `
+    -UninstallScriptPath (Join-Path $PSScriptRoot "WWPTools-uninstall-packages.ps1") `
+    -OutputPrefix "WWPTools-Packages"

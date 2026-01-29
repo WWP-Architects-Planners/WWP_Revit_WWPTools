@@ -18,6 +18,7 @@ namespace WWPTools.WpfUI
     public static class DialogService
     {
         private const string DefaultFont = "Arial Narrow";
+        private const double DefaultFontSize = 14;
 
         public static int[] SelectIndices(
             IEnumerable items,
@@ -154,65 +155,44 @@ namespace WWPTools.WpfUI
                 items = Array.Empty<string>();
 
             var window = CreateWindow(title, width, height);
-            var content = new StackPanel { Margin = new Thickness(12) };
-            content.Children.Add(CreatePrompt(prompt));
+            var grid = new Grid { Margin = new Thickness(12) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var checkedItems = new List<CheckBox>();
-            ListBox listBox = null;
+            var promptBlock = CreatePrompt(prompt);
+            Grid.SetRow(promptBlock, 0);
+            grid.Children.Add(promptBlock);
 
-            if (multiselect)
+            var listBox = new ListBox
             {
-                var scroll = new ScrollViewer
-                {
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-                };
-                var listPanel = new StackPanel();
-                for (var i = 0; i < items.Count; i++)
-                {
-                    var check = new CheckBox { Content = items[i], Margin = new Thickness(0, 2, 0, 2) };
-                    checkedItems.Add(check);
-                    listPanel.Children.Add(check);
-                }
-                scroll.Content = listPanel;
-                content.Children.Add(scroll);
-            }
-            else
+                SelectionMode = multiselect ? SelectionMode.Extended : SelectionMode.Single,
+                MinHeight = 200,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(listBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(listBox, ScrollBarVisibility.Disabled);
+            foreach (var item in items)
             {
-                listBox = new ListBox
-                {
-                    SelectionMode = SelectionMode.Single,
-                    MinHeight = height - 140
-                };
-                foreach (var item in items)
-                {
-                    listBox.Items.Add(item);
-                }
-                content.Children.Add(listBox);
+                listBox.Items.Add(item);
             }
+            Grid.SetRow(listBox, 1);
+            grid.Children.Add(listBox);
 
             var buttons = CreateOkCancelButtons("OK", "Cancel");
             buttons.Ok.Click += (_, __) => window.DialogResult = true;
             buttons.Cancel.Click += (_, __) => window.DialogResult = false;
-            content.Children.Add(buttons.Panel);
+            Grid.SetRow(buttons.Panel, 2);
+            grid.Children.Add(buttons.Panel);
 
-            window.Content = WrapWithLogo(content);
+            window.Content = WrapWithLogo(grid);
 
             if (window.ShowDialog() != true)
                 return Array.Empty<int>();
 
             if (multiselect)
-            {
-                var selected = new List<int>();
-                for (var i = 0; i < checkedItems.Count; i++)
-                {
-                    if (checkedItems[i].IsChecked == true)
-                        selected.Add(i);
-                }
-                return selected.ToArray();
-            }
+                return GetSelectedIndices(listBox);
 
-            if (listBox == null)
-                return Array.Empty<int>();
             return listBox.SelectedIndex >= 0 ? new[] { listBox.SelectedIndex } : Array.Empty<int>();
         }
 
@@ -259,26 +239,24 @@ namespace WWPTools.WpfUI
             var content = new StackPanel { Margin = new Thickness(12) };
             content.Children.Add(CreatePrompt(prompt));
 
-            var checkedItems = new List<CheckBox>();
-            var scroll = new ScrollViewer
+            var listBox = new ListBox
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = Math.Max(200, height - 200)
+                SelectionMode = SelectionMode.Extended,
+                Height = Math.Max(200, height - 200),
+                Margin = new Thickness(0, 0, 0, 8)
             };
-            var listPanel = new StackPanel();
+            ScrollViewer.SetVerticalScrollBarVisibility(listBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(listBox, ScrollBarVisibility.Disabled);
             for (var i = 0; i < items.Count; i++)
             {
-                var check = new CheckBox
-                {
-                    Content = items[i],
-                    IsChecked = prechecked.Contains(i),
-                    Margin = new Thickness(0, 2, 0, 2)
-                };
-                checkedItems.Add(check);
-                listPanel.Children.Add(check);
+                listBox.Items.Add(items[i]);
             }
-            scroll.Content = listPanel;
-            content.Children.Add(scroll);
+            foreach (var index in prechecked)
+            {
+                if (index >= 0 && index < listBox.Items.Count)
+                    listBox.SelectedItems.Add(listBox.Items[index]);
+            }
+            content.Children.Add(listBox);
 
             var modePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 8) };
             var rbLeft = new RadioButton { Content = string.IsNullOrWhiteSpace(modeLabelA) ? "Option A" : modeLabelA, Margin = new Thickness(0, 0, 16, 0) };
@@ -299,16 +277,9 @@ namespace WWPTools.WpfUI
             if (window.ShowDialog() != true)
                 return null;
 
-            var selected = new List<int>();
-            for (var i = 0; i < checkedItems.Count; i++)
-            {
-                if (checkedItems[i].IsChecked == true)
-                    selected.Add(i);
-            }
-
             return new SelectionWithModeResult
             {
-                SelectedIndices = selected.ToArray(),
+                SelectedIndices = GetSelectedIndices(listBox),
                 Mode = rbLeft.IsChecked == true ? 0 : 1
             };
         }
@@ -430,21 +401,19 @@ namespace WWPTools.WpfUI
             var content = new StackPanel { Margin = new Thickness(12) };
             content.Children.Add(CreatePrompt(prompt));
 
-            var checkedItems = new List<CheckBox>();
-            var scroll = new ScrollViewer
+            var listBox = new ListBox
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = Math.Max(200, height - 220)
+                SelectionMode = SelectionMode.Extended,
+                Height = Math.Max(200, height - 220),
+                Margin = new Thickness(0, 0, 0, 8)
             };
-            var listPanel = new StackPanel();
+            ScrollViewer.SetVerticalScrollBarVisibility(listBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(listBox, ScrollBarVisibility.Disabled);
             for (var i = 0; i < items.Count; i++)
             {
-                var check = new CheckBox { Content = items[i], Margin = new Thickness(0, 2, 0, 2) };
-                checkedItems.Add(check);
-                listPanel.Children.Add(check);
+                listBox.Items.Add(items[i]);
             }
-            scroll.Content = listPanel;
-            content.Children.Add(scroll);
+            content.Children.Add(listBox);
 
             content.Children.Add(CreateLabel(startingLabel));
             var startInput = CreateTextBox();
@@ -460,16 +429,9 @@ namespace WWPTools.WpfUI
             if (window.ShowDialog() != true)
                 return null;
 
-            var selected = new List<int>();
-            for (var i = 0; i < checkedItems.Count; i++)
-            {
-                if (checkedItems[i].IsChecked == true)
-                    selected.Add(i);
-            }
-
             return new SheetRenumberInputsWithListResult
             {
-                SelectedIndices = selected.ToArray(),
+                SelectedIndices = GetSelectedIndices(listBox),
                 StartingNumber = startInput.Text ?? ""
             };
         }
@@ -570,21 +532,19 @@ namespace WWPTools.WpfUI
             var content = new StackPanel { Margin = new Thickness(12) };
             content.Children.Add(CreatePrompt(prompt));
 
-            var checkedItems = new List<CheckBox>();
-            var scroll = new ScrollViewer
+            var listBox = new ListBox
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Height = Math.Max(240, height - 320)
+                SelectionMode = SelectionMode.Extended,
+                Height = Math.Max(240, height - 320),
+                Margin = new Thickness(0, 0, 0, 8)
             };
-            var listPanel = new StackPanel();
+            ScrollViewer.SetVerticalScrollBarVisibility(listBox, ScrollBarVisibility.Auto);
+            ScrollViewer.SetHorizontalScrollBarVisibility(listBox, ScrollBarVisibility.Disabled);
             for (var i = 0; i < items.Count; i++)
             {
-                var check = new CheckBox { Content = items[i], Margin = new Thickness(0, 2, 0, 2) };
-                checkedItems.Add(check);
-                listPanel.Children.Add(check);
+                listBox.Items.Add(items[i]);
             }
-            scroll.Content = listPanel;
-            content.Children.Add(scroll);
+            content.Children.Add(listBox);
 
             var viewsCheckbox = new CheckBox { Content = duplicateWithViewsLabel, IsChecked = true, Margin = new Thickness(0, 8, 0, 2) };
             content.Children.Add(viewsCheckbox);
@@ -616,16 +576,9 @@ namespace WWPTools.WpfUI
             if (window.ShowDialog() != true)
                 return null;
 
-            var selected = new List<int>();
-            for (var i = 0; i < checkedItems.Count; i++)
-            {
-                if (checkedItems[i].IsChecked == true)
-                    selected.Add(i);
-            }
-
             return new DuplicateSheetInputsResult
             {
-                SelectedIndices = selected.ToArray(),
+                SelectedIndices = GetSelectedIndices(listBox),
                 DuplicateWithViews = viewsCheckbox.IsChecked == true,
                 DuplicateOption = optionsCombo.SelectedIndex >= 0 ? optionsCombo.SelectedIndex : 0,
                 Prefix = prefixInput.Text ?? "",
@@ -1062,24 +1015,132 @@ namespace WWPTools.WpfUI
 
         private static Window CreateMessageWindow(string message, string title, bool showCancel)
         {
-            var window = CreateWindow(title, 520, 220);
-            var content = new StackPanel { Margin = new Thickness(12) };
+            var window = CreateWindow(title, 520, 260);
+            var grid = new Grid { Margin = new Thickness(12) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
             var messageBlock = new TextBlock
             {
                 Text = message ?? "",
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
+                TextWrapping = TextWrapping.Wrap
             };
-            content.Children.Add(messageBlock);
+            var scroll = new ScrollViewer
+            {
+                Content = messageBlock,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 0, 0, 8),
+                MinHeight = 80
+            };
+            Grid.SetRow(scroll, 0);
+            grid.Children.Add(scroll);
 
             var buttons = CreateOkCancelButtons("OK", showCancel ? "Cancel" : null);
             buttons.Ok.Click += (_, __) => window.DialogResult = true;
             if (showCancel)
                 buttons.Cancel.Click += (_, __) => window.DialogResult = false;
-            content.Children.Add(buttons.Panel);
+            Grid.SetRow(buttons.Panel, 1);
+            grid.Children.Add(buttons.Panel);
 
-            window.Content = WrapWithLogo(content);
+            window.Content = WrapWithLogo(grid);
             return window;
+        }
+
+        public static LevelSetupInputsResult LevelSetupInputs(
+            string title,
+            string levelCountLabel,
+            string height12Label,
+            string height23Label,
+            string typicalHeightLabel,
+            string undergroundCountLabel,
+            string heightP1ToL1Label,
+            string typicalDepthLabel,
+            string defaultLevelCount,
+            string defaultHeight12,
+            string defaultHeight23,
+            string defaultTypicalHeight,
+            string defaultUndergroundCount,
+            string defaultHeightP1ToL1,
+            string defaultTypicalDepth,
+            string okText,
+            string cancelText,
+            int width,
+            int height)
+        {
+            var window = CreateWindow(title, width, height);
+            var grid = new Grid { Margin = new Thickness(12) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var content = new StackPanel();
+
+            content.Children.Add(CreateLabel(levelCountLabel));
+            var levelCountInput = CreateTextBox();
+            levelCountInput.Text = defaultLevelCount ?? "";
+            content.Children.Add(levelCountInput);
+
+            content.Children.Add(CreateLabel(height12Label));
+            var height12Input = CreateTextBox();
+            height12Input.Text = defaultHeight12 ?? "";
+            content.Children.Add(height12Input);
+
+            content.Children.Add(CreateLabel(height23Label));
+            var height23Input = CreateTextBox();
+            height23Input.Text = defaultHeight23 ?? "";
+            content.Children.Add(height23Input);
+
+            content.Children.Add(CreateLabel(typicalHeightLabel));
+            var typicalInput = CreateTextBox();
+            typicalInput.Text = defaultTypicalHeight ?? "";
+            content.Children.Add(typicalInput);
+
+            content.Children.Add(CreateLabel(undergroundCountLabel));
+            var undergroundCountInput = CreateTextBox();
+            undergroundCountInput.Text = defaultUndergroundCount ?? "";
+            content.Children.Add(undergroundCountInput);
+
+            content.Children.Add(CreateLabel(heightP1ToL1Label));
+            var heightP1ToL1Input = CreateTextBox();
+            heightP1ToL1Input.Text = defaultHeightP1ToL1 ?? "";
+            content.Children.Add(heightP1ToL1Input);
+
+            content.Children.Add(CreateLabel(typicalDepthLabel));
+            var typicalDepthInput = CreateTextBox();
+            typicalDepthInput.Text = defaultTypicalDepth ?? "";
+            content.Children.Add(typicalDepthInput);
+
+            var scroll = new ScrollViewer
+            {
+                Content = content,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            Grid.SetRow(scroll, 0);
+            grid.Children.Add(scroll);
+
+            var buttons = CreateOkCancelButtons(okText, cancelText);
+            buttons.Ok.Click += (_, __) => window.DialogResult = true;
+            if (buttons.Cancel != null)
+                buttons.Cancel.Click += (_, __) => window.DialogResult = false;
+            Grid.SetRow(buttons.Panel, 1);
+            grid.Children.Add(buttons.Panel);
+
+            window.Content = WrapWithLogo(grid);
+            if (window.ShowDialog() != true)
+                return null;
+
+            return new LevelSetupInputsResult
+            {
+                LevelCount = levelCountInput.Text ?? "",
+                Height12 = height12Input.Text ?? "",
+                Height23 = height23Input.Text ?? "",
+                TypicalHeight = typicalInput.Text ?? "",
+                UndergroundCount = undergroundCountInput.Text ?? "",
+                HeightP1ToL1 = heightP1ToL1Input.Text ?? "",
+                TypicalDepth = typicalDepthInput.Text ?? ""
+            };
         }
 
         private static Window CreateWindow(string title, int width, int height)
@@ -1093,6 +1154,7 @@ namespace WWPTools.WpfUI
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.CanResize,
                 FontFamily = new FontFamily(DefaultFont),
+                FontSize = DefaultFontSize,
                 Background = Brushes.White,
                 ShowInTaskbar = false
             };
@@ -1144,6 +1206,21 @@ namespace WWPTools.WpfUI
             if (combo.Items.Count > 0)
                 combo.SelectedIndex = 0;
             return combo;
+        }
+
+        private static int[] GetSelectedIndices(ListBox listBox)
+        {
+            if (listBox == null)
+                return Array.Empty<int>();
+            var selected = new List<int>();
+            foreach (var item in listBox.SelectedItems)
+            {
+                var index = listBox.Items.IndexOf(item);
+                if (index >= 0)
+                    selected.Add(index);
+            }
+            selected.Sort();
+            return selected.ToArray();
         }
 
         private static (StackPanel Panel, Button Ok, Button Cancel) CreateOkCancelButtons(string okText, string cancelText)
@@ -1488,5 +1565,16 @@ namespace WWPTools.WpfUI
     {
         public int TemplateIndex { get; set; }
         public int FillTypeIndex { get; set; }
+    }
+
+    public class LevelSetupInputsResult
+    {
+        public string LevelCount { get; set; } = "";
+        public string Height12 { get; set; } = "";
+        public string Height23 { get; set; } = "";
+        public string TypicalHeight { get; set; } = "";
+        public string UndergroundCount { get; set; } = "";
+        public string HeightP1ToL1 { get; set; } = "";
+        public string TypicalDepth { get; set; } = "";
     }
 }

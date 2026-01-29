@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installer License Agreement dialog UI errors (first active control and tab order)
 - MSI build step now patches dialog metadata after banner removal
 
+## [1.1.5] - 2026-01-28
+
+### Added
+- Separate installers for WWPTools scripts and Dynamo packages
+- Dynamo packages installer (v1.0.0) for package-only deployments
+
+### Fixed
+- Installer uninstall now removes installed extension/packages via uninstall actions
+
 ## [1.1.4] - 2026-01-16
 
 ### Added
@@ -83,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Views Sheet Manager tools
 
 [1.1.4]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.4
+[1.1.5]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.5
 [1.1.3]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.3
 [1.1.2]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.2
 [1.1.1]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.1
