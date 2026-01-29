@@ -233,54 +233,27 @@ namespace WWPTools.WpfUI
             if (items == null)
                 items = Array.Empty<string>();
 
+            EnsureApplication();
             var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
-
-            var window = CreateWindow(title, width, height);
-            var content = new StackPanel { Margin = new Thickness(12) };
-            content.Children.Add(CreatePrompt(prompt));
-
-            var listBox = new ListBox
+            var window = new Views.SelectItemsWithModeWindow
             {
-                SelectionMode = SelectionMode.Extended,
-                Height = Math.Max(200, height - 200),
-                Margin = new Thickness(0, 0, 0, 8)
+                Title = title ?? "Select Items",
+                Width = width > 0 ? width : 720,
+                Height = height > 0 ? height : 620
             };
-            ScrollViewer.SetVerticalScrollBarVisibility(listBox, ScrollBarVisibility.Auto);
-            ScrollViewer.SetHorizontalScrollBarVisibility(listBox, ScrollBarVisibility.Disabled);
-            for (var i = 0; i < items.Count; i++)
-            {
-                listBox.Items.Add(items[i]);
-            }
-            foreach (var index in prechecked)
-            {
-                if (index >= 0 && index < listBox.Items.Count)
-                    listBox.SelectedItems.Add(listBox.Items[index]);
-            }
-            content.Children.Add(listBox);
+            var owner = GetOwnerHandle();
+            if (owner != IntPtr.Zero)
+                new WindowInteropHelper(window) { Owner = owner };
 
-            var modePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 8) };
-            var rbLeft = new RadioButton { Content = string.IsNullOrWhiteSpace(modeLabelA) ? "Option A" : modeLabelA, Margin = new Thickness(0, 0, 16, 0) };
-            var rbRight = new RadioButton { Content = string.IsNullOrWhiteSpace(modeLabelB) ? "Option B" : modeLabelB };
-            rbLeft.IsChecked = defaultMode == 0;
-            rbRight.IsChecked = defaultMode == 1;
-            modePanel.Children.Add(rbLeft);
-            modePanel.Children.Add(rbRight);
-            content.Children.Add(modePanel);
-
-            var buttons = CreateOkCancelButtons("Export", "Cancel");
-            buttons.Ok.Click += (_, __) => window.DialogResult = true;
-            buttons.Cancel.Click += (_, __) => window.DialogResult = false;
-            content.Children.Add(buttons.Panel);
-
-            window.Content = WrapWithLogo(content);
+            window.Initialize(items, prompt, modeLabelA, modeLabelB, defaultMode, prechecked);
 
             if (window.ShowDialog() != true)
                 return null;
 
             return new SelectionWithModeResult
             {
-                SelectedIndices = GetSelectedIndices(listBox),
-                Mode = rbLeft.IsChecked == true ? 0 : 1
+                SelectedIndices = window.GetSelectedIndices(),
+                Mode = window.GetSelectedMode()
             };
         }
 
