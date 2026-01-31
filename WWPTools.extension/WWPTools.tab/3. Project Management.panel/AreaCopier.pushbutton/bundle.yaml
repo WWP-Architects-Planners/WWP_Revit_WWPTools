@@ -1,3 +1,3 @@
-title: "Copy Areas\nBetween Schemes"
-tooltip: "Purpose: Re-create areas, boundaries, and tags from one area scheme into another.\nUse: Pick source scheme, target scheme, then select levels to copy; the tool rebuilds boundaries and areas and copies instance parameters."
+title: "Area Plan\nDuplicator"
+tooltip: "Purpose: Duplicate area plans from one area scheme into another, including boundaries, areas, tags, and instance parameters.\nUse: Select a source scheme, a target scheme, and levels. The tool recreates boundaries and areas in the target scheme to match the source."
 author: "Jason Tian"

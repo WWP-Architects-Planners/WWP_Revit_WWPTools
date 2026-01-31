@@ -50,12 +50,30 @@ def _get_area_plans_by_level(doc, scheme_id):
             continue
         if view.IsTemplate:
             continue
+
+        view_scheme_id = None
         try:
-            param = view.get_Parameter(DB.BuiltInParameter.VIEW_AREA_SCHEME)
-            if not param or param.AsElementId() != scheme_id:
-                continue
+            if hasattr(view, "AreaSchemeId"):
+                view_scheme_id = view.AreaSchemeId
         except Exception:
+            view_scheme_id = None
+        if view_scheme_id is None:
+            try:
+                if hasattr(view, "AreaScheme") and view.AreaScheme:
+                    view_scheme_id = view.AreaScheme.Id
+            except Exception:
+                view_scheme_id = None
+        if view_scheme_id is None:
+            try:
+                param = view.get_Parameter(DB.BuiltInParameter.VIEW_AREA_SCHEME)
+                if param:
+                    view_scheme_id = param.AsElementId()
+            except Exception:
+                view_scheme_id = None
+
+        if view_scheme_id is None or view_scheme_id != scheme_id:
             continue
+
         level_id = None
         try:
             if view.GenLevel:
@@ -67,6 +85,12 @@ def _get_area_plans_by_level(doc, scheme_id):
                 level_id = view.LevelId
             except Exception:
                 level_id = None
+        if level_id is None:
+            try:
+                level_id = view.AssociatedLevelId
+            except Exception:
+                level_id = None
+
         if level_id is not None and level_id not in plans:
             plans[level_id] = view
     return plans
@@ -400,7 +424,10 @@ def main():
                         total_failed += 1
 
             areas = []
-            for area in DB.FilteredElementCollector(doc).OfClass(DB.Area):
+            for elem in DB.FilteredElementCollector(doc).OfClass(DB.SpatialElement):
+                if not isinstance(elem, DB.Area):
+                    continue
+                area = elem
                 try:
                     if area.AreaScheme.Id != source_scheme.Id:
                         continue

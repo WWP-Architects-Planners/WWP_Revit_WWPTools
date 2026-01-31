@@ -504,7 +504,11 @@ namespace WWPTools.WpfUI
                 items = Array.Empty<string>();
 
             var window = CreateWindow(title, width, height);
-            var content = new StackPanel { Margin = new Thickness(12) };
+            var grid = new Grid { Margin = new Thickness(12) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var content = new StackPanel();
             content.Children.Add(CreatePrompt(prompt));
 
             var listBox = new ListBox
@@ -544,9 +548,20 @@ namespace WWPTools.WpfUI
             var buttons = CreateOkCancelButtons(okText, cancelText);
             buttons.Ok.Click += (_, __) => window.DialogResult = true;
             buttons.Cancel.Click += (_, __) => window.DialogResult = false;
-            content.Children.Add(buttons.Panel);
+            var scroll = new ScrollViewer
+            {
+                Content = content,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            Grid.SetRow(scroll, 0);
+            grid.Children.Add(scroll);
 
-            window.Content = WrapWithLogo(content);
+            Grid.SetRow(buttons.Panel, 1);
+            grid.Children.Add(buttons.Panel);
+
+            window.Content = WrapWithLogo(grid);
 
             if (window.ShowDialog() != true)
                 return null;
@@ -1529,7 +1544,7 @@ namespace WWPTools.WpfUI
 
             var track = new FrameworkElementFactory(typeof(Border));
             track.Name = "ToggleTrack";
-            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(229, 231, 235)));
+            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(218, 223, 230)));
             track.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
             toggleGrid.AppendChild(track);
 
@@ -1552,7 +1567,7 @@ namespace WWPTools.WpfUI
             template.VisualTree = root;
 
             var checkedTrigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
-            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(10, 102, 209)), "ToggleTrack"));
+            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(45, 140, 255)), "ToggleTrack"));
             checkedTrigger.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right, "ToggleThumb"));
             template.Triggers.Add(checkedTrigger);
 
