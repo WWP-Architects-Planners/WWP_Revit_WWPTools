@@ -10,8 +10,10 @@ using System.Windows.Interop;
 using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 
 namespace WWPTools.WpfUI
 {
@@ -519,7 +521,7 @@ namespace WWPTools.WpfUI
             }
             content.Children.Add(listBox);
 
-            var viewsCheckbox = new CheckBox { Content = duplicateWithViewsLabel, IsChecked = true, Margin = new Thickness(0, 8, 0, 2) };
+            var viewsCheckbox = CreateToggleCheckBox(duplicateWithViewsLabel, true, new Thickness(0, 8, 0, 2));
             content.Children.Add(viewsCheckbox);
 
             content.Children.Add(CreateLabel(optionsLabel));
@@ -592,12 +594,10 @@ namespace WWPTools.WpfUI
             folderPanel.Children.Add(browseButton);
             content.Children.Add(folderPanel);
 
-            var subfolders = new CheckBox
-            {
-                Content = string.IsNullOrWhiteSpace(includeSubfoldersLabel) ? "Include subfolders" : includeSubfoldersLabel,
-                IsChecked = true,
-                Margin = new Thickness(0, 4, 0, 0)
-            };
+            var subfolders = CreateToggleCheckBox(
+                string.IsNullOrWhiteSpace(includeSubfoldersLabel) ? "Include subfolders" : includeSubfoldersLabel,
+                true,
+                new Thickness(0, 4, 0, 0));
             content.Children.Add(subfolders);
 
             var buttons = CreateOkCancelButtons(okText, cancelText);
@@ -665,20 +665,16 @@ namespace WWPTools.WpfUI
             var window = CreateWindow(title, width, height);
             var content = new StackPanel { Margin = new Thickness(12) };
 
-            var rotation = new CheckBox
-            {
-                Content = string.IsNullOrWhiteSpace(rotationLabel) ? "Random Rotation" : rotationLabel,
-                IsChecked = true,
-                Margin = new Thickness(0, 0, 0, 4)
-            };
+            var rotation = CreateToggleCheckBox(
+                string.IsNullOrWhiteSpace(rotationLabel) ? "Random Rotation" : rotationLabel,
+                true,
+                new Thickness(0, 0, 0, 4));
             content.Children.Add(rotation);
 
-            var size = new CheckBox
-            {
-                Content = string.IsNullOrWhiteSpace(sizeLabel) ? "Random Size" : sizeLabel,
-                IsChecked = true,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
+            var size = CreateToggleCheckBox(
+                string.IsNullOrWhiteSpace(sizeLabel) ? "Random Size" : sizeLabel,
+                true,
+                new Thickness(0, 0, 0, 8));
             content.Children.Add(size);
 
             content.Children.Add(CreateLabel(string.IsNullOrWhiteSpace(percentLabel) ? "Size variance (%)" : percentLabel));
@@ -894,12 +890,7 @@ namespace WWPTools.WpfUI
                 titleblockCombo.SelectedIndex = titleblockIndex;
             content.Children.Add(titleblockCombo);
 
-            var keyplanCheckbox = new CheckBox
-            {
-                Content = "Create Keyplan",
-                IsChecked = keyplanEnabled,
-                Margin = new Thickness(0, 6, 0, 4)
-            };
+            var keyplanCheckbox = CreateToggleCheckBox("Create Keyplan", keyplanEnabled, new Thickness(0, 6, 0, 4));
             content.Children.Add(keyplanCheckbox);
 
             content.Children.Add(CreateLabel("Keyplan view template:"));
@@ -914,12 +905,10 @@ namespace WWPTools.WpfUI
                 fillCombo.SelectedIndex = fillTypeIndex;
             content.Children.Add(fillCombo);
 
-            var overwriteCheckbox = new CheckBox
-            {
-                Content = "Overwrite existing sheet if sheet number exists",
-                IsChecked = overwriteExisting,
-                Margin = new Thickness(0, 6, 0, 4)
-            };
+            var overwriteCheckbox = CreateToggleCheckBox(
+                "Overwrite existing sheet if sheet number exists",
+                overwriteExisting,
+                new Thickness(0, 6, 0, 4));
             content.Children.Add(overwriteCheckbox);
 
             var buttons = CreateOkCancelButtons("Create", "Cancel");
@@ -1208,9 +1197,11 @@ namespace WWPTools.WpfUI
             var okButton = new Button
             {
                 Content = string.IsNullOrWhiteSpace(okText) ? "OK" : okText,
-                MinWidth = 80,
-                Margin = new Thickness(0, 0, 8, 0)
+                MinWidth = 140,
+                MinHeight = 38,
+                Margin = new Thickness(0, 0, 12, 0)
             };
+            DialogStyles.ApplyPrimaryButtonStyle(okButton);
             panel.Children.Add(okButton);
 
             Button cancelButton = null;
@@ -1219,12 +1210,28 @@ namespace WWPTools.WpfUI
                 cancelButton = new Button
                 {
                     Content = cancelText,
-                    MinWidth = 80
+                    MinWidth = 140,
+                    MinHeight = 38
                 };
+                DialogStyles.ApplyPrimaryButtonStyle(cancelButton);
                 panel.Children.Add(cancelButton);
             }
 
             return (panel, okButton, cancelButton);
+        }
+
+        private static CheckBox CreateToggleCheckBox(string content, bool isChecked, Thickness margin)
+        {
+            var checkbox = new CheckBox
+            {
+                Content = content ?? "",
+                IsChecked = isChecked,
+                Margin = margin,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left
+            };
+            DialogStyles.ApplyToggleStyle(checkbox);
+            return checkbox;
         }
 
         private static UIElement WrapWithLogo(UIElement content)
@@ -1250,10 +1257,10 @@ namespace WWPTools.WpfUI
         {
             try
             {
-                var assemblyPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var assemblyPath = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 if (string.IsNullOrWhiteSpace(assemblyPath))
                     return null;
-                var logoPath = Path.Combine(assemblyPath, "WWPtools-logo.png");
+                var logoPath = System.IO.Path.Combine(assemblyPath, "WWPtools-logo.png");
                 if (!File.Exists(logoPath))
                     return null;
 
@@ -1447,6 +1454,114 @@ namespace WWPTools.WpfUI
                 }
             }
             return results.ToArray();
+        }
+    }
+
+    internal static class DialogStyles
+    {
+        private static Style _primaryButtonStyle;
+        private static Style _toggleCheckBoxStyle;
+
+        public static void ApplyPrimaryButtonStyle(Button button)
+        {
+            if (button == null)
+                return;
+            button.Style = _primaryButtonStyle ?? (_primaryButtonStyle = CreatePrimaryButtonStyle());
+        }
+
+        public static void ApplyToggleStyle(CheckBox checkbox)
+        {
+            if (checkbox == null)
+                return;
+            checkbox.Style = _toggleCheckBoxStyle ?? (_toggleCheckBoxStyle = CreateToggleCheckBoxStyle());
+        }
+
+        private static Style CreatePrimaryButtonStyle()
+        {
+            var style = new Style(typeof(Button));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(10, 102, 209))));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(18, 6, 18, 6)));
+            style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+            border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(18));
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.AppendChild(presenter);
+
+            template.VisualTree = border;
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(8, 88, 182))));
+            template.Triggers.Add(hoverTrigger);
+
+            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+            disabledTrigger.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(170, 170, 170))));
+            disabledTrigger.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
+            template.Triggers.Add(disabledTrigger);
+
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            return style;
+        }
+
+        private static Style CreateToggleCheckBoxStyle()
+        {
+            var style = new Style(typeof(CheckBox));
+            style.Setters.Add(new Setter(Control.FocusVisualStyleProperty, null));
+
+            var template = new ControlTemplate(typeof(CheckBox));
+            var root = new FrameworkElementFactory(typeof(DockPanel));
+            root.SetValue(DockPanel.LastChildFillProperty, true);
+
+            var toggleGrid = new FrameworkElementFactory(typeof(Grid));
+            toggleGrid.SetValue(DockPanel.DockProperty, Dock.Right);
+            toggleGrid.SetValue(FrameworkElement.WidthProperty, 46.0);
+            toggleGrid.SetValue(FrameworkElement.HeightProperty, 24.0);
+
+            var track = new FrameworkElementFactory(typeof(Border));
+            track.Name = "ToggleTrack";
+            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(229, 231, 235)));
+            track.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
+            toggleGrid.AppendChild(track);
+
+            var thumb = new FrameworkElementFactory(typeof(Ellipse));
+            thumb.Name = "ToggleThumb";
+            thumb.SetValue(FrameworkElement.WidthProperty, 18.0);
+            thumb.SetValue(FrameworkElement.HeightProperty, 18.0);
+            thumb.SetValue(Shape.FillProperty, Brushes.White);
+            thumb.SetValue(FrameworkElement.MarginProperty, new Thickness(3));
+            thumb.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            thumb.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            toggleGrid.AppendChild(thumb);
+
+            var content = new FrameworkElementFactory(typeof(ContentPresenter));
+            content.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            content.SetValue(ContentPresenter.MarginProperty, new Thickness(0, 0, 10, 0));
+
+            root.AppendChild(toggleGrid);
+            root.AppendChild(content);
+            template.VisualTree = root;
+
+            var checkedTrigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
+            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(10, 102, 209)), "ToggleTrack"));
+            checkedTrigger.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right, "ToggleThumb"));
+            template.Triggers.Add(checkedTrigger);
+
+            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+            disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.6));
+            template.Triggers.Add(disabledTrigger);
+
+            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+            return style;
         }
     }
 

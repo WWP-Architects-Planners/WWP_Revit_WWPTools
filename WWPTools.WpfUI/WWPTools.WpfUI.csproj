@@ -11,6 +11,17 @@
     <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
+    <Compile Remove="bin\**\*.cs" />
+    <Compile Remove="obj.*\**\*.cs" />
+    <Compile Remove="bin.*\**\*.cs" />
+    <Page Remove="obj\**\*.xaml" />
+    <Page Remove="bin\**\*.xaml" />
+    <Page Remove="obj.*\**\*.xaml" />
+    <Page Remove="bin.*\**\*.xaml" />
+  </ItemGroup>
+
   <Target Name="CopyToLib" AfterTargets="Build">
     <PropertyGroup>
       <LibDir>$(MSBuildProjectDirectory)\..\WWPTools.extension\lib</LibDir>

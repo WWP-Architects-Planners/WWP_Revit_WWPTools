@@ -13,6 +13,8 @@ namespace WWPTools.WpfUI.Views
         public SelectItemsWithModeWindow()
         {
             InitializeComponent();
+            DialogStyles.ApplyPrimaryButtonStyle(OkButton);
+            DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
             OkButton.Click += (_, __) => DialogResult = true;
             CancelButton.Click += (_, __) => DialogResult = false;
             LoadLogo();

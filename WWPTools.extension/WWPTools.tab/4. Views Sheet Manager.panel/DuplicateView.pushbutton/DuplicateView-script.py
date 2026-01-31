@@ -4,7 +4,6 @@ import traceback
 from Autodesk.Revit import DB
 
 import WWP_uiUtils as ui
-from UIutility import UIform
 
 
 TITLE = "Duplicate Views"
@@ -108,14 +107,17 @@ def _build_form_result():
         ("Duplicate as Dependent", "AsDependent"),
         ("Duplicate with Details", "WithDetailing"),
     ]
-    return UIform(
+    labels = [opt[0] for opt in options]
+    values = [opt[1] for opt in options]
+    return ui.uiUtils_duplicate_view_options(
+        option_labels=labels,
+        option_values=values,
+        default_index=2,
         title=TITLE,
         description=DESCRIPTION,
         prefix_default="",
         suffix_default="-copy",
-        duplicate_options=options,
-        default_index=2,
-        button_text="Set Values",
+        ok_text="Set Values",
     )
 
 
