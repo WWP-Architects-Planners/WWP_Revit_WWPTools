@@ -59,6 +59,8 @@ try:
 	else:
 		msg_time = timeToString(e_mins) + " mins & " + timeToString(e_secs) + " secs"
 		msg_title = "Sync complete"
+	if e_mins >= 10:
+		msg_time = msg_time + "\nModel health: https://svn-architects-planners-inc.gitbook.io/svn-guidebooks/w7kFyDX0kRTb27slSn93/wwp-technical-guidebook/section-2-or-revit/2.2-or-general-info/2.1.5-or-important-concepts/2.1.5.4-or-revit-health"
 	# Show toast message
 	icon_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "lib", "WWPtools-logo.png"))
 	forms.toaster.send_toast(
