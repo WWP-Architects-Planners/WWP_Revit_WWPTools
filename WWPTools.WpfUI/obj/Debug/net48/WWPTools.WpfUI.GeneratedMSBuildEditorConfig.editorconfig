@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = WWPTools.WpfUI
-build_property.ProjectDir = N:\Library\Design Software\Autodesk\Revit\Dynamo\WWPTools\WWPTools.WpfUI\
+build_property.ProjectDir = C:\Users\jtian\Documents\GitHub\WWP_Revit_WWPTools\WWPTools.WpfUI\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

@@ -223,26 +223,6 @@ def write_table_to_sheet(sheet, data, start_row, header_rows=0, column_specs=Non
 
 
 _NUMERIC_RE = re.compile(r"^-?\d+(\.\d+)?$")
-_NUMERIC_WITH_UNIT_RE = re.compile(r"^\s*(-?\d{1,3}(?:,\d{3})*(?:\.\d+)?)(?:\s*[A-Za-z%]+)?\s*$")
-
-
-def _try_parse_with_spec(doc, spec, text):
-    if doc is None or spec is None:
-        return None
-    if not any(ch.isdigit() for ch in text):
-        return None
-    try:
-        from System import Double
-        from clr import Reference
-        parsed = Reference[Double](0.0)
-        if DB.UnitFormatUtils.TryParse(doc.GetUnits(), spec, text, parsed):
-            value = float(parsed.Value)
-            if abs(value - round(value)) < 1e-9:
-                return int(round(value))
-            return value
-    except Exception:
-        pass
-    return None
 
 
 def coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True):
@@ -254,12 +234,11 @@ def coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True):
         text = value.strip()
         if text == "":
             return ""
-        parsed = _try_parse_with_spec(doc, spec, text)
-        if parsed is not None:
-            return parsed
         if not numeric_fallback:
             return value
         if "'" in text or '"' in text or "/" in text:
+            return value
+        if re.search(r"\d[A-Za-z]", text):
             return value
         if _NUMERIC_RE.match(text):
             if spec is None:
@@ -275,16 +254,6 @@ def coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True):
                 return float(text)
             except Exception:
                 return value
-        match = _NUMERIC_WITH_UNIT_RE.match(text)
-        if match:
-            number_text = match.group(1).replace(",", "")
-            try:
-                return int(number_text)
-            except Exception:
-                try:
-                    return float(number_text)
-                except Exception:
-                    return value
     return value
 
 
@@ -401,8 +370,11 @@ def export_to_excel(doc, schedules, file_path, ui):
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
             data = normalize_table_data(read_csv_rows(csv_path))
+            data = inject_element_id_column(data, view)
             header_rows = get_section_row_count(view, DB.SectionType.Header)
             column_specs = get_column_specs(view)
+            if column_specs is not None:
+                column_specs = [None] + column_specs
             write_table_to_sheet(
                 sheet,
                 data,
@@ -435,6 +407,7 @@ def export_to_csv(doc, schedules, folder):
         view.Export(folder, file_name, options)
         csv_path = os.path.join(folder, file_name)
         rows = normalize_table_data(read_csv_rows(csv_path))
+        rows = inject_element_id_column(rows, view)
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as handle:
             writer = csv.writer(handle)
             writer.writerows(rows)

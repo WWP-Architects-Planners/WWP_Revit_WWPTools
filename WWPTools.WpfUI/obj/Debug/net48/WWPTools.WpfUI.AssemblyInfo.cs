@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WWPTools.WpfUI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1e8e27f8ec9a4e5297b5bcb59827e0b43de8f629")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b484d2d8f7fb235ff49a7f314b1cb0458002da18")]
 [assembly: System.Reflection.AssemblyProductAttribute("WWPTools.WpfUI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WWPTools.WpfUI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj": {}
+    "C:\\Users\\jtian\\Documents\\GitHub\\WWP_Revit_WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj": {}
   },
   "projects": {
-    "N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj": {
+    "C:\\Users\\jtian\\Documents\\GitHub\\WWP_Revit_WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj",
+        "projectUniqueName": "C:\\Users\\jtian\\Documents\\GitHub\\WWP_Revit_WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj",
         "projectName": "WWPTools.WpfUI",
-        "projectPath": "N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj",
+        "projectPath": "C:\\Users\\jtian\\Documents\\GitHub\\WWP_Revit_WWPTools\\WWPTools.WpfUI\\WWPTools.WpfUI.csproj",
         "packagesPath": "C:\\Users\\jtian\\.nuget\\packages\\",
-        "outputPath": "N:\\Library\\Design Software\\Autodesk\\Revit\\Dynamo\\WWPTools\\WWPTools.WpfUI\\obj\\",
+        "outputPath": "C:\\Users\\jtian\\Documents\\GitHub\\WWP_Revit_WWPTools\\WWPTools.WpfUI\\obj\\",
         "projectStyle": "PackageReference",
         "crossTargeting": true,
         "fallbackFolders": [
