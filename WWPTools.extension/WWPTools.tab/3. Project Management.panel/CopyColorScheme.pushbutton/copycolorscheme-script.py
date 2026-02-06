@@ -38,16 +38,62 @@ def _call_if_exists(obj, method_name, *args):
 	return None
 
 
+def _scheme_area_scheme_name(doc, scheme):
+	try:
+		area_scheme_id = getattr(scheme, "AreaSchemeId", None)
+		if area_scheme_id:
+			area_scheme = doc.GetElement(area_scheme_id)
+			if area_scheme:
+				return getattr(area_scheme, "Name", "") or ""
+	except Exception:
+		pass
+	try:
+		get_area_scheme_id = getattr(scheme, "GetAreaSchemeId", None)
+		if callable(get_area_scheme_id):
+			area_scheme_id = get_area_scheme_id()
+			if area_scheme_id:
+				area_scheme = doc.GetElement(area_scheme_id)
+				if area_scheme:
+					return getattr(area_scheme, "Name", "") or ""
+	except Exception:
+		pass
+	try:
+		param = scheme.LookupParameter("Area Scheme")
+		if param:
+			return param.AsString() or param.AsValueString() or ""
+	except Exception:
+		pass
+	return ""
+
+
 def _scheme_display_name(doc, scheme):
+	scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
+	area_scheme_name = _scheme_area_scheme_name(doc, scheme)
+	if area_scheme_name:
+		return "Area({}):{}".format(area_scheme_name, scheme_name)
 	try:
 		cat = doc.GetElement(scheme.CategoryId)
 		cat_name = getattr(cat, "Name", "") if cat else ""
 	except Exception:
 		cat_name = ""
-	scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
-	if cat_name:
-		return "{} - {}".format(cat_name, scheme_name)
-	return scheme_name
+	if not cat_name:
+		try:
+			cat_name = DB.LabelUtils.GetLabelFor(scheme.CategoryId)
+		except Exception:
+			cat_name = ""
+	if not cat_name:
+		try:
+			cat_id = scheme.CategoryId
+			cat_int = cat_id.IntegerValue if hasattr(cat_id, "IntegerValue") else int(cat_id)
+			try:
+				import System
+				bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
+				cat_name = DB.LabelUtils.GetLabelFor(bic)
+			except Exception:
+				cat_name = "Category {}".format(cat_int)
+		except Exception:
+			cat_name = "Unknown Category"
+	return "{}: {}".format(cat_name, scheme_name)
 
 
 class _SchemeOption(object):
@@ -56,11 +102,12 @@ class _SchemeOption(object):
 		self.scheme = scheme
 
 
-def _copy_scheme_data(source, target):
+def _copy_scheme_data(source, target, allow_category_mismatch=False):
 	try:
 		if hasattr(source, "CategoryId") and hasattr(target, "CategoryId"):
 			if source.CategoryId != target.CategoryId:
-				return False, "Source and target schemes use different categories."
+				if not allow_category_mismatch:
+					return False, "Source and target schemes use different categories."
 	except Exception:
 		pass
 
@@ -133,22 +180,83 @@ if not targets:
 	ui.uiUtils_alert("No other Color Fill Scheme found to copy into.", title="Copy Color Scheme")
 	raise SystemExit
 
-target_names = [_scheme_display_name(doc, s) for s in targets]
-target_indices = ui.uiUtils_select_indices(
-	target_names,
-	title="Target Color Scheme",
-	prompt="Select target scheme:",
-	multiselect=False,
+category_map = {}
+for scheme in targets:
+	try:
+		cat = doc.GetElement(scheme.CategoryId)
+		cat_name = getattr(cat, "Name", "") if cat else ""
+	except Exception:
+		cat_name = ""
+	if not cat_name:
+		try:
+			cat_name = DB.LabelUtils.GetLabelFor(scheme.CategoryId)
+		except Exception:
+			cat_name = ""
+	if not cat_name:
+		try:
+			cat_id = scheme.CategoryId
+			cat_int = cat_id.IntegerValue if hasattr(cat_id, "IntegerValue") else int(cat_id)
+			try:
+				import System
+				bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
+				cat_name = DB.LabelUtils.GetLabelFor(bic)
+			except Exception:
+				cat_name = "Category {}".format(cat_int)
+		except Exception:
+			cat_name = "Unknown Category"
+	category_map[cat_name] = scheme.CategoryId
+
+category_names = sorted(category_map.keys(), key=lambda s: (s or "").lower())
+selected_indices, overwrite_mode = ui.uiUtils_select_items_with_mode(
+	category_names,
+	title="Target Category",
+	prompt="Select target category:",
+	mode_labels=("Overwrite existing", ""),
+	default_mode=0,
+	prechecked_indices=None,
 	width=720,
 	height=520,
 )
-if not target_indices:
+if not selected_indices:
 	raise SystemExit
-target = targets[target_indices[0]]
+
+target_category_name = category_names[selected_indices[0]]
+target_category_id = category_map.get(target_category_name)
+overwrite = overwrite_mode == 1
+
+source_name = getattr(source, "Name", "") or "Color Scheme"
+target = None
+for scheme in schemes:
+	try:
+		if scheme.Id == source.Id:
+			continue
+		if getattr(scheme, "Name", "") != source_name:
+			continue
+		if scheme.CategoryId != target_category_id:
+			continue
+		target = scheme
+		break
+	except Exception:
+		continue
+
+if target is None:
+	ui.uiUtils_alert(
+		"No target Color Scheme named '{}' found in category '{}'.\nCreate a scheme with that name first."
+		.format(source_name, target_category_name),
+		title="Copy Color Scheme",
+	)
+	raise SystemExit
+
+if not overwrite:
+	ui.uiUtils_alert(
+		"Overwrite disabled. Selected target scheme will not be modified.",
+		title="Copy Color Scheme",
+	)
+	raise SystemExit
 
 with revit.Transaction("Copy Color Scheme"):
 	try:
-		ok, error = _copy_scheme_data(source, target)
+		ok, error = _copy_scheme_data(source, target, allow_category_mismatch=True)
 		if not ok:
 			raise Exception(error or "Copy failed")
 	except Exception as ex:

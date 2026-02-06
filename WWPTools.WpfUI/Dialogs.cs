@@ -259,6 +259,78 @@ namespace WWPTools.WpfUI
             };
         }
 
+        public static FilteredSelectionResult SelectItemsWithFilter(
+            IEnumerable items,
+            string title,
+            string prompt,
+            IEnumerable filterParams,
+            IEnumerable filterValuesByParam,
+            IEnumerable precheckedIndices,
+            string defaultFilterParam,
+            string defaultFilterValue,
+            int width,
+            int height)
+        {
+            return SelectItemsWithFilter(
+                AsStringList(items),
+                title,
+                prompt,
+                AsStringList(filterParams),
+                AsStringListList(filterValuesByParam),
+                AsIntArray(precheckedIndices),
+                defaultFilterParam,
+                defaultFilterValue,
+                width,
+                height);
+        }
+
+        public static FilteredSelectionResult SelectItemsWithFilter(
+            IList<string> items,
+            string title,
+            string prompt,
+            IList<string> filterParams,
+            IList<IList<string>> filterValuesByParam,
+            int[] precheckedIndices,
+            string defaultFilterParam,
+            string defaultFilterValue,
+            int width,
+            int height)
+        {
+            if (items == null)
+                items = Array.Empty<string>();
+
+            EnsureApplication();
+            var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
+            var window = new Views.SelectItemsWithFilterWindow
+            {
+                Title = title ?? "Select Items",
+                Width = width > 0 ? width : 980,
+                Height = height > 0 ? height : 720
+            };
+            var owner = GetOwnerHandle();
+            if (owner != IntPtr.Zero)
+                new WindowInteropHelper(window) { Owner = owner };
+
+            window.Initialize(
+                items,
+                prompt,
+                filterParams ?? Array.Empty<string>(),
+                filterValuesByParam ?? new List<IList<string>>(),
+                prechecked,
+                defaultFilterParam ?? "",
+                defaultFilterValue ?? "");
+
+            if (window.ShowDialog() != true)
+                return null;
+
+            return new FilteredSelectionResult
+            {
+                SelectedIndices = window.GetSelectedIndices(),
+                FilterParameter = window.SelectedFilterParameter ?? "",
+                FilterValue = window.SelectedFilterValue ?? ""
+            };
+        }
+
         public static SheetRenumberInputsResult SelectSheetRenumberInputs(
             IEnumerable categories,
             IEnumerable printSets,
@@ -1470,6 +1542,21 @@ namespace WWPTools.WpfUI
             }
             return results.ToArray();
         }
+
+        private static List<List<string>> AsStringListList(IEnumerable items)
+        {
+            var results = new List<List<string>>();
+            if (items == null)
+                return results;
+            foreach (var item in items)
+            {
+                if (item is IEnumerable inner)
+                {
+                    results.Add(AsStringList(inner));
+                }
+            }
+            return results;
+        }
     }
 
     internal static class DialogStyles
@@ -1539,13 +1626,13 @@ namespace WWPTools.WpfUI
 
             var toggleGrid = new FrameworkElementFactory(typeof(Grid));
             toggleGrid.SetValue(DockPanel.DockProperty, Dock.Right);
-            toggleGrid.SetValue(FrameworkElement.WidthProperty, 46.0);
-            toggleGrid.SetValue(FrameworkElement.HeightProperty, 24.0);
+            toggleGrid.SetValue(FrameworkElement.WidthProperty, 44.0);
+            toggleGrid.SetValue(FrameworkElement.HeightProperty, 22.0);
 
             var track = new FrameworkElementFactory(typeof(Border));
             track.Name = "ToggleTrack";
-            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(218, 223, 230)));
-            track.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
+            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(229, 232, 237)));
+            track.SetValue(Border.CornerRadiusProperty, new CornerRadius(11));
             toggleGrid.AppendChild(track);
 
             var thumb = new FrameworkElementFactory(typeof(Ellipse));
@@ -1553,7 +1640,7 @@ namespace WWPTools.WpfUI
             thumb.SetValue(FrameworkElement.WidthProperty, 18.0);
             thumb.SetValue(FrameworkElement.HeightProperty, 18.0);
             thumb.SetValue(Shape.FillProperty, Brushes.White);
-            thumb.SetValue(FrameworkElement.MarginProperty, new Thickness(3));
+            thumb.SetValue(FrameworkElement.MarginProperty, new Thickness(2));
             thumb.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
             thumb.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             toggleGrid.AppendChild(thumb);
@@ -1567,7 +1654,7 @@ namespace WWPTools.WpfUI
             template.VisualTree = root;
 
             var checkedTrigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
-            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(45, 140, 255)), "ToggleTrack"));
+            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0, 120, 215)), "ToggleTrack"));
             checkedTrigger.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right, "ToggleThumb"));
             template.Triggers.Add(checkedTrigger);
 
@@ -1584,6 +1671,13 @@ namespace WWPTools.WpfUI
     {
         public int[] SelectedIndices { get; set; } = Array.Empty<int>();
         public int Mode { get; set; }
+    }
+
+    public class FilteredSelectionResult
+    {
+        public int[] SelectedIndices { get; set; } = Array.Empty<int>();
+        public string FilterParameter { get; set; } = "";
+        public string FilterValue { get; set; } = "";
     }
 
     public class SheetRenumberInputsResult

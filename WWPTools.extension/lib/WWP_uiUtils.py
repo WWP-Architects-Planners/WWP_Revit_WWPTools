@@ -118,6 +118,15 @@ def _to_net_string_list(items):
 	return net_list
 
 
+def _to_net_string_list_list(items):
+	if items is None:
+		return None
+	net_outer = List[List[String]]()
+	for inner in items:
+		net_outer.Add(_to_net_string_list(inner) or List[String]())
+	return net_outer
+
+
 def _to_net_int_list(items):
 	if items is None:
 		return None
@@ -167,6 +176,40 @@ def uiUtils_select_items_with_mode(
 	if result is None:
 		return [], None
 	return list(result.SelectedIndices), int(result.Mode)
+
+
+def uiUtils_select_items_with_filter(
+	items,
+	filter_param_names,
+	filter_values_by_param,
+	title="Select Items",
+	prompt="Select items:",
+	prechecked_indices=None,
+	default_filter_param="",
+	default_filter_value="",
+	width=980,
+	height=720,
+):
+	_ensure_wpf()
+	items_list = _to_net_string_list(items) or List[String]()
+	param_list = _to_net_string_list(filter_param_names) or List[String]()
+	values_matrix = _to_net_string_list_list(filter_values_by_param) or List[List[String]]()
+	prechecked = _to_net_int_list(prechecked_indices) or List[Int32]()
+	result = _DIALOGS.SelectItemsWithFilter(
+		items_list,
+		title,
+		prompt,
+		param_list,
+		values_matrix,
+		prechecked,
+		default_filter_param or "",
+		default_filter_value or "",
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return [], "", ""
+	return list(result.SelectedIndices), str(result.FilterParameter or ""), str(result.FilterValue or "")
 
 
 def uiUtils_project_upgrader_options(

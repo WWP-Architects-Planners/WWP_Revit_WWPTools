@@ -1,6 +1,8 @@
 /.vscode
 /.vs
 **/.vs/
+**/bin/
+**/obj/
 release_assets/
 installer/*.msi
 installer/*.wixpdb

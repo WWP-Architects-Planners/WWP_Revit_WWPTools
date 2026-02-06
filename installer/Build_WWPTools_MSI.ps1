@@ -172,6 +172,26 @@ function Build-WwpToolsMsi {
     $version = Get-PackageVersion -WxsPath $WxsPath
     $msiPath = Join-Path $PSScriptRoot ("{0}-v{1}.msi" -f $OutputPrefix, $version)
 
+    if ($OutputPrefix -eq "WWPTools") {
+        $versionPath = Join-Path $repoRoot "WWPTools.extension\\lib\\WWPTools.version.json"
+        $versionPayload = @{ version = $version } | ConvertTo-Json -Compress
+        Set-Content -LiteralPath $versionPath -Value $versionPayload -Encoding Ascii
+        Write-Host ("Updated extension version file: {0}" -f $versionPath)
+
+        $aboutBundle = Join-Path $repoRoot "WWPTools.extension\\WWPTools.tab\\6. Links.panel\\About us.urlbutton\\bundle.yaml"
+        if (Test-Path -LiteralPath $aboutBundle) {
+            $bundleLines = Get-Content -LiteralPath $aboutBundle
+            $tooltipLine = "tooltip: \"Installed version: {0}\"" -f $version
+            if ($bundleLines -match "^tooltip:") {
+                $bundleLines = $bundleLines -replace "^tooltip:.*$", $tooltipLine
+            } else {
+                $bundleLines = @($bundleLines + $tooltipLine)
+            }
+            Set-Content -LiteralPath $aboutBundle -Value $bundleLines -Encoding Ascii
+            Write-Host ("Updated About tooltip: {0}" -f $aboutBundle)
+        }
+    }
+
     Write-Host ("Building {0} installer v{1}..." -f $OutputPrefix, $version)
     Push-Location $PSScriptRoot
     try {

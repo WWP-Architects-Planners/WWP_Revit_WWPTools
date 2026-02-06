@@ -15,8 +15,16 @@ namespace WWPTools.WpfUI.Views
             InitializeComponent();
             DialogStyles.ApplyPrimaryButtonStyle(OkButton);
             DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
+            DialogStyles.ApplyToggleStyle(ModeA);
+            DialogStyles.ApplyToggleStyle(ModeB);
             OkButton.Click += (_, __) => DialogResult = true;
             CancelButton.Click += (_, __) => DialogResult = false;
+            ModeA.Checked += (_, __) =>
+            {
+                if (ModeB.Visibility == Visibility.Visible)
+                    ModeB.IsChecked = false;
+            };
+            ModeB.Checked += (_, __) => ModeA.IsChecked = false;
             LoadLogo();
         }
 
@@ -29,10 +37,25 @@ namespace WWPTools.WpfUI.Views
             ISet<int> prechecked)
         {
             PromptText.Text = prompt ?? "";
-            ModeA.Content = string.IsNullOrWhiteSpace(modeLabelA) ? "Option A" : modeLabelA;
-            ModeB.Content = string.IsNullOrWhiteSpace(modeLabelB) ? "Option B" : modeLabelB;
-            ModeA.IsChecked = defaultMode == 0;
-            ModeB.IsChecked = defaultMode == 1;
+            var hasModeA = !string.IsNullOrWhiteSpace(modeLabelA);
+            var hasModeB = !string.IsNullOrWhiteSpace(modeLabelB);
+            if (!hasModeA && !hasModeB)
+            {
+                ModePanel.Visibility = Visibility.Collapsed;
+            }
+            else if (hasModeA && !hasModeB)
+            {
+                ModeA.Content = modeLabelA;
+                ModeB.Visibility = Visibility.Collapsed;
+                ModeA.IsChecked = defaultMode == 1;
+            }
+            else
+            {
+                ModeA.Content = hasModeA ? modeLabelA : "Option A";
+                ModeB.Content = hasModeB ? modeLabelB : "Option B";
+                ModeA.IsChecked = defaultMode == 0;
+                ModeB.IsChecked = defaultMode == 1;
+            }
 
             ItemsList.Items.Clear();
             if (items != null)
@@ -68,6 +91,8 @@ namespace WWPTools.WpfUI.Views
 
         public int GetSelectedMode()
         {
+            if (ModeB.Visibility != Visibility.Visible)
+                return ModeA.IsChecked == true ? 1 : 0;
             return ModeA.IsChecked == true ? 0 : 1;
         }
 
