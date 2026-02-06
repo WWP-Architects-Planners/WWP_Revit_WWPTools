@@ -608,6 +608,37 @@ def uiUtils_keyplan_options(
 	}
 
 
+def uiUtils_area_keyplan_import(
+	title="Import Area Key Schedule",
+	file_path="",
+	column_names=None,
+	preview_lines=None,
+	parameter_options=None,
+	default_selections=None,
+	width=980,
+	height=720,
+):
+	_ensure_wpf()
+	result = _DIALOGS.AreaKeyplanImport(
+		title,
+		file_path or "",
+		_to_net_string_list(column_names) or List[String](),
+		_to_net_string_list(preview_lines) or List[String](),
+		_to_net_string_list(parameter_options) or List[String](),
+		_to_net_string_list(default_selections) or List[String](),
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"load_requested": bool(result.LoadRequested),
+		"file_path": result.FilePath or "",
+		"column_names": list(result.ColumnNames or []),
+		"selected_options": list(result.SelectedOptions or []),
+	}
+
+
 def uiUtils_level_setup_inputs(
 	title="Level Setup",
 	level_count_label="How many levels are needed?",

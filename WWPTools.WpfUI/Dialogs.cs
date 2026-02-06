@@ -1062,6 +1062,55 @@ namespace WWPTools.WpfUI
             };
         }
 
+        public static AreaKeyplanImportResult AreaKeyplanImport(
+            string title,
+            string filePath,
+            IEnumerable columnNames,
+            IEnumerable previewLines,
+            IEnumerable parameterOptions,
+            IEnumerable defaultSelections,
+            int width,
+            int height)
+        {
+            EnsureApplication();
+            var window = new Views.AreaKeyplanImportWindow
+            {
+                Title = title ?? "Import Area Key Schedule",
+                Width = width > 0 ? width : 980,
+                Height = height > 0 ? height : 720
+            };
+            var owner = GetOwnerHandle();
+            if (owner != IntPtr.Zero)
+                new WindowInteropHelper(window) { Owner = owner };
+
+            window.Initialize(
+                filePath ?? "",
+                AsStringList(columnNames),
+                AsStringList(previewLines),
+                AsStringList(parameterOptions),
+                AsStringList(defaultSelections));
+
+            if (window.ShowDialog() != true)
+                return null;
+
+            var mappings = window.GetMappings() ?? new List<Views.ColumnMapping>();
+            var columns = new List<string>();
+            var selections = new List<string>();
+            foreach (var mapping in mappings)
+            {
+                columns.Add(mapping.ColumnName ?? "");
+                selections.Add(mapping.SelectedOption ?? "");
+            }
+
+            return new AreaKeyplanImportResult
+            {
+                LoadRequested = window.LoadRequested,
+                FilePath = window.FilePath ?? "",
+                ColumnNames = columns.ToArray(),
+                SelectedOptions = selections.ToArray()
+            };
+        }
+
         private static Window CreateMessageWindow(string message, string title, bool showCancel)
         {
             var window = CreateWindow(title, 520, 260);
@@ -1762,6 +1811,14 @@ namespace WWPTools.WpfUI
     {
         public int TemplateIndex { get; set; }
         public int FillTypeIndex { get; set; }
+    }
+
+    public class AreaKeyplanImportResult
+    {
+        public bool LoadRequested { get; set; }
+        public string FilePath { get; set; } = "";
+        public string[] ColumnNames { get; set; } = Array.Empty<string>();
+        public string[] SelectedOptions { get; set; } = Array.Empty<string>();
     }
 
     public class LevelSetupInputsResult
