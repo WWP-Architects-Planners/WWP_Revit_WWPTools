@@ -175,13 +175,15 @@ function Build-WwpToolsMsi {
     if ($OutputPrefix -eq "WWPTools") {
         $versionPath = Join-Path $repoRoot "WWPTools.extension\\lib\\WWPTools.version.json"
         $versionPayload = @{ version = $version } | ConvertTo-Json -Compress
-        Set-Content -LiteralPath $versionPath -Value $versionPayload -Encoding Ascii
+        $tempVersionPath = Join-Path $repoRoot ".tmp_WWPTools.version.json"
+        Set-Content -LiteralPath $tempVersionPath -Value $versionPayload -Encoding Ascii
+        Move-Item -LiteralPath $tempVersionPath -Destination $versionPath -Force
         Write-Host ("Updated extension version file: {0}" -f $versionPath)
 
         $aboutBundle = Join-Path $repoRoot "WWPTools.extension\\WWPTools.tab\\6. Links.panel\\About us.urlbutton\\bundle.yaml"
         if (Test-Path -LiteralPath $aboutBundle) {
             $bundleLines = Get-Content -LiteralPath $aboutBundle
-            $tooltipLine = "tooltip: \"Installed version: {0}\"" -f $version
+            $tooltipLine = ('tooltip: "Installed version: {0}"' -f $version)
             if ($bundleLines -match "^tooltip:") {
                 $bundleLines = $bundleLines -replace "^tooltip:.*$", $tooltipLine
             } else {

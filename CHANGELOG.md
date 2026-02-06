@@ -5,6 +5,26 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2026-02-06
+
+### Added
+- Update checker on startup with GitHub latest-release comparison
+- Local version file `WWPTools.extension/lib/WWPTools.version.json`
+- About button icon and version tooltip
+- Update WWPTools button (fetch/pull GitHub updates with user confirmation)
+- Windows 10-style toggle styling in WPF dialogs
+
+### Changed
+- Sheet Scale Updater: sorted sheet list, selectable sheets, target parameter picker (instance + type), and performance tuning
+- Copy Color Scheme: source list shows category/area scheme names; target selection is category-only with single overwrite toggle
+- App-init toast now reports “outdated” vs “latest” on load
+
+### Fixed
+- CPython output flushing errors in Sheet Scale Updater report
+- Cancel/exit handling to avoid CPython `SystemExit` errors
+- IronPython update check import error (urllib fallback)
+- Update button fallback when Git is missing (opens releases page)
+
 ## [1.1.3] - 2026-01-09
 
 ### Fixed
@@ -93,6 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [1.1.4]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.4
 [1.1.5]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.5
+[1.1.6]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.6
 [1.1.3]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.3
 [1.1.2]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.2
 [1.1.1]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.1
