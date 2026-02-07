@@ -2,8 +2,7 @@
 import clr
 import sys
 clr.AddReference('RevitAPI')
-from Autodesk.Revit.DB import *
-from Autodesk.Revit import UI
+from Autodesk.Revit import DB, UI
 
 # pyRevit script tools
 from pyrevit import script
@@ -35,13 +34,13 @@ def _is_titleblock(element):
     if not element or not element.Category:
         return False
     category_id = element.Category.Id
-    titleblock_builtin_id = int(BuiltInCategory.OST_TitleBlocks)
+    titleblock_builtin_id = int(DB.BuiltInCategory.OST_TitleBlocks)
     # Try Revit 2025 method first (IntegerValue property)
     if hasattr(category_id, 'IntegerValue'):
         return category_id.IntegerValue == titleblock_builtin_id
     # Revit 2026 method: convert to long for ElementId constructor
     try:
-        titleblock_id = ElementId(long(titleblock_builtin_id))
+        titleblock_id = DB.ElementId(int(titleblock_builtin_id))
         return category_id == titleblock_id
     except:
         # Fallback: compare as integers
@@ -52,8 +51,8 @@ def _is_titleblock(element):
 
 def _collect_titleblocks():
     return list(
-        FilteredElementCollector(doc)
-        .OfCategory(BuiltInCategory.OST_TitleBlocks)
+        DB.FilteredElementCollector(doc)
+        .OfCategory(DB.BuiltInCategory.OST_TitleBlocks)
         .WhereElementIsNotElementType()
         .ToElements()
     )
@@ -89,7 +88,7 @@ def _get_param_entries(titleblock_instances):
     return keys, entries
 
 def main():
-    sheets = list(FilteredElementCollector(doc).OfClass(ViewSheet).ToElements())
+    sheets = list(DB.FilteredElementCollector(doc).OfClass(DB.ViewSheet).ToElements())
     sheets.sort(key=lambda s: (s.SheetNumber or "", s.Name or ""))
     if not sheets:
         UI.TaskDialog.Show("Sheet Scale Updater", "No sheets found.")
@@ -200,7 +199,7 @@ def main():
         except Exception:
             continue
 
-    t = Transaction(doc, "Update Sheet Scale")
+    t = DB.Transaction(doc, "Update Sheet Scale")
     t.Start()
     try:
         view_scale_cache = {}
@@ -286,12 +285,12 @@ def main():
                 if sheet_scale_param.IsReadOnly:
                     sheet_debug["error"] = "Parameter is read-only"
                     failed_sheets.append(sheet_name + " - Parameter is read-only")
-                elif sheet_scale_param.StorageType == StorageType.Double:
+                elif sheet_scale_param.StorageType == DB.StorageType.Double:
                     sheet_scale_param.Set(float(sheet_scale_value))
                     sheet_debug["written_as"] = "Double"
                     sheet_debug["status"] = "SUCCESS"
                     updated_count += 1
-                elif sheet_scale_param.StorageType == StorageType.Integer:
+                elif sheet_scale_param.StorageType == DB.StorageType.Integer:
                     sheet_scale_param.Set(int(sheet_scale_value))
                     sheet_debug["written_as"] = "Integer"
                     sheet_debug["status"] = "SUCCESS"
