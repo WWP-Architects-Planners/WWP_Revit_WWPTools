@@ -16,6 +16,8 @@ from pyrevit import DB, revit, script
 CONFIG_LAST_EXCEL_PATH = "last_excel_path"
 CONFIG_LAST_CSV_DIR = "last_csv_dir"
 CONFIG_LAST_SCHEDULE_IDS = "last_schedule_ids"
+CONFIG_LAST_CSV_MODE = "last_csv_mode"
+CONFIG_LAST_CSV_DELIM = "last_csv_delim"
 
 
 def sanitize_sheet_name(name):
@@ -113,11 +115,11 @@ def load_uiutils():
     return ui
 
 
-def read_csv_rows(path):
+def read_csv_rows(path, delimiter=","):
     for encoding in ("utf-8-sig", "utf-16", "cp1252"):
         try:
             with open(path, "r", encoding=encoding, newline="") as handle:
-                reader = csv.reader(handle)
+                reader = csv.reader(handle, delimiter=delimiter)
                 return [row for row in reader]
         except Exception:
             continue
@@ -170,7 +172,7 @@ def get_body_row_element_ids(view):
     return ids
 
 
-def inject_element_id_column(data, view):
+def inject_element_id_column(data, view, csv_text=False):
     if not data:
         return data
     header_rows = get_section_row_count(view, DB.SectionType.Header)
@@ -188,7 +190,10 @@ def inject_element_id_column(data, view):
             else:
                 row.insert(0, "")
         elif idx < header_rows + body_rows:
-            row.insert(0, body_ids[idx - header_rows])
+            elem_value = body_ids[idx - header_rows]
+            if csv_text and elem_value and elem_value.isdigit() and len(elem_value) > 11:
+                elem_value = "'" + elem_value
+            row.insert(0, elem_value)
         else:
             row.insert(0, "")
         data[idx] = row
@@ -216,8 +221,13 @@ def write_table_to_sheet(sheet, data, start_row, header_rows=0, column_specs=Non
                 else:
                     cell_value = coerce_cell_value(value, spec=spec, doc=doc, numeric_fallback=True)
             else:
-                cell_value = coerce_cell_value(value, spec=None, doc=None, numeric_fallback=True)
-            sheet.cell(row=row_idx, column=col_idx, value=cell_value)
+                cell_value = coerce_cell_value(value, spec=None, doc=None, numeric_fallback=False)
+            cell = sheet.cell(row=row_idx, column=col_idx, value=cell_value)
+            if row_offset >= header_rows and col_idx == 1:
+                if cell_value is None:
+                    cell_value = ""
+                cell.value = str(cell_value)
+                cell.number_format = "@"
             col_idx += 1
         row_idx += 1
 
@@ -370,7 +380,7 @@ def export_to_excel(doc, schedules, file_path, ui):
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
             data = normalize_table_data(read_csv_rows(csv_path))
-            data = inject_element_id_column(data, view)
+            data = inject_element_id_column(data, view, csv_text=False)
             header_rows = get_section_row_count(view, DB.SectionType.Header)
             column_specs = get_column_specs(view)
             if column_specs is not None:
@@ -394,11 +404,11 @@ def export_to_excel(doc, schedules, file_path, ui):
     return True
 
 
-def export_to_csv(doc, schedules, folder):
+def export_to_csv(doc, schedules, folder, quote_all=False, delimiter=","):
     if not os.path.isdir(folder):
         os.makedirs(folder)
     options = DB.ViewScheduleExportOptions()
-    options.FieldDelimiter = ","
+    options.FieldDelimiter = delimiter
     used_names = set()
     for view in schedules:
         base_name = sanitize_file_name(view.Name)
@@ -406,12 +416,69 @@ def export_to_csv(doc, schedules, folder):
         file_name = "{}.csv".format(unique_name)
         view.Export(folder, file_name, options)
         csv_path = os.path.join(folder, file_name)
-        rows = normalize_table_data(read_csv_rows(csv_path))
-        rows = inject_element_id_column(rows, view)
+        rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter))
+        rows = inject_element_id_column(rows, view, csv_text=True)
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.writer(handle)
+            if quote_all:
+                writer = csv.writer(handle, delimiter=delimiter, quoting=csv.QUOTE_ALL)
+            else:
+                writer = csv.writer(handle, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
             writer.writerows(rows)
     return True
+
+
+def select_csv_mode(ui, default_mode=0):
+    options = [
+        "Standard CSV (comma, minimal quotes)",
+        "CSV (Quoted - all fields)",
+    ]
+    try:
+        selected = ui.uiUtils_select_indices(
+            options,
+            title="CSV Export Mode",
+            prompt="Choose CSV export format:",
+            multiselect=False,
+            width=520,
+            height=260,
+        )
+    except Exception:
+        selected = []
+    if selected is None or len(selected) == 0:
+        return None
+    if selected[0] < 0 or selected[0] >= len(options):
+        return default_mode
+    return int(selected[0])
+
+
+def select_csv_delimiter(ui, default_delimiter=","):
+    options = [
+        ("Comma (,)", ","),
+        ("Semicolon (;)", ";"),
+        ("Tab (\\t)", "\t"),
+    ]
+    labels = [opt[0] for opt in options]
+    default_index = 0
+    for idx, opt in enumerate(options):
+        if opt[1] == default_delimiter:
+            default_index = idx
+            break
+    try:
+        selected = ui.uiUtils_select_indices(
+            labels,
+            title="CSV Delimiter",
+            prompt="Choose delimiter:",
+            multiselect=False,
+            width=520,
+            height=260,
+        )
+    except Exception:
+        selected = []
+    if selected is None or len(selected) == 0:
+        return None
+    sel_idx = int(selected[0]) if selected else default_index
+    if sel_idx < 0 or sel_idx >= len(options):
+        sel_idx = default_index
+    return options[sel_idx][1]
 
 
 def main():
@@ -486,14 +553,24 @@ def main():
     else:
         last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
         init_dir = ensure_existing_dir(last_csv_dir, default_dir)
+        last_csv_mode = getattr(config, CONFIG_LAST_CSV_MODE, 0)
+        last_csv_delim = getattr(config, CONFIG_LAST_CSV_DELIM, ",")
+        csv_mode = select_csv_mode(ui, default_mode=last_csv_mode)
+        if csv_mode is None:
+            return
+        csv_delim = select_csv_delimiter(ui, default_delimiter=last_csv_delim)
+        if csv_delim is None:
+            return
         folder = ui.uiUtils_select_folder_dialog(
             title="Select CSV Folder",
             initial_directory=init_dir,
         )
         if not folder:
             return
-        export_to_csv(doc, selected_views, folder)
+        export_to_csv(doc, selected_views, folder, quote_all=(csv_mode == 1), delimiter=csv_delim)
         config.last_csv_dir = folder
+        config.last_csv_mode = csv_mode
+        config.last_csv_delim = csv_delim
 
     script.save_config()
     ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
