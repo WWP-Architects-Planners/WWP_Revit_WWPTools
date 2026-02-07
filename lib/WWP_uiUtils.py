@@ -178,6 +178,55 @@ def uiUtils_select_items_with_mode(
 	return list(result.SelectedIndices), int(result.Mode)
 
 
+def uiUtils_export_schedules_inputs(
+	items,
+	title="Export Schedules",
+	prompt="Select schedules to export:",
+	mode_labels=("Export to Excel", "Export to CSV"),
+	default_mode=0,
+	prechecked_indices=None,
+	excel_path="",
+	csv_folder="",
+	csv_delimiter=",",
+	csv_quote_all=False,
+	width=860,
+	height=720,
+):
+	_ensure_wpf()
+	if not hasattr(_DIALOGS, "ExportSchedulesInputs"):
+		return False
+	items_list = _to_net_string_list(items) or List[String]()
+	labels = list(mode_labels) if mode_labels is not None else []
+	label_a = labels[0] if len(labels) > 0 else "Export to Excel"
+	label_b = labels[1] if len(labels) > 1 else "Export to CSV"
+	prechecked = _to_net_int_list(prechecked_indices) or List[Int32]()
+	result = _DIALOGS.ExportSchedulesInputs(
+		items_list,
+		title,
+		prompt,
+		label_a,
+		label_b,
+		int(default_mode),
+		prechecked,
+		excel_path or "",
+		csv_folder or "",
+		csv_delimiter or ",",
+		bool(csv_quote_all),
+		int(width),
+		int(height),
+	)
+	if result is None:
+		return None
+	return {
+		"selected_indices": list(result.SelectedIndices),
+		"mode": int(result.Mode),
+		"excel_path": result.ExcelPath or "",
+		"csv_folder": result.CsvFolder or "",
+		"csv_delimiter": result.CsvDelimiter or ",",
+		"csv_quote_all": bool(result.CsvQuoteAll),
+	}
+
+
 def uiUtils_select_items_with_filter(
 	items,
 	filter_param_names,

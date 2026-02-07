@@ -18,6 +18,7 @@ CONFIG_LAST_CSV_DIR = "last_csv_dir"
 CONFIG_LAST_SCHEDULE_IDS = "last_schedule_ids"
 CONFIG_LAST_CSV_MODE = "last_csv_mode"
 CONFIG_LAST_CSV_DELIM = "last_csv_delim"
+CONFIG_LAST_EXPORT_MODE = "last_export_mode"
 
 
 def sanitize_sheet_name(name):
@@ -186,16 +187,16 @@ def inject_element_id_column(data, view, csv_text=False):
             row = []
         if idx < header_rows:
             if idx == max(0, header_rows - 1):
-                row.insert(0, "ElementId")
+                row.append("ElementId")
             else:
-                row.insert(0, "")
+                row.append("")
         elif idx < header_rows + body_rows:
             elem_value = body_ids[idx - header_rows]
             if csv_text and elem_value and elem_value.isdigit() and len(elem_value) > 11:
                 elem_value = "'" + elem_value
-            row.insert(0, elem_value)
+            row.append(elem_value)
         else:
-            row.insert(0, "")
+            row.append("")
         data[idx] = row
     return data
 
@@ -223,7 +224,7 @@ def write_table_to_sheet(sheet, data, start_row, header_rows=0, column_specs=Non
             else:
                 cell_value = coerce_cell_value(value, spec=None, doc=None, numeric_fallback=False)
             cell = sheet.cell(row=row_idx, column=col_idx, value=cell_value)
-            if row_offset >= header_rows and col_idx == 1:
+            if row_offset >= header_rows and col_idx == len(row):
                 if cell_value is None:
                     cell_value = ""
                 cell.value = str(cell_value)
@@ -501,6 +502,70 @@ def main():
         idx for idx, item in enumerate(items)
         if element_id_value(item.view.Id) in prechecked_ids
     ]
+    default_dir = get_default_dir(doc)
+    last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
+    last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
+    last_csv_mode = getattr(config, CONFIG_LAST_CSV_MODE, 0)
+    last_csv_delim = getattr(config, CONFIG_LAST_CSV_DELIM, ",")
+    last_export_mode = getattr(config, CONFIG_LAST_EXPORT_MODE, 0)
+
+    init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
+    init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
+    inputs = ui.uiUtils_export_schedules_inputs(
+        [item.display_name for item in items],
+        title="Export Schedules",
+        prompt="Select schedules to export:",
+        mode_labels=("Export to Excel", "Export to CSV"),
+        default_mode=last_export_mode,
+        prechecked_indices=prechecked_indices,
+        excel_path=init_excel_path,
+        csv_folder=init_csv_dir,
+        csv_delimiter=last_csv_delim,
+        csv_quote_all=(last_csv_mode == 1),
+        width=860,
+        height=720,
+    )
+    if inputs is not False:
+        if not inputs:
+            return
+        selected_indices = inputs.get("selected_indices") or []
+        if not selected_indices:
+            ui.uiUtils_alert("Select at least one schedule.", title="Multiple Schedules Exporter")
+            return
+        selected_views = [items[i].view for i in selected_indices]
+        config.last_schedule_ids = [element_id_value(v.Id) for v in selected_views]
+        mode = int(inputs.get("mode", 0))
+        if mode == 0:
+            file_path = (inputs.get("excel_path") or "").strip()
+            if not file_path:
+                ui.uiUtils_alert("Choose an Excel file path.", title="Multiple Schedules Exporter")
+                return
+            if not file_path.lower().endswith(".xlsx"):
+                file_path = "{}.xlsx".format(file_path)
+            success = export_to_excel(doc, selected_views, file_path, ui)
+            if not success:
+                return
+            config.last_excel_path = file_path
+            try:
+                os.startfile(file_path)
+            except Exception:
+                pass
+        else:
+            folder = (inputs.get("csv_folder") or "").strip()
+            if not folder:
+                ui.uiUtils_alert("Choose a CSV folder.", title="Multiple Schedules Exporter")
+                return
+            csv_delim = inputs.get("csv_delimiter") or ","
+            quote_all = bool(inputs.get("csv_quote_all"))
+            export_to_csv(doc, selected_views, folder, quote_all=quote_all, delimiter=csv_delim)
+            config.last_csv_dir = folder
+            config.last_csv_mode = 1 if quote_all else 0
+            config.last_csv_delim = csv_delim
+        config.last_export_mode = mode
+        script.save_config()
+        ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
+        return
+
     if hasattr(ui, "uiUtils_select_items_with_mode"):
         selected_indices, mode = ui.uiUtils_select_items_with_mode(
             [item.display_name for item in items],
@@ -526,9 +591,7 @@ def main():
     selected_views = [items[i].view for i in selected_indices]
     config.last_schedule_ids = [element_id_value(v.Id) for v in selected_views]
 
-    default_dir = get_default_dir(doc)
     if mode == 0:
-        last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
         last_excel_dir = os.path.dirname(last_excel_path) if last_excel_path else ""
         init_dir = ensure_existing_dir(last_excel_dir, default_dir)
         file_path = ui.uiUtils_save_file_dialog(
@@ -551,10 +614,7 @@ def main():
         except Exception:
             pass
     else:
-        last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
         init_dir = ensure_existing_dir(last_csv_dir, default_dir)
-        last_csv_mode = getattr(config, CONFIG_LAST_CSV_MODE, 0)
-        last_csv_delim = getattr(config, CONFIG_LAST_CSV_DELIM, ",")
         csv_mode = select_csv_mode(ui, default_mode=last_csv_mode)
         if csv_mode is None:
             return
