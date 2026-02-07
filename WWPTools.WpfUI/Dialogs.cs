@@ -259,6 +259,93 @@ namespace WWPTools.WpfUI
             };
         }
 
+        public static ExportSchedulesInputsResult ExportSchedulesInputs(
+            IEnumerable items,
+            string title,
+            string prompt,
+            string modeLabelExcel,
+            string modeLabelCsv,
+            int defaultMode,
+            IEnumerable precheckedIndices,
+            string excelPath,
+            string csvFolder,
+            string csvDelimiter,
+            bool csvQuoteAll,
+            int width,
+            int height)
+        {
+            return ExportSchedulesInputs(
+                AsStringList(items),
+                title,
+                prompt,
+                modeLabelExcel,
+                modeLabelCsv,
+                defaultMode,
+                AsIntArray(precheckedIndices),
+                excelPath,
+                csvFolder,
+                csvDelimiter,
+                csvQuoteAll,
+                width,
+                height);
+        }
+
+        public static ExportSchedulesInputsResult ExportSchedulesInputs(
+            IList<string> items,
+            string title,
+            string prompt,
+            string modeLabelExcel,
+            string modeLabelCsv,
+            int defaultMode,
+            int[] precheckedIndices,
+            string excelPath,
+            string csvFolder,
+            string csvDelimiter,
+            bool csvQuoteAll,
+            int width,
+            int height)
+        {
+            if (items == null)
+                items = Array.Empty<string>();
+
+            EnsureApplication();
+            var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
+            var window = new Views.ExportSchedulesWindow
+            {
+                Title = title ?? "Export Schedules",
+                Width = width > 0 ? width : 860,
+                Height = height > 0 ? height : 720
+            };
+            var owner = GetOwnerHandle();
+            if (owner != IntPtr.Zero)
+                new WindowInteropHelper(window) { Owner = owner };
+
+            window.Initialize(
+                items,
+                prompt,
+                modeLabelExcel,
+                modeLabelCsv,
+                defaultMode,
+                prechecked,
+                excelPath,
+                csvFolder,
+                csvDelimiter,
+                csvQuoteAll);
+
+            if (window.ShowDialog() != true)
+                return null;
+
+            return new ExportSchedulesInputsResult
+            {
+                SelectedIndices = window.GetSelectedIndices(),
+                Mode = window.GetSelectedMode(),
+                ExcelPath = window.GetExcelPath(),
+                CsvFolder = window.GetCsvFolder(),
+                CsvDelimiter = window.GetCsvDelimiter(),
+                CsvQuoteAll = window.GetCsvQuoteAll()
+            };
+        }
+
         public static FilteredSelectionResult SelectItemsWithFilter(
             IEnumerable items,
             string title,
@@ -1720,6 +1807,16 @@ namespace WWPTools.WpfUI
     {
         public int[] SelectedIndices { get; set; } = Array.Empty<int>();
         public int Mode { get; set; }
+    }
+
+    public class ExportSchedulesInputsResult
+    {
+        public int[] SelectedIndices { get; set; } = Array.Empty<int>();
+        public int Mode { get; set; }
+        public string ExcelPath { get; set; } = "";
+        public string CsvFolder { get; set; } = "";
+        public string CsvDelimiter { get; set; } = ",";
+        public bool CsvQuoteAll { get; set; }
     }
 
     public class FilteredSelectionResult
