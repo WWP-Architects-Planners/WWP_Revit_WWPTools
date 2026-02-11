@@ -9,6 +9,10 @@ import shutil
 import sys
 import tempfile
 
+import clr
+from System import String
+from System.Collections.Generic import List
+
 from pyrevit import DB, revit, script
 
 
@@ -19,6 +23,11 @@ CONFIG_LAST_SCHEDULE_IDS = "last_schedule_ids"
 CONFIG_LAST_CSV_MODE = "last_csv_mode"
 CONFIG_LAST_CSV_DELIM = "last_csv_delim"
 CONFIG_LAST_EXPORT_MODE = "last_export_mode"
+CONFIG_LAST_CSV_EXPORT_TITLE = "last_csv_export_title"
+CONFIG_LAST_CSV_COLUMN_HEADERS = "last_csv_column_headers"
+CONFIG_LAST_CSV_GROUP_HEADERS = "last_csv_group_headers"
+CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
+CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
 
 
 def sanitize_sheet_name(name):
@@ -116,11 +125,388 @@ def load_uiutils():
     return ui
 
 
-def read_csv_rows(path, delimiter=","):
+def _show_export_form(
+    ui,
+    items,
+    prechecked_indices,
+    init_excel_path,
+    init_csv_dir,
+    last_csv_delim,
+    last_csv_mode,
+    last_export_mode,
+    last_export_title,
+    last_column_headers,
+    last_group_headers,
+    last_grouped_column_headers,
+    last_text_qualifier,
+):
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.IO import StringReader
+    from System.Windows.Markup import XamlReader
+    from System.Xml import XmlReader
+    from System.Windows.Controls import SelectionMode
+
+    def _to_net_list(values):
+        net_list = List[String]()
+        for value in values:
+            net_list.Add("" if value is None else str(value))
+        return net_list
+
+    xaml = """
+    <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            Title="Export Schedules" Height="720" Width="880"
+            WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
+        <Window.Resources>
+            <Style x:Key="PrimaryButton" TargetType="Button">
+                <Setter Property="Background" Value="#1976D2"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Padding" Value="14,6"/>
+                <Setter Property="Height" Value="40"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}"
+                                    CornerRadius="18">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+                <Setter Property="Background" Value="#E0E0E0"/>
+                <Setter Property="Foreground" Value="#424242"/>
+            </Style>
+            <Style x:Key="BlueToggle" TargetType="ToggleButton">
+                <Setter Property="Width" Value="42"/>
+                <Setter Property="Height" Value="21"/>
+                <Setter Property="FontWeight" Value="Bold"/>
+                <Setter Property="FontSize" Value="9"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Grid>
+                                <Border x:Name="SwitchTrack"
+                                        CornerRadius="10.5"
+                                        Background="#BDBDBD"
+                                        BorderBrush="#9E9E9E"
+                                        BorderThickness="1"/>
+                                <Grid>
+                                    <TextBlock x:Name="OnText"
+                                               Text="ON"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
+                                               Margin="4,0,0,0"
+                                               Visibility="Collapsed"/>
+                                    <TextBlock x:Name="OffText"
+                                               Text="OFF"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Right"
+                                               Margin="0,0,5,0"
+                                               Visibility="Visible"/>
+                                </Grid>
+                                <Ellipse x:Name="Thumb"
+                                         Width="14"
+                                         Height="14"
+                                         Fill="White"
+                                         Stroke="#9E9E9E"
+                                         StrokeThickness="1"
+                                         HorizontalAlignment="Left"
+                                         Margin="3,3,0,3"/>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="SwitchTrack" Property="Background" Value="#1976D2"/>
+                                    <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#0F5BA8"/>
+                                    <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                                    <Setter TargetName="Thumb" Property="Margin" Value="0,3,3,3"/>
+                                    <Setter TargetName="OnText" Property="Visibility" Value="Visible"/>
+                                    <Setter TargetName="OffText" Property="Visibility" Value="Collapsed"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.95"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.5"/>
+                                    <Setter TargetName="Thumb" Property="Opacity" Value="0.6"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Window.Resources>
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0">
+                <TextBlock Text="Search schedules:"/>
+                <TextBox Name="SearchBox" Margin="0,4,0,8"/>
+            </StackPanel>
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="320"/>
+                </Grid.ColumnDefinitions>
+                <ListBox Name="ScheduleList" Grid.Column="0" SelectionMode="Extended"/>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                    <TextBlock Text="Export mode:"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
+                        <RadioButton Name="ExcelMode" Content="Excel" GroupName="ModeGroup" Margin="0,0,12,0"/>
+                        <RadioButton Name="CsvMode" Content="CSV" GroupName="ModeGroup"/>
+                    </StackPanel>
+
+                    <GroupBox Header="Schedule appearance" Margin="0,4,0,8">
+                        <StackPanel Margin="8,6,8,8">
+                            <CheckBox Name="ExportTitle" Content="Export title"/>
+                            <CheckBox Name="ExportColumnHeaders" Content="Export column headers" IsChecked="True"/>
+                            <CheckBox Name="ExportGroupedColumnHeaders" Content="Include grouped column headers" Margin="18,0,0,0"/>
+                            <CheckBox Name="ExportGroupHeaders" Content="Export group headers, footers, and blank lines"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <TextBlock Text="Excel file path:"/>
+                    <DockPanel Margin="0,4,0,8">
+                        <TextBox Name="ExcelPath" DockPanel.Dock="Left" Width="220" Margin="0,0,6,0"/>
+                        <Button Name="BrowseExcel" Content="Browse" Width="70"/>
+                    </DockPanel>
+
+                    <GroupBox Header="Output options" Margin="0,4,0,8">
+                        <StackPanel Margin="8,6,8,8">
+                            <TextBlock Text="CSV folder:"/>
+                            <DockPanel Margin="0,4,0,8">
+                                <TextBox Name="CsvFolder" DockPanel.Dock="Left" Width="220" Margin="0,0,6,0"/>
+                                <Button Name="BrowseCsv" Content="Browse" Width="70"/>
+                            </DockPanel>
+
+                            <TextBlock Text="CSV delimiter:"/>
+                            <ComboBox Name="CsvDelimiter" Margin="0,4,0,8"/>
+
+                            <TextBlock Text="Text qualifier:"/>
+                            <ComboBox Name="TextQualifier" Margin="0,4,0,8"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Quote all fields" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ToggleButton Name="QuoteAll" Style="{StaticResource BlueToggle}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+            </Grid>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                <Button Name="OkButton" Style="{StaticResource PrimaryButton}" Width="150" Margin="0,0,8,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE105;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="Export" FontSize="14"/>
+                    </StackPanel>
+                </Button>
+                <Button Name="CancelButton" Style="{StaticResource SecondaryButton}" Width="150">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="Cancel" FontSize="14"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Window>
+    """
+    reader = XmlReader.Create(StringReader(xaml))
+    window = XamlReader.Load(reader)
+
+    search_box = window.FindName("SearchBox")
+    schedule_list = window.FindName("ScheduleList")
+    excel_mode = window.FindName("ExcelMode")
+    csv_mode = window.FindName("CsvMode")
+    excel_path = window.FindName("ExcelPath")
+    browse_excel = window.FindName("BrowseExcel")
+    csv_folder = window.FindName("CsvFolder")
+    browse_csv = window.FindName("BrowseCsv")
+    csv_delim = window.FindName("CsvDelimiter")
+    text_qualifier = window.FindName("TextQualifier")
+    quote_all = window.FindName("QuoteAll")
+    export_title = window.FindName("ExportTitle")
+    export_column_headers = window.FindName("ExportColumnHeaders")
+    export_group_headers = window.FindName("ExportGroupHeaders")
+    export_grouped_column_headers = window.FindName("ExportGroupedColumnHeaders")
+    ok_button = window.FindName("OkButton")
+    cancel_button = window.FindName("CancelButton")
+
+    schedule_list.ItemsSource = _to_net_list(items)
+    delimiter_items = [
+        "Comma (,)",
+        "Semicolon (;)",
+        "Tab (\\t)",
+    ]
+    csv_delim.ItemsSource = _to_net_list(delimiter_items)
+
+    qualifier_items = [
+        "(none)",
+        'Double Quote (")',
+        "Single Quote (')",
+    ]
+    text_qualifier.ItemsSource = _to_net_list(qualifier_items)
+
+    delimiter_values = {
+        "Comma (,)": ",",
+        "Semicolon (;)": ";",
+        "Tab (\\t)": "\t",
+    }
+    default_delim_label = "Comma (,)"
+    for label, value in delimiter_values.items():
+        if value == last_csv_delim:
+            default_delim_label = label
+            break
+
+    excel_path.Text = init_excel_path or ""
+    csv_folder.Text = init_csv_dir or ""
+    quote_all.IsChecked = bool(last_csv_mode == 1)
+    csv_delim.SelectedItem = default_delim_label
+
+    export_title.IsChecked = bool(last_export_title)
+    export_column_headers.IsChecked = bool(last_column_headers)
+    export_group_headers.IsChecked = bool(last_group_headers)
+    export_grouped_column_headers.IsChecked = bool(last_grouped_column_headers)
+    qualifier_label = "(none)"
+    if last_text_qualifier == "\"":
+        qualifier_label = 'Double Quote (")'
+    elif last_text_qualifier == "'":
+        qualifier_label = "Single Quote (')"
+    text_qualifier.SelectedItem = qualifier_label
+
+    if last_export_mode == 1:
+        csv_mode.IsChecked = True
+    else:
+        excel_mode.IsChecked = True
+
+    selected_names = set()
+    if prechecked_indices:
+        for idx in prechecked_indices:
+            if 0 <= idx < len(items):
+                selected_names.add(items[idx])
+
+    def _apply_selection():
+        schedule_list.SelectedItems.Clear()
+        for item in schedule_list.Items:
+            if str(item) in selected_names:
+                schedule_list.SelectedItems.Add(item)
+
+    _apply_selection()
+
+    def _update_enabled_state():
+        is_excel = bool(excel_mode.IsChecked)
+        excel_path.IsEnabled = is_excel
+        browse_excel.IsEnabled = is_excel
+        csv_folder.IsEnabled = not is_excel
+        browse_csv.IsEnabled = not is_excel
+
+    def _filter_list(_sender=None, _args=None):
+        text = search_box.Text or ""
+        text = text.strip().lower()
+        if not text:
+            filtered = items
+        else:
+            filtered = [item for item in items if text in item.lower()]
+        schedule_list.ItemsSource = _to_net_list(filtered)
+        _apply_selection()
+
+    def _selection_changed(_sender, _args):
+        visible = set(str(item) for item in schedule_list.Items)
+        selected_names.difference_update(visible)
+        for item in schedule_list.SelectedItems:
+            selected_names.add(str(item))
+
+    def _browse_excel(_sender, _args):
+        current = excel_path.Text or ""
+        init_dir = os.path.dirname(current) if current else ""
+        file_path = ui.uiUtils_save_file_dialog(
+            title="Export Schedules",
+            filter_text="Excel Workbook (*.xlsx)|*.xlsx",
+            default_extension="xlsx",
+            initial_directory=init_dir,
+            file_name=os.path.basename(current) if current else "Schedules.xlsx",
+        )
+        if file_path:
+            excel_path.Text = file_path
+
+    def _browse_csv(_sender, _args):
+        init_dir = csv_folder.Text or ""
+        folder = ui.uiUtils_select_folder_dialog(
+            title="Select CSV Folder",
+            initial_directory=init_dir,
+        )
+        if folder:
+            csv_folder.Text = folder
+
+    def _ok(_sender, _args):
+        window.DialogResult = True
+        window.Close()
+
+    def _cancel(_sender, _args):
+        window.DialogResult = False
+        window.Close()
+
+    excel_mode.Checked += lambda s, e: _update_enabled_state()
+    csv_mode.Checked += lambda s, e: _update_enabled_state()
+    search_box.TextChanged += _filter_list
+    schedule_list.SelectionChanged += _selection_changed
+    browse_excel.Click += _browse_excel
+    browse_csv.Click += _browse_csv
+    ok_button.Click += _ok
+    cancel_button.Click += _cancel
+
+    _update_enabled_state()
+
+    if not window.ShowDialog():
+        return None
+
+    selected_indices = [idx for idx, item in enumerate(items) if item in selected_names]
+    selected_mode = 0 if excel_mode.IsChecked else 1
+    delimiter_label = str(csv_delim.SelectedItem) if csv_delim.SelectedItem else default_delim_label
+    delimiter = delimiter_values.get(delimiter_label, ",")
+    qualifier_label = str(text_qualifier.SelectedItem) if text_qualifier.SelectedItem else "(none)"
+    qualifier_value = ""
+    if qualifier_label.startswith("Double"):
+        qualifier_value = "\""
+    elif qualifier_label.startswith("Single"):
+        qualifier_value = "'"
+
+    return {
+        "selected_indices": selected_indices,
+        "mode": selected_mode,
+        "excel_path": excel_path.Text or "",
+        "csv_folder": csv_folder.Text or "",
+        "csv_delimiter": delimiter,
+        "csv_quote_all": bool(quote_all.IsChecked),
+        "csv_text_qualifier": qualifier_value,
+        "export_title": bool(export_title.IsChecked),
+        "export_column_headers": bool(export_column_headers.IsChecked),
+        "export_group_headers": bool(export_group_headers.IsChecked),
+        "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
+    }
+
+
+def read_csv_rows(path, delimiter=",", quotechar=""):
     for encoding in ("utf-8-sig", "utf-16", "cp1252"):
         try:
             with open(path, "r", encoding=encoding, newline="") as handle:
-                reader = csv.reader(handle, delimiter=delimiter)
+                if quotechar in ("\"", "'"):
+                    reader = csv.reader(handle, delimiter=delimiter, quotechar=quotechar)
+                else:
+                    reader = csv.reader(handle, delimiter=delimiter)
                 return [row for row in reader]
         except Exception:
             continue
@@ -330,7 +716,18 @@ def make_unique_name(base, used, max_len=None):
         idx += 1
 
 
-def export_to_excel(doc, schedules, file_path, ui):
+def export_to_excel(
+    doc,
+    schedules,
+    file_path,
+    ui,
+    export_title=False,
+    export_column_headers=True,
+    export_group_headers=False,
+    export_grouped_column_headers=False,
+    text_qualifier="",
+    delimiter=",",
+):
     add_lib_path()
     try:
         import openpyxl
@@ -352,7 +749,30 @@ def export_to_excel(doc, schedules, file_path, ui):
     temp_dir = tempfile.mkdtemp(prefix="wwp_schedules_")
 
     options = DB.ViewScheduleExportOptions()
-    options.FieldDelimiter = ","
+    options.FieldDelimiter = delimiter
+    try:
+        options.ExportTitle = bool(export_title)
+    except Exception:
+        pass
+    try:
+        options.ExportColumnHeaders = bool(export_column_headers)
+    except Exception:
+        pass
+    try:
+        options.ExportGroupHeaders = bool(export_group_headers)
+    except Exception:
+        pass
+    try:
+        options.ExportGroupedColumnHeaders = bool(export_grouped_column_headers)
+    except Exception:
+        pass
+    try:
+        if text_qualifier in ("\"", "'"):
+            options.TextQualifier = text_qualifier
+        else:
+            options.TextQualifier = ""
+    except Exception:
+        pass
     try:
         for view in schedules:
             base_name = sanitize_sheet_name(view.Name)
@@ -380,7 +800,7 @@ def export_to_excel(doc, schedules, file_path, ui):
             temp_name = "{}.csv".format(sanitize_file_name(view.Name))
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
-            data = normalize_table_data(read_csv_rows(csv_path))
+            data = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
             data = inject_element_id_column(data, view, csv_text=False)
             header_rows = get_section_row_count(view, DB.SectionType.Header)
             column_specs = get_column_specs(view)
@@ -405,11 +825,45 @@ def export_to_excel(doc, schedules, file_path, ui):
     return True
 
 
-def export_to_csv(doc, schedules, folder, quote_all=False, delimiter=","):
+def export_to_csv(
+    doc,
+    schedules,
+    folder,
+    quote_all=False,
+    delimiter=",",
+    export_title=False,
+    export_column_headers=True,
+    export_group_headers=False,
+    export_grouped_column_headers=False,
+    text_qualifier="",
+):
     if not os.path.isdir(folder):
         os.makedirs(folder)
     options = DB.ViewScheduleExportOptions()
     options.FieldDelimiter = delimiter
+    try:
+        options.ExportTitle = bool(export_title)
+    except Exception:
+        pass
+    try:
+        options.ExportColumnHeaders = bool(export_column_headers)
+    except Exception:
+        pass
+    try:
+        options.ExportGroupHeaders = bool(export_group_headers)
+    except Exception:
+        pass
+    try:
+        options.ExportGroupedColumnHeaders = bool(export_grouped_column_headers)
+    except Exception:
+        pass
+    try:
+        if text_qualifier in ("\"", "'"):
+            options.TextQualifier = text_qualifier
+        else:
+            options.TextQualifier = ""
+    except Exception:
+        pass
     used_names = set()
     for view in schedules:
         base_name = sanitize_file_name(view.Name)
@@ -417,13 +871,22 @@ def export_to_csv(doc, schedules, folder, quote_all=False, delimiter=","):
         file_name = "{}.csv".format(unique_name)
         view.Export(folder, file_name, options)
         csv_path = os.path.join(folder, file_name)
-        rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter))
+        rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
         rows = inject_element_id_column(rows, view, csv_text=True)
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as handle:
-            if quote_all:
-                writer = csv.writer(handle, delimiter=delimiter, quoting=csv.QUOTE_ALL)
+            if text_qualifier in ("\"", "'"):
+                writer = csv.writer(
+                    handle,
+                    delimiter=delimiter,
+                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+                    quotechar=text_qualifier,
+                )
             else:
-                writer = csv.writer(handle, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL)
+                writer = csv.writer(
+                    handle,
+                    delimiter=delimiter,
+                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+                )
             writer.writerows(rows)
     return True
 
@@ -508,22 +971,28 @@ def main():
     last_csv_mode = getattr(config, CONFIG_LAST_CSV_MODE, 0)
     last_csv_delim = getattr(config, CONFIG_LAST_CSV_DELIM, ",")
     last_export_mode = getattr(config, CONFIG_LAST_EXPORT_MODE, 0)
+    last_export_title = getattr(config, CONFIG_LAST_CSV_EXPORT_TITLE, False)
+    last_column_headers = getattr(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True)
+    last_group_headers = getattr(config, CONFIG_LAST_CSV_GROUP_HEADERS, False)
+    last_grouped_column_headers = getattr(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False)
+    last_text_qualifier = getattr(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, "")
 
     init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
     init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
-    inputs = ui.uiUtils_export_schedules_inputs(
+    inputs = _show_export_form(
+        ui,
         [item.display_name for item in items],
-        title="Export Schedules",
-        prompt="Select schedules to export:",
-        mode_labels=("Export to Excel", "Export to CSV"),
-        default_mode=last_export_mode,
-        prechecked_indices=prechecked_indices,
-        excel_path=init_excel_path,
-        csv_folder=init_csv_dir,
-        csv_delimiter=last_csv_delim,
-        csv_quote_all=(last_csv_mode == 1),
-        width=860,
-        height=720,
+        prechecked_indices,
+        init_excel_path,
+        init_csv_dir,
+        last_csv_delim,
+        last_csv_mode,
+        last_export_mode,
+        last_export_title,
+        last_column_headers,
+        last_group_headers,
+        last_grouped_column_headers,
+        last_text_qualifier,
     )
     if inputs is not False:
         if not inputs:
@@ -534,6 +1003,13 @@ def main():
             return
         selected_views = [items[i].view for i in selected_indices]
         config.last_schedule_ids = [element_id_value(v.Id) for v in selected_views]
+        export_title = bool(inputs.get("export_title"))
+        export_column_headers = bool(inputs.get("export_column_headers"))
+        export_group_headers = bool(inputs.get("export_group_headers"))
+        export_grouped_column_headers = bool(inputs.get("export_grouped_column_headers"))
+        csv_text_qualifier = inputs.get("csv_text_qualifier") or ""
+        csv_delim = inputs.get("csv_delimiter") or last_csv_delim
+        quote_all = bool(inputs.get("csv_quote_all"))
         mode = int(inputs.get("mode", 0))
         if mode == 0:
             file_path = (inputs.get("excel_path") or "").strip()
@@ -542,7 +1018,18 @@ def main():
                 return
             if not file_path.lower().endswith(".xlsx"):
                 file_path = "{}.xlsx".format(file_path)
-            success = export_to_excel(doc, selected_views, file_path, ui)
+            success = export_to_excel(
+                doc,
+                selected_views,
+                file_path,
+                ui,
+                export_title=export_title,
+                export_column_headers=export_column_headers,
+                export_group_headers=export_group_headers,
+                export_grouped_column_headers=export_grouped_column_headers,
+                text_qualifier=csv_text_qualifier,
+                delimiter=csv_delim,
+            )
             if not success:
                 return
             config.last_excel_path = file_path
@@ -555,13 +1042,27 @@ def main():
             if not folder:
                 ui.uiUtils_alert("Choose a CSV folder.", title="Multiple Schedules Exporter")
                 return
-            csv_delim = inputs.get("csv_delimiter") or ","
-            quote_all = bool(inputs.get("csv_quote_all"))
-            export_to_csv(doc, selected_views, folder, quote_all=quote_all, delimiter=csv_delim)
+            export_to_csv(
+                doc,
+                selected_views,
+                folder,
+                quote_all=quote_all,
+                delimiter=csv_delim,
+                export_title=export_title,
+                export_column_headers=export_column_headers,
+                export_group_headers=export_group_headers,
+                export_grouped_column_headers=export_grouped_column_headers,
+                text_qualifier=csv_text_qualifier,
+            )
             config.last_csv_dir = folder
-            config.last_csv_mode = 1 if quote_all else 0
-            config.last_csv_delim = csv_delim
         config.last_export_mode = mode
+        config.last_csv_mode = 1 if quote_all else 0
+        config.last_csv_delim = csv_delim
+        config.last_csv_text_qualifier = csv_text_qualifier
+        config.last_csv_export_title = export_title
+        config.last_csv_column_headers = export_column_headers
+        config.last_csv_group_headers = export_group_headers
+        config.last_csv_grouped_column_headers = export_grouped_column_headers
         script.save_config()
         ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
         return
