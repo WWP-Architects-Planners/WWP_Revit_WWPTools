@@ -255,6 +255,7 @@ def main():
             sheet_debug["viewport_count"] = viewport_ids.Count
             scales = set()
             scale_details = []
+            legend_views_skipped = 0
             for vp_id in viewport_ids:
                 viewport = doc.GetElement(vp_id)
                 if not viewport:
@@ -262,10 +263,16 @@ def main():
                 view_id = viewport.ViewId
                 if view_id in view_scale_cache:
                     sval = view_scale_cache[view_id]
+                    is_legend = view_scale_cache.get(("legend", view_id), False)
                 else:
                     view = doc.GetElement(view_id)
+                    is_legend = bool(view and hasattr(view, "ViewType") and view.ViewType == DB.ViewType.Legend)
                     sval = view.Scale if view and hasattr(view, 'Scale') else None
                     view_scale_cache[view_id] = sval
+                    view_scale_cache[("legend", view_id)] = is_legend
+                if is_legend:
+                    legend_views_skipped += 1
+                    continue
                 if sval is not None:
                     scale_details.append(sval)
                     if sval > 0:
@@ -273,6 +280,8 @@ def main():
 
             sheet_debug["scales_read"] = sorted(list(scales))
             sheet_debug["all_viewport_scales"] = scale_details
+            if legend_views_skipped:
+                sheet_debug["legend_views_skipped"] = legend_views_skipped
 
             if not scales:
                 sheet_debug["error"] = "No valid scales found"
