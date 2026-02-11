@@ -6,7 +6,7 @@ from Autodesk.Revit import DB, UI
 
 # pyRevit script tools
 from pyrevit import script
-from WWP_uiUtils import uiUtils_select_indices, uiUtils_select_items_with_mode, uiUtils_alert
+from WWP_uiUtils import uiUtils_select_indices, uiUtils_select_items_with_mode, uiUtils_alert, uiUtils_confirm
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -87,6 +87,24 @@ def _get_param_entries(titleblock_instances):
     keys = sorted(entries.keys())
     return keys, entries
 
+def _element_id_int(element_id):
+    if element_id is None:
+        return None
+    if hasattr(element_id, "IntegerValue"):
+        try:
+            return int(element_id.IntegerValue)
+        except Exception:
+            pass
+    if hasattr(element_id, "Value"):
+        try:
+            return int(element_id.Value)
+        except Exception:
+            pass
+    try:
+        return int(element_id)
+    except Exception:
+        return None
+
 def main():
     sheets = list(DB.FilteredElementCollector(doc).OfClass(DB.ViewSheet).ToElements())
     sheets.sort(key=lambda s: (s.SheetNumber or "", s.Name or ""))
@@ -112,7 +130,8 @@ def main():
     prechecked_indices = []
     if last_sheet_ids:
         for i, s in enumerate(sheet_by_index):
-            if s.Id.IntegerValue in last_sheet_ids:
+            sheet_id_val = _element_id_int(s.Id)
+            if sheet_id_val is not None and sheet_id_val in last_sheet_ids:
                 prechecked_indices.append(i)
 
     try:
@@ -162,32 +181,42 @@ def main():
     target_param_name = last_param_name
     target_param_scope = last_param_scope
     target_label = None
+    default_label = None
     if target_param_name and target_param_scope:
-        target_label = "{} [{}]".format(target_param_name, "Instance" if target_param_scope == "instance" else "Type")
-    if not target_label or target_label not in param_entries:
-        try:
-            selected = uiUtils_select_indices(
-                param_labels,
-                title="Sheet Scale Updater",
-                prompt="Select titleblock parameter to write scale to:",
-                multiselect=False,
-                width=720,
-                height=560,
-            )
-        except Exception as ex:
-            UI.TaskDialog.Show("Sheet Scale Updater", "WPF UI error:\n{}".format(str(ex)))
-            return
+        default_label = "{} [{}]".format(target_param_name, "Instance" if target_param_scope == "instance" else "Type")
+    try:
+        selected = uiUtils_select_indices(
+            param_labels,
+            title="Sheet Scale Updater",
+            prompt="Select titleblock parameter to write scale to:",
+            multiselect=False,
+            width=720,
+            height=560,
+        )
+    except Exception as ex:
+        UI.TaskDialog.Show("Sheet Scale Updater", "WPF UI error:\n{}".format(str(ex)))
+        return
 
-        if not selected:
+    if not selected:
+        if default_label and default_label in param_entries:
+            use_default = uiUtils_confirm(
+                "No parameter selected.\n\nUse last selection: {} ?".format(default_label),
+                title="Sheet Scale Updater",
+            )
+            if not use_default:
+                uiUtils_alert("No parameter selected. Operation cancelled.", "Sheet Scale Updater")
+                return
+            target_label = default_label
+        else:
             uiUtils_alert("No parameter selected. Operation cancelled.", "Sheet Scale Updater")
             return
-
+    else:
         target_label = param_labels[selected[0]]
-        entry = param_entries.get(target_label)
-        target_param_name = entry["name"] if entry else target_label
-        target_param_scope = entry["scope"] if entry else "instance"
+    entry = param_entries.get(target_label)
+    target_param_name = entry["name"] if entry else target_label
+    target_param_scope = entry["scope"] if entry else "instance"
 
-    config.sheet_ids = [s.Id.IntegerValue for s in selected_sheets]
+    config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.sheet_scale_param_name = target_param_name
     config.sheet_scale_param_scope = target_param_scope
     script.save_config()
@@ -293,6 +322,11 @@ def main():
                 elif sheet_scale_param.StorageType == DB.StorageType.Integer:
                     sheet_scale_param.Set(int(sheet_scale_value))
                     sheet_debug["written_as"] = "Integer"
+                    sheet_debug["status"] = "SUCCESS"
+                    updated_count += 1
+                elif sheet_scale_param.StorageType == DB.StorageType.String:
+                    sheet_scale_param.Set(str(sheet_scale_value))
+                    sheet_debug["written_as"] = "String"
                     sheet_debug["status"] = "SUCCESS"
                     updated_count += 1
                 else:
