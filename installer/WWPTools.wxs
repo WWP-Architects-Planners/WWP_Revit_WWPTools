@@ -3,7 +3,7 @@
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="WW+P Tools Installer"
            Manufacturer="WW+P"
-           Version="1.1.6.0"
+           Version="1.1.7.0"
            UpgradeCode="{F0C6E339-6C9E-4A3A-9D2A-59F8E3D1B8B9}"
            Scope="perUser"
            Compressed="yes">
