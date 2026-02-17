@@ -141,6 +141,8 @@ function Build-WwpToolsMsi {
         [string]$InstallScriptPath,
         [Parameter(Mandatory = $true)]
         [string]$UninstallScriptPath,
+        [string]$InstallWithPackagesScriptPath,
+        [string]$UninstallWithPackagesScriptPath,
         [Parameter(Mandatory = $true)]
         [string]$OutputPrefix
     )
@@ -157,6 +159,20 @@ function Build-WwpToolsMsi {
 
     $encodedInstall = Get-EncodedCommand -ScriptPath $InstallScriptPath
     $encodedUninstall = Get-EncodedCommand -ScriptPath $UninstallScriptPath
+    $encodedInstallWithPackages = $null
+    $encodedUninstallWithPackages = $null
+    if ($InstallWithPackagesScriptPath) {
+        if (-not (Test-Path -LiteralPath $InstallWithPackagesScriptPath)) {
+            throw "Install-with-packages script not found at $InstallWithPackagesScriptPath."
+        }
+        $encodedInstallWithPackages = Get-EncodedCommand -ScriptPath $InstallWithPackagesScriptPath
+    }
+    if ($UninstallWithPackagesScriptPath) {
+        if (-not (Test-Path -LiteralPath $UninstallWithPackagesScriptPath)) {
+            throw "Uninstall-with-packages script not found at $UninstallWithPackagesScriptPath."
+        }
+        $encodedUninstallWithPackages = Get-EncodedCommand -ScriptPath $UninstallWithPackagesScriptPath
+    }
     $wxsBuildPath = Join-Path $PSScriptRoot ((Split-Path -Leaf $WxsPath) + ".generated")
     $wxsContent = Get-Content -LiteralPath $WxsPath -Raw
     if ($wxsContent -notmatch "__WWPTOOLS_PS_INSTALL_BASE64__") {
@@ -167,6 +183,18 @@ function Build-WwpToolsMsi {
     }
     $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_INSTALL_BASE64__", $encodedInstall)
     $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_UNINSTALL_BASE64__", $encodedUninstall)
+    if ($wxsContent -match "__WWPTOOLS_PS_INSTALL_WITH_PACKAGES_BASE64__") {
+        if (-not $encodedInstallWithPackages) {
+            throw "Placeholder __WWPTOOLS_PS_INSTALL_WITH_PACKAGES_BASE64__ found in $WxsPath but no InstallWithPackagesScriptPath was provided."
+        }
+        $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_INSTALL_WITH_PACKAGES_BASE64__", $encodedInstallWithPackages)
+    }
+    if ($wxsContent -match "__WWPTOOLS_PS_UNINSTALL_WITH_PACKAGES_BASE64__") {
+        if (-not $encodedUninstallWithPackages) {
+            throw "Placeholder __WWPTOOLS_PS_UNINSTALL_WITH_PACKAGES_BASE64__ found in $WxsPath but no UninstallWithPackagesScriptPath was provided."
+        }
+        $wxsContent = $wxsContent.Replace("__WWPTOOLS_PS_UNINSTALL_WITH_PACKAGES_BASE64__", $encodedUninstallWithPackages)
+    }
     Set-Content -LiteralPath $wxsBuildPath -Value $wxsContent -Encoding Ascii
 
     $version = Get-PackageVersion -WxsPath $WxsPath
@@ -227,6 +255,8 @@ Build-WwpToolsMsi `
     -WxsPath (Join-Path $PSScriptRoot "WWPTools.wxs") `
     -InstallScriptPath (Join-Path $PSScriptRoot "WWPTools-install-scripts.ps1") `
     -UninstallScriptPath (Join-Path $PSScriptRoot "WWPTools-uninstall-scripts.ps1") `
+    -InstallWithPackagesScriptPath (Join-Path $PSScriptRoot "WWPTools-install.ps1") `
+    -UninstallWithPackagesScriptPath (Join-Path $PSScriptRoot "WWPTools-uninstall.ps1") `
     -OutputPrefix "WWPTools"
 
 Build-WwpToolsMsi `

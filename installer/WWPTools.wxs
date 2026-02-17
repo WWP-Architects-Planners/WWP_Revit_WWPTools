@@ -27,37 +27,56 @@
                      Value="1"
                      KeyPath="yes" />
     </Component>
-    <Feature Id="MainFeature" Title="WWPTools" Level="1">
+    <Component Id="RegistryMarkerPackagesFeature" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKCU"
+                     Key="Software\\WWP\\WWPTools"
+                     Name="PackagesFeatureInstalled"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+    <Feature Id="MainFeature" Title="WWPTools Scripts" Level="1">
       <ComponentRef Id="RegistryMarker" />
     </Feature>
+    <Feature Id="PackagesFeature" Title="Dynamo Packages" Description="Install Dynamo packages to C:\\dynpackages and register the path in Dynamo settings." Level="2">
+      <ComponentRef Id="RegistryMarkerPackagesFeature" />
+    </Feature>
 
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
     <WixVariable Id="WixUIBannerBmp" Value="WWPTools-banner.bmp" />
     <WixVariable Id="WixUIDialogBmp" Value="WWPTools-dialog.png" />
     <UI>
-      <ui:WixUI Id="WixUI_InstallDir" />
+      <ui:WixUI Id="WixUI_FeatureTree" />
     </UI>
 
     <!-- Run the pre-install Revit check at UI time before the actual install executes so the user
          is informed and the install is prevented if Revit is running. This reuses the existing
          SetWixQuietExecCmdLine custom action (which pops up a message and aborts when Revit is found). -->
     <InstallUISequence>
-      <Custom Action="SetWixQuietExecCmdLineInstall" Before="ExecuteAction" Condition="NOT REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="SetWixQuietExecCmdLineInstallScripts" Before="ExecuteAction" Condition="NOT REMOVE~=&quot;ALL&quot; AND &amp;PackagesFeature&lt;&gt;3" />
+      <Custom Action="SetWixQuietExecCmdLineInstallWithPackages" Before="ExecuteAction" Condition="NOT REMOVE~=&quot;ALL&quot; AND &amp;PackagesFeature=3" />
     </InstallUISequence>
 
     <Property Id="WixQuietExecCmdLine" Hidden="yes" />
-    <CustomAction Id="SetWixQuietExecCmdLineInstall"
+    <CustomAction Id="SetWixQuietExecCmdLineInstallScripts"
                   Property="WixQuietExecCmdLine"
                   Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_INSTALL_BASE64__" />
-    <CustomAction Id="SetWixQuietExecCmdLineUninstall"
+    <CustomAction Id="SetWixQuietExecCmdLineInstallWithPackages"
+                  Property="WixQuietExecCmdLine"
+                  Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_INSTALL_WITH_PACKAGES_BASE64__" />
+    <CustomAction Id="SetWixQuietExecCmdLineUninstallScripts"
                   Property="WixQuietExecCmdLine"
                   Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_UNINSTALL_BASE64__" />
+    <CustomAction Id="SetWixQuietExecCmdLineUninstallWithPackages"
+                  Property="WixQuietExecCmdLine"
+                  Value="&quot;[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -EncodedCommand __WWPTOOLS_PS_UNINSTALL_WITH_PACKAGES_BASE64__" />
     <CustomActionRef Id="Wix4QuietExec_X64" />
 
     <InstallExecuteSequence>
-      <Custom Action="SetWixQuietExecCmdLineInstall" Before="Wix4QuietExec_X64" Condition="NOT REMOVE~=&quot;ALL&quot;" />
-      <Custom Action="SetWixQuietExecCmdLineUninstall" Before="Wix4QuietExec_X64" Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="SetWixQuietExecCmdLineInstallScripts" Before="Wix4QuietExec_X64" Condition="NOT REMOVE~=&quot;ALL&quot; AND &amp;PackagesFeature&lt;&gt;3" />
+      <Custom Action="SetWixQuietExecCmdLineInstallWithPackages" Before="Wix4QuietExec_X64" Condition="NOT REMOVE~=&quot;ALL&quot; AND &amp;PackagesFeature=3" />
+      <Custom Action="SetWixQuietExecCmdLineUninstallScripts" Before="Wix4QuietExec_X64" Condition="REMOVE~=&quot;ALL&quot; AND !PackagesFeature&lt;&gt;3" />
+      <Custom Action="SetWixQuietExecCmdLineUninstallWithPackages" Before="Wix4QuietExec_X64" Condition="REMOVE~=&quot;ALL&quot; AND !PackagesFeature=3" />
       <Custom Action="Wix4QuietExec_X64" After="InstallInitialize" />
     </InstallExecuteSequence>
   </Package>

@@ -181,6 +181,14 @@ try {
         } catch {
         }
     }
+
+    try {
+        New-Item -Path 'HKCU:\Software\WWP\WWPTools' -Force | Out-Null
+        New-ItemProperty -Path 'HKCU:\Software\WWP\WWPTools' -Name 'PackagesInstalledByMain' -PropertyType DWord -Value 1 -Force | Out-Null
+    } catch {
+        Write-Log ("WARN: failed to set PackagesInstalledByMain marker. {0}" -f $_.Exception.Message)
+    }
+
     Write-Log "Install completed."
 } catch {
     Write-Log ("ERROR: {0}" -f $_.Exception.Message)
