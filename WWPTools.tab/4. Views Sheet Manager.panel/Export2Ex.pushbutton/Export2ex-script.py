@@ -78,8 +78,6 @@ def collect_schedules(doc):
             pass
         if view.IsTitleblockRevisionSchedule:
             continue
-        if view.Definition and view.Definition.IsKeySchedule:
-            continue
         schedules.append(view)
     schedules.sort(key=lambda v: v.Name)
     return schedules
@@ -424,8 +422,8 @@ def _show_export_form(
         _apply_selection()
 
     def _selection_changed(_sender, _args):
-        visible = set(str(item) for item in schedule_list.Items)
-        selected_names.difference_update(visible)
+        # Keep export selection aligned with what is currently highlighted in the UI.
+        selected_names.clear()
         for item in schedule_list.SelectedItems:
             selected_names.add(str(item))
 
@@ -533,6 +531,17 @@ def get_section_row_count(view, section_type):
         return section.NumberOfRows
     except Exception:
         return 0
+
+
+def is_key_schedule(view):
+    try:
+        definition = view.Definition
+    except Exception:
+        definition = None
+    try:
+        return bool(definition and definition.IsKeySchedule)
+    except Exception:
+        return False
 
 
 def get_body_row_element_ids(view):
@@ -716,6 +725,40 @@ def make_unique_name(base, used, max_len=None):
         idx += 1
 
 
+def _try_set_option(options, names, value):
+    for name in names:
+        if not hasattr(options, name):
+            continue
+        try:
+            setattr(options, name, value)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def apply_schedule_export_options(
+    options,
+    delimiter=",",
+    export_title=False,
+    export_column_headers=True,
+    export_group_headers=False,
+    export_grouped_column_headers=False,
+    text_qualifier="",
+):
+    options.FieldDelimiter = delimiter
+    # Revit API property names differ by version; support both.
+    _try_set_option(options, ("ExportTitle", "Title"), bool(export_title))
+    _try_set_option(options, ("ExportColumnHeaders", "ColumnHeaders"), bool(export_column_headers))
+    _try_set_option(options, ("ExportGroupHeaders", "HeadersFootersBlanks"), bool(export_group_headers))
+    _try_set_option(options, ("ExportGroupedColumnHeaders",), bool(export_grouped_column_headers))
+
+    if text_qualifier in ("\"", "'"):
+        _try_set_option(options, ("TextQualifier",), text_qualifier)
+    else:
+        _try_set_option(options, ("TextQualifier",), "")
+
+
 def export_to_excel(
     doc,
     schedules,
@@ -743,57 +786,34 @@ def export_to_excel(
         workbook = openpyxl.load_workbook(file_path)
     else:
         workbook = openpyxl.Workbook()
-
-    existing_names = set(workbook.sheetnames)
-    existing_list = list(workbook.sheetnames)
     temp_dir = tempfile.mkdtemp(prefix="wwp_schedules_")
 
     options = DB.ViewScheduleExportOptions()
-    options.FieldDelimiter = delimiter
-    try:
-        options.ExportTitle = bool(export_title)
-    except Exception:
-        pass
-    try:
-        options.ExportColumnHeaders = bool(export_column_headers)
-    except Exception:
-        pass
-    try:
-        options.ExportGroupHeaders = bool(export_group_headers)
-    except Exception:
-        pass
-    try:
-        options.ExportGroupedColumnHeaders = bool(export_grouped_column_headers)
-    except Exception:
-        pass
-    try:
-        if text_qualifier in ("\"", "'"):
-            options.TextQualifier = text_qualifier
-        else:
-            options.TextQualifier = ""
-    except Exception:
-        pass
+    apply_schedule_export_options(
+        options,
+        delimiter=delimiter,
+        export_title=export_title,
+        export_column_headers=export_column_headers,
+        export_group_headers=export_group_headers,
+        export_grouped_column_headers=export_grouped_column_headers,
+        text_qualifier=text_qualifier,
+    )
     try:
         for view in schedules:
+            key_schedule = is_key_schedule(view)
             base_name = sanitize_sheet_name(view.Name)
-            if base_name in existing_names and base_name not in used_names:
+            if base_name in workbook.sheetnames and base_name not in used_names:
                 sheet_name = base_name
             else:
-                candidates = [
-                    name for name in existing_list
-                    if name.startswith(base_name) and name not in used_names
-                ]
-                if len(candidates) == 1:
-                    sheet_name = candidates[0]
-                else:
-                    used_pool = set(existing_names)
-                    used_pool.update(used_names)
-                    sheet_name = make_unique_name(base_name, used_pool, max_len=31)
+                used_pool = set(workbook.sheetnames)
+                used_pool.update(used_names)
+                sheet_name = make_unique_name(base_name, used_pool, max_len=31)
             used_names.add(sheet_name)
             if sheet_name in workbook.sheetnames:
                 existing = workbook[sheet_name]
+                sheet_idx = workbook.worksheets.index(existing)
                 workbook.remove(existing)
-                sheet = workbook.create_sheet(title=sheet_name)
+                sheet = workbook.create_sheet(title=sheet_name, index=sheet_idx)
             else:
                 sheet = workbook.create_sheet(title=sheet_name)
 
@@ -801,10 +821,14 @@ def export_to_excel(
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
             data = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
-            data = inject_element_id_column(data, view, csv_text=False)
+            if not key_schedule:
+                data = inject_element_id_column(data, view, csv_text=False)
             header_rows = get_section_row_count(view, DB.SectionType.Header)
             column_specs = get_column_specs(view)
-            if column_specs is not None:
+            if key_schedule:
+                # Preserve key schedule values exactly as exported (avoid numeric coercion).
+                column_specs = None
+            elif column_specs is not None:
                 column_specs = [None] + column_specs
             write_table_to_sheet(
                 sheet,
@@ -840,39 +864,26 @@ def export_to_csv(
     if not os.path.isdir(folder):
         os.makedirs(folder)
     options = DB.ViewScheduleExportOptions()
-    options.FieldDelimiter = delimiter
-    try:
-        options.ExportTitle = bool(export_title)
-    except Exception:
-        pass
-    try:
-        options.ExportColumnHeaders = bool(export_column_headers)
-    except Exception:
-        pass
-    try:
-        options.ExportGroupHeaders = bool(export_group_headers)
-    except Exception:
-        pass
-    try:
-        options.ExportGroupedColumnHeaders = bool(export_grouped_column_headers)
-    except Exception:
-        pass
-    try:
-        if text_qualifier in ("\"", "'"):
-            options.TextQualifier = text_qualifier
-        else:
-            options.TextQualifier = ""
-    except Exception:
-        pass
+    apply_schedule_export_options(
+        options,
+        delimiter=delimiter,
+        export_title=export_title,
+        export_column_headers=export_column_headers,
+        export_group_headers=export_group_headers,
+        export_grouped_column_headers=export_grouped_column_headers,
+        text_qualifier=text_qualifier,
+    )
     used_names = set()
     for view in schedules:
+        key_schedule = is_key_schedule(view)
         base_name = sanitize_file_name(view.Name)
         unique_name = make_unique_name(base_name, used_names)
         file_name = "{}.csv".format(unique_name)
         view.Export(folder, file_name, options)
         csv_path = os.path.join(folder, file_name)
         rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
-        rows = inject_element_id_column(rows, view, csv_text=True)
+        if not key_schedule:
+            rows = inject_element_id_column(rows, view, csv_text=True)
         with open(csv_path, "w", encoding="utf-8-sig", newline="") as handle:
             if text_qualifier in ("\"", "'"):
                 writer = csv.writer(
