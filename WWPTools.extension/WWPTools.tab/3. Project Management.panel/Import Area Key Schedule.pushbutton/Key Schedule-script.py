@@ -12,6 +12,33 @@ SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
 
 
+def _is_bic_value(cat_id, bic):
+    if not cat_id:
+        return False
+    try:
+        return cat_id.IntegerValue == int(bic)
+    except Exception:
+        return False
+
+
+def choose_schedule_target(ui):
+    options = ["Area Key Schedule", "Room Key Schedule"]
+    selected = ui.uiUtils_select_indices(
+        options,
+        title=TITLE,
+        prompt="Choose key schedule type to import:",
+        multiselect=False,
+        width=460,
+        height=280,
+    )
+    if not selected:
+        return None
+    idx = selected[0]
+    if idx == 1:
+        return {"bic": DB.BuiltInCategory.OST_Rooms, "label": "Room"}
+    return {"bic": DB.BuiltInCategory.OST_Areas, "label": "Area"}
+
+
 def add_lib_path():
     script_dir = os.path.dirname(__file__)
     lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
@@ -50,15 +77,15 @@ def element_id_value(elem_id):
         return None
 
 
-def get_area_parameter_options(doc):
+def get_category_parameter_options(doc, category_bic):
     params = {}
-    areas = (
+    elements = (
         DB.FilteredElementCollector(doc)
-        .OfCategory(DB.BuiltInCategory.OST_Areas)
+        .OfCategory(category_bic)
         .WhereElementIsNotElementType()
         .ToElements()
     )
-    sample = areas[0] if areas else None
+    sample = elements[0] if elements else None
     if not sample:
         return [], {}
 
@@ -214,8 +241,8 @@ def build_default_selections(headers, param_display_names):
     return defaults
 
 
-def create_key_schedule(doc, name):
-    cat_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
+def create_key_schedule(doc, name, category_bic, category_label):
+    cat_id = DB.ElementId(category_bic)
     schedule = None
     try:
         schedule = DB.ViewSchedule.CreateKeySchedule(doc, cat_id)
@@ -227,7 +254,7 @@ def create_key_schedule(doc, name):
         except Exception:
             schedule = None
     if schedule is None:
-        return None, "Failed to create area key schedule."
+        return None, "Failed to create {} key schedule.".format(category_label.lower())
     if not schedule.Definition or not schedule.Definition.IsKeySchedule:
         return None, "Created schedule is not a key schedule."
     schedule.Name = unique_view_name(doc, name)
@@ -259,14 +286,14 @@ def add_schedule_fields(definition, column_mappings, param_map):
     return added_param_ids
 
 
-def get_area_key_schedules(doc):
+def get_key_schedules(doc, category_bic):
     schedules = []
     for view in DB.FilteredElementCollector(doc).OfClass(DB.ViewSchedule):
         try:
             if not view.Definition or not view.Definition.IsKeySchedule:
                 continue
             cat_id = view.Definition.CategoryId
-            if not cat_id or cat_id.IntegerValue != int(DB.BuiltInCategory.OST_Areas):
+            if not _is_bic_value(cat_id, category_bic):
                 continue
             schedules.append(view)
         except Exception:
@@ -358,6 +385,48 @@ def _as_int(value):
         return None
 
 
+def _as_yes_no_int(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (int, float)):
+        try:
+            return 1 if int(value) != 0 else 0
+        except Exception:
+            return None
+    text = str(value).strip().lower()
+    if text in ("yes", "y", "true", "t", "1", "on", "checked", "x"):
+        return 1
+    if text in ("no", "n", "false", "f", "0", "off", "unchecked"):
+        return 0
+    return None
+
+
+def _is_yes_no_parameter(param):
+    try:
+        definition = param.Definition
+    except Exception:
+        definition = None
+    if not definition:
+        return False
+    try:
+        if hasattr(definition, "GetDataType") and hasattr(DB, "SpecTypeId"):
+            spec = definition.GetDataType()
+            bool_yesno = getattr(getattr(DB.SpecTypeId, "Boolean", None), "YesNo", None)
+            if bool_yesno and spec == bool_yesno:
+                return True
+    except Exception:
+        pass
+    try:
+        parameter_type = definition.ParameterType
+        if hasattr(DB, "ParameterType") and parameter_type == DB.ParameterType.YesNo:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _as_float(value):
     if value is None or value == "":
         return None
@@ -385,6 +454,12 @@ def set_parameter_value(param, value):
         if storage == DB.StorageType.String:
             return param.Set(text)
         if storage == DB.StorageType.Integer:
+            if _is_yes_no_parameter(param):
+                # Yes/No parameters must be persisted as Revit booleans (0/1), never text.
+                yn = _as_yes_no_int(value)
+                if yn is None:
+                    return False
+                return param.Set(yn)
             num = _as_int(value)
             if num is None:
                 return param.SetValueString(text)
@@ -434,9 +509,18 @@ def main():
     doc = revit.doc
     ui = load_uiutils()
 
-    param_names, param_map = get_area_parameter_options(doc)
+    target = choose_schedule_target(ui)
+    if not target:
+        return
+    category_bic = target["bic"]
+    category_label = target["label"]
+
+    param_names, param_map = get_category_parameter_options(doc, category_bic)
     if not param_names:
-        ui.uiUtils_alert("No Area instances found to read parameters from.", title=TITLE)
+        ui.uiUtils_alert(
+            "No {} instances found to read parameters from.".format(category_label),
+            title=TITLE,
+        )
         return
 
     parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
@@ -518,7 +602,7 @@ def main():
             ui.uiUtils_alert("Please map one column to 'Key Name'.", title=TITLE)
             continue
 
-        default_name = "Area Key Schedule - Imported"
+        default_name = "{} Key Schedule - Imported".format(category_label)
         if state.get("file_path"):
             try:
                 base = os.path.splitext(os.path.basename(state["file_path"]))[0]
@@ -528,7 +612,7 @@ def main():
                 pass
         schedule_name = ui.uiUtils_prompt_text(
             title=TITLE,
-            prompt="Enter the new Area Key Schedule name:",
+            prompt="Enter the new {} Key Schedule name:".format(category_label),
             default_value=default_name,
             ok_text="Create",
             cancel_text="Cancel",
@@ -554,19 +638,19 @@ def main():
                     cleaned = cleaned.split(" (Id ", 1)[0].strip()
                 mapped_fields.add(cleaned.strip().lower())
             overlaps = []
-            for sched in get_area_key_schedules(doc):
+            for sched in get_key_schedules(doc, category_bic):
                 field_map = schedule_field_names_with_ids(sched)
                 shared = sorted(set(field_map.keys()) & mapped_fields)
                 if shared:
                     overlaps.append((sched, shared, field_map))
-            # Delete all existing Area key schedules before creating a new one
-            for sched in get_area_key_schedules(doc):
+            # Delete existing key schedules for the selected category before creating a new one
+            for sched in get_key_schedules(doc, category_bic):
                 try:
                     doc.Delete(sched.Id)
                 except Exception:
                     pass
 
-            schedule, err = create_key_schedule(doc, schedule_name)
+            schedule, err = create_key_schedule(doc, schedule_name, category_bic, category_label)
             if schedule is None:
                 ui.uiUtils_alert(err or "Failed to create key schedule.", title=TITLE)
                 return
