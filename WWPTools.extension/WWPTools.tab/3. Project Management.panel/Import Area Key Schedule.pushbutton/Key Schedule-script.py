@@ -301,10 +301,108 @@ def get_key_schedules(doc, category_bic):
     return schedules
 
 
+def find_key_schedule_by_name(doc, category_bic, schedule_name):
+    target = _normalize_name(schedule_name)
+    if not target:
+        return None
+    for sched in get_key_schedules(doc, category_bic):
+        try:
+            if _normalize_name(sched.Name) == target:
+                return sched
+        except Exception:
+            continue
+    return None
+
+
 def _normalize_name(value):
     if value is None:
         return ""
     return str(value).strip().lower()
+
+
+def get_schedule_key_parameter_names(schedule):
+    names = []
+    try:
+        key_name = (schedule.KeyScheduleParameterName or "").strip()
+        if key_name:
+            names.append(key_name)
+    except Exception:
+        pass
+    if "Key Name" not in names:
+        names.append("Key Name")
+    return names
+
+
+def get_schedule_key_name_value(elem, key_param_names):
+    for param_name in key_param_names:
+        param = elem.LookupParameter(param_name)
+        if not param:
+            continue
+        try:
+            value = param.AsString()
+            if value:
+                return value
+        except Exception:
+            pass
+        try:
+            value = param.AsValueString()
+            if value:
+                return value
+        except Exception:
+            pass
+    return ""
+
+
+def collect_schedule_key_elements(schedule):
+    elements = []
+    try:
+        elements = list(DB.FilteredElementCollector(schedule.Document, schedule.Id).ToElements())
+    except Exception:
+        elements = []
+    return [elem for elem in elements if elem is not None]
+
+
+def build_schedule_key_element_map(schedule, key_param_names):
+    key_map = {}
+    duplicates = set()
+    for elem in collect_schedule_key_elements(schedule):
+        key_value = get_schedule_key_name_value(elem, key_param_names)
+        key_norm = _normalize_name(key_value)
+        if not key_norm:
+            continue
+        if key_norm in key_map:
+            duplicates.add(key_norm)
+            continue
+        key_map[key_norm] = elem
+    return key_map, duplicates
+
+
+def build_key_usage_counts(doc, category_bic, host_key_param_name, key_ids):
+    usage = dict((key_id, 0) for key_id in key_ids)
+    if not host_key_param_name or not key_ids:
+        return usage
+    for elem in (
+        DB.FilteredElementCollector(doc)
+        .OfCategory(category_bic)
+        .WhereElementIsNotElementType()
+        .ToElements()
+    ):
+        param = elem.LookupParameter(host_key_param_name)
+        if not param:
+            continue
+        try:
+            if param.StorageType != DB.StorageType.ElementId:
+                continue
+        except Exception:
+            continue
+        try:
+            ref_id = param.AsElementId()
+        except Exception:
+            continue
+        ref_val = element_id_value(ref_id)
+        if ref_val in usage:
+            usage[ref_val] = usage.get(ref_val, 0) + 1
+    return usage
 
 
 def schedule_field_names_with_ids(schedule):
@@ -505,6 +603,17 @@ def create_key_elements(schedule, row_count):
     return created_ids
 
 
+def create_single_key_element(schedule):
+    created = create_key_elements(schedule, 1)
+    if not created:
+        return None
+    elem_id = DB.ElementId(created[0])
+    try:
+        return schedule.Document.GetElement(elem_id)
+    except Exception:
+        return None
+
+
 def main():
     doc = revit.doc
     ui = load_uiutils()
@@ -612,9 +721,12 @@ def main():
                 pass
         schedule_name = ui.uiUtils_prompt_text(
             title=TITLE,
-            prompt="Enter the new {} Key Schedule name:".format(category_label),
+            prompt=(
+                "Enter {} Key Schedule name.\n"
+                "If an existing key schedule has this exact name, it will be overwritten in place."
+            ).format(category_label),
             default_value=default_name,
-            ok_text="Create",
+            ok_text="Import",
             cancel_text="Cancel",
             width=520,
             height=220,
@@ -622,58 +734,70 @@ def main():
         if not schedule_name:
             return
 
+        key_column_indices = [
+            m.get("index", 0)
+            for m in column_mappings
+            if m.get("option") == KEY_NAME_OPTION
+        ]
+        key_column_index = key_column_indices[0] if key_column_indices else None
+        if key_column_index is None:
+            ui.uiUtils_alert("Please map one column to 'Key Name'.", title=TITLE)
+            continue
+
         created = 0
+        updated = 0
+        deleted = 0
+        kept_in_use = 0
         skipped = 0
         errors = []
+        warnings = []
 
         with revit.Transaction(TITLE):
-            # Check for overlapping fields in existing area key schedules
-            mapped_fields = set()
-            for mapping in column_mappings:
-                option = mapping.get("option")
-                if option in (None, "", SKIP_OPTION, KEY_NAME_OPTION):
-                    continue
-                cleaned = option
-                if cleaned.endswith(")") and " (Id " in cleaned:
-                    cleaned = cleaned.split(" (Id ", 1)[0].strip()
-                mapped_fields.add(cleaned.strip().lower())
-            overlaps = []
-            for sched in get_key_schedules(doc, category_bic):
-                field_map = schedule_field_names_with_ids(sched)
-                shared = sorted(set(field_map.keys()) & mapped_fields)
-                if shared:
-                    overlaps.append((sched, shared, field_map))
-            # Delete existing key schedules for the selected category before creating a new one
-            for sched in get_key_schedules(doc, category_bic):
-                try:
-                    doc.Delete(sched.Id)
-                except Exception:
-                    pass
-
-            schedule, err = create_key_schedule(doc, schedule_name, category_bic, category_label)
+            schedule = find_key_schedule_by_name(doc, category_bic, schedule_name)
             if schedule is None:
-                ui.uiUtils_alert(err or "Failed to create key schedule.", title=TITLE)
-                return
+                schedule, err = create_key_schedule(doc, schedule_name, category_bic, category_label)
+                if schedule is None:
+                    ui.uiUtils_alert(err or "Failed to create key schedule.", title=TITLE)
+                    return
 
             definition = schedule.Definition
             add_schedule_fields(definition, column_mappings, param_map)
 
-            key_param_name = ""
-            try:
-                key_param_name = schedule.KeyScheduleParameterName
-            except Exception:
-                key_param_name = "Key Name"
-
-            row_ids = create_key_elements(schedule, len(state["rows"]))
-            elements_by_id = {
-                element_id_value(e.Id): e
-                for e in DB.FilteredElementCollector(doc, schedule.Id).ToElements()
-            }
+            key_param_names = get_schedule_key_parameter_names(schedule)
+            key_param_name = key_param_names[0] if key_param_names else "Key Name"
+            existing_key_map, duplicate_existing_keys = build_schedule_key_element_map(schedule, key_param_names)
+            if duplicate_existing_keys:
+                warnings.append(
+                    "Existing schedule has duplicate key names. Only the first match was updated for: {}".format(
+                        ", ".join(sorted(list(duplicate_existing_keys))[:10])
+                    )
+                )
+            matched_existing_keys = set()
+            seen_excel_keys = set()
 
             for idx, row in enumerate(state["rows"]):
-                elem_id_val = row_ids[idx] if idx < len(row_ids) else None
-                elem = elements_by_id.get(elem_id_val)
+                key_value = row[key_column_index] if key_column_index < len(row) else None
+                key_text = format_cell_value(key_value).strip()
+                key_norm = _normalize_name(key_text)
+                if not key_norm:
+                    errors.append("Row {}: key name is blank".format(idx + 1))
+                    skipped += 1
+                    continue
+                if key_norm in seen_excel_keys:
+                    errors.append("Row {}: duplicate key name '{}' in Excel".format(idx + 1, key_text))
+                    skipped += 1
+                    continue
+                seen_excel_keys.add(key_norm)
+
+                elem = existing_key_map.get(key_norm)
+                is_new = False
+                if elem is not None:
+                    matched_existing_keys.add(key_norm)
+                else:
+                    elem = create_single_key_element(schedule)
+                    is_new = True
                 if elem is None:
+                    errors.append("Row {} ({}): failed to create or find key row".format(idx + 1, key_text))
                     skipped += 1
                     continue
 
@@ -685,7 +809,11 @@ def main():
                     value = row[col_index] if col_index < len(row) else None
 
                     if option == KEY_NAME_OPTION:
-                        param = elem.LookupParameter(key_param_name) or elem.LookupParameter("Key Name")
+                        param = None
+                        for p_name in key_param_names:
+                            param = elem.LookupParameter(p_name)
+                            if param:
+                                break
                         if not param:
                             errors.append("Row {} (Key Name): parameter not found".format(idx + 1))
                             continue
@@ -711,9 +839,44 @@ def main():
                     if not set_parameter_value(param, value):
                         errors.append("Row {} ({}): failed to set value".format(idx + 1, option))
 
-                created += 1
+                if is_new:
+                    created += 1
+                else:
+                    updated += 1
 
-        summary = "Rows created: {}\nRows skipped: {}".format(created, skipped)
+            to_remove_keys = [
+                key_norm
+                for key_norm in existing_key_map.keys()
+                if key_norm not in matched_existing_keys
+            ]
+            key_ids_to_check = [
+                element_id_value(existing_key_map[k].Id)
+                for k in to_remove_keys
+                if existing_key_map.get(k) is not None
+            ]
+            usage_counts = build_key_usage_counts(doc, category_bic, key_param_name, key_ids_to_check)
+            for key_norm in to_remove_keys:
+                elem = existing_key_map.get(key_norm)
+                if elem is None:
+                    continue
+                elem_id_val = element_id_value(elem.Id)
+                if usage_counts.get(elem_id_val, 0) > 0:
+                    kept_in_use += 1
+                    continue
+                try:
+                    doc.Delete(elem.Id)
+                    deleted += 1
+                except Exception:
+                    errors.append("Failed to delete old key '{}'".format(key_norm))
+
+        summary = (
+            "Rows created: {}\nRows updated: {}\nRows deleted: {}\n"
+            "Rows kept (in use): {}\nRows skipped: {}"
+        ).format(created, updated, deleted, kept_in_use, skipped)
+        if warnings:
+            summary += "\n\nWarnings:\n" + "\n".join(warnings[:10])
+            if len(warnings) > 10:
+                summary += "\n... ({} more)".format(len(warnings) - 10)
         if errors:
             summary += "\n\nErrors:\n" + "\n".join(errors[:10])
             if len(errors) > 10:
