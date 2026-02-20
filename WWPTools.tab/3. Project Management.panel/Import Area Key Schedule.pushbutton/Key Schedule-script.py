@@ -4,12 +4,74 @@ from __future__ import annotations
 import os
 import sys
 
-from pyrevit import DB, revit
+from pyrevit import DB, revit, script
 
 
 TITLE = "Import Area Key Schedule"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
+DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
+
+
+def _get_config():
+    try:
+        return script.get_config()
+    except Exception:
+        return None
+
+
+def _safe_config_get(config, key, default=None):
+    if config is None:
+        return default
+    try:
+        return getattr(config, key, default)
+    except Exception:
+        return default
+
+
+def _safe_config_set(config, key, value):
+    if config is None:
+        return
+    try:
+        setattr(config, key, value)
+    except Exception:
+        pass
+
+
+def _save_config():
+    try:
+        script.save_config()
+    except Exception:
+        pass
+
+
+def _header_signature(headers):
+    return "|".join([_normalize_name(h) for h in headers or []])
+
+
+def _sanitize_selections(selections, column_count, parameter_options):
+    if not selections or len(selections) != column_count:
+        return None
+    valid = set(parameter_options)
+    cleaned = []
+    for item in selections:
+        if item in valid:
+            cleaned.append(item)
+        else:
+            cleaned.append(SKIP_OPTION)
+    return cleaned
+
+
+def _default_schedule_name(file_path, category_label):
+    default_name = "{} {}".format(category_label, DEFAULT_SCHEDULE_SUFFIX)
+    if file_path:
+        try:
+            base = os.path.splitext(os.path.basename(file_path))[0]
+            if base:
+                return base
+        except Exception:
+            pass
+    return default_name
 
 
 def _is_bic_value(cat_id, bic):
@@ -617,12 +679,14 @@ def create_single_key_element(schedule):
 def main():
     doc = revit.doc
     ui = load_uiutils()
+    config = _get_config()
 
     target = choose_schedule_target(ui)
     if not target:
         return
     category_bic = target["bic"]
     category_label = target["label"]
+    category_key = _normalize_name(category_label)
 
     param_names, param_map = get_category_parameter_options(doc, category_bic)
     if not param_names:
@@ -634,14 +698,52 @@ def main():
 
     parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
 
+    last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
+    last_target = _safe_config_get(config, "area_key_import_target", "") or ""
+    if _normalize_name(last_target) != category_key:
+        last_file_path = ""
+
     state = {
-        "file_path": "",
+        "file_path": last_file_path,
         "headers": [],
         "column_labels": [],
         "rows": [],
         "preview": [],
         "defaults": [],
+        "schedule_name": "",
     }
+
+    # Preload the most recently used workbook for this target type.
+    if state["file_path"] and os.path.exists(state["file_path"]):
+        workbook = read_workbook(state["file_path"], ui)
+        if workbook is not None:
+            headers, column_labels, rows = extract_excel_data(workbook)
+            if column_labels:
+                signature = _header_signature(headers)
+                saved_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
+                saved_target = _safe_config_get(config, "area_key_import_target", "") or ""
+                saved_selections = _safe_config_get(config, "area_key_import_selected_options", None)
+                defaults = None
+                if _normalize_name(saved_target) == category_key and saved_signature == signature:
+                    defaults = _sanitize_selections(saved_selections, len(column_labels), parameter_options)
+                if defaults is None:
+                    defaults = build_default_selections(headers, param_names)
+                state.update(
+                    {
+                        "headers": headers,
+                        "column_labels": column_labels,
+                        "rows": rows,
+                        "preview": build_preview_lines(headers, rows),
+                        "defaults": defaults,
+                    }
+                )
+
+    if not state["schedule_name"]:
+        state["schedule_name"] = _safe_config_get(
+            config,
+            "area_key_import_schedule_name_{}".format(category_key),
+            "",
+        ) or _default_schedule_name(state["file_path"], category_label)
 
     while True:
         result = ui.uiUtils_area_keyplan_import(
@@ -672,7 +774,15 @@ def main():
                 ui.uiUtils_alert("No data found in the Excel file.", title=TITLE)
                 continue
             preview = build_preview_lines(headers, rows)
-            defaults = build_default_selections(headers, param_names)
+            signature = _header_signature(headers)
+            saved_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
+            saved_target = _safe_config_get(config, "area_key_import_target", "") or ""
+            saved_selections = _safe_config_get(config, "area_key_import_selected_options", None)
+            defaults = None
+            if _normalize_name(saved_target) == category_key and saved_signature == signature:
+                defaults = _sanitize_selections(saved_selections, len(column_labels), parameter_options)
+            if defaults is None:
+                defaults = build_default_selections(headers, param_names)
             state.update(
                 {
                     "headers": headers,
@@ -682,6 +792,7 @@ def main():
                     "defaults": defaults,
                 }
             )
+            state["schedule_name"] = _default_schedule_name(state["file_path"], category_label)
             continue
 
         if not state["column_labels"]:
@@ -711,28 +822,12 @@ def main():
             ui.uiUtils_alert("Please map one column to 'Key Name'.", title=TITLE)
             continue
 
-        default_name = "{} Key Schedule - Imported".format(category_label)
-        if state.get("file_path"):
-            try:
-                base = os.path.splitext(os.path.basename(state["file_path"]))[0]
-                if base:
-                    default_name = base
-            except Exception:
-                pass
-        schedule_name = ui.uiUtils_prompt_text(
-            title=TITLE,
-            prompt=(
-                "Enter {} Key Schedule name.\n"
-                "If an existing key schedule has this exact name, it will be overwritten in place."
-            ).format(category_label),
-            default_value=default_name,
-            ok_text="Import",
-            cancel_text="Cancel",
-            width=520,
-            height=220,
-        )
+        schedule_name = (state.get("schedule_name") or "").strip()
         if not schedule_name:
-            return
+            schedule_name = _default_schedule_name(state.get("file_path", ""), category_label)
+        if not schedule_name:
+            ui.uiUtils_alert("Unable to determine schedule name.", title=TITLE)
+            continue
 
         key_column_indices = [
             m.get("index", 0)
@@ -868,6 +963,14 @@ def main():
                     deleted += 1
                 except Exception:
                     errors.append("Failed to delete old key '{}'".format(key_norm))
+
+        # Persist latest choices for the next run.
+        _safe_config_set(config, "area_key_import_target", category_label)
+        _safe_config_set(config, "area_key_import_file_path", state.get("file_path", ""))
+        _safe_config_set(config, "area_key_import_headers_signature", _header_signature(state.get("headers", [])))
+        _safe_config_set(config, "area_key_import_selected_options", selections)
+        _safe_config_set(config, "area_key_import_schedule_name_{}".format(category_key), schedule_name)
+        _save_config()
 
         summary = (
             "Rows created: {}\nRows updated: {}\nRows deleted: {}\n"
