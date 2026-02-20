@@ -1153,7 +1153,8 @@ namespace WWPTools.WpfUI
             string title,
             string filePath,
             IEnumerable columnNames,
-            IEnumerable previewLines,
+            IEnumerable targetTypes,
+            string selectedTargetType,
             IEnumerable parameterOptions,
             IEnumerable defaultSelections,
             int width,
@@ -1173,7 +1174,8 @@ namespace WWPTools.WpfUI
             window.Initialize(
                 filePath ?? "",
                 AsStringList(columnNames),
-                AsStringList(previewLines),
+                AsStringList(targetTypes),
+                selectedTargetType ?? "",
                 AsStringList(parameterOptions),
                 AsStringList(defaultSelections));
 
@@ -1192,6 +1194,7 @@ namespace WWPTools.WpfUI
             return new AreaKeyplanImportResult
             {
                 LoadRequested = window.LoadRequested,
+                SelectedTargetType = window.SelectedTargetType ?? "",
                 FilePath = window.FilePath ?? "",
                 ColumnNames = columns.ToArray(),
                 SelectedOptions = selections.ToArray()
@@ -1913,6 +1916,7 @@ namespace WWPTools.WpfUI
     public class AreaKeyplanImportResult
     {
         public bool LoadRequested { get; set; }
+        public string SelectedTargetType { get; set; } = "";
         public string FilePath { get; set; } = "";
         public string[] ColumnNames { get; set; } = Array.Empty<string>();
         public string[] SelectedOptions { get; set; } = Array.Empty<string>();

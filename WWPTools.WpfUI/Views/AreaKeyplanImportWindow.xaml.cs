@@ -51,14 +51,24 @@ namespace WWPTools.WpfUI.Views
 
         public string FilePath => FilePathBox.Text ?? "";
 
+        public string SelectedTargetType => TargetTypeCombo.SelectedItem != null
+            ? TargetTypeCombo.SelectedItem.ToString() ?? ""
+            : "";
+
         public void Initialize(
             string filePath,
             IList<string> columnNames,
-            IList<string> previewLines,
+            IList<string> targetTypes,
+            string selectedTargetType,
             IList<string> parameterOptions,
             IList<string> defaultSelections)
         {
             FilePathBox.Text = filePath ?? "";
+            TargetTypeCombo.ItemsSource = targetTypes ?? Array.Empty<string>();
+            if (!string.IsNullOrWhiteSpace(selectedTargetType) && targetTypes != null && targetTypes.Contains(selectedTargetType))
+                TargetTypeCombo.SelectedItem = selectedTargetType;
+            else if (TargetTypeCombo.Items.Count > 0)
+                TargetTypeCombo.SelectedIndex = 0;
 
             _parameterOptions.Clear();
             if (parameterOptions != null)
@@ -85,11 +95,6 @@ namespace WWPTools.WpfUI.Views
                     _columnMappings.Add(mapping);
                 }
             }
-
-            var previewText = "";
-            if (previewLines != null && previewLines.Count > 0)
-                previewText = string.Join(Environment.NewLine, previewLines);
-            PreviewBox.Text = previewText;
 
             var hasData = _columnMappings.Count > 0;
             MappingGrid.IsEnabled = hasData;

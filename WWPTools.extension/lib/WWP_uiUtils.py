@@ -661,7 +661,8 @@ def uiUtils_area_keyplan_import(
 	title="Import Area Key Schedule",
 	file_path="",
 	column_names=None,
-	preview_lines=None,
+	target_types=None,
+	selected_target_type="",
 	parameter_options=None,
 	default_selections=None,
 	width=980,
@@ -672,7 +673,8 @@ def uiUtils_area_keyplan_import(
 		title,
 		file_path or "",
 		_to_net_string_list(column_names) or List[String](),
-		_to_net_string_list(preview_lines) or List[String](),
+		_to_net_string_list(target_types) or List[String](),
+		selected_target_type or "",
 		_to_net_string_list(parameter_options) or List[String](),
 		_to_net_string_list(default_selections) or List[String](),
 		int(width),
@@ -682,6 +684,7 @@ def uiUtils_area_keyplan_import(
 		return None
 	return {
 		"load_requested": bool(result.LoadRequested),
+		"selected_target_type": result.SelectedTargetType or "",
 		"file_path": result.FilePath or "",
 		"column_names": list(result.ColumnNames or []),
 		"selected_options": list(result.SelectedOptions or []),

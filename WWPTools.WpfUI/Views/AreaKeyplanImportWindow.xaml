@@ -13,8 +13,8 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -45,13 +45,28 @@
                     Margin="8,0,0,0" />
         </Grid>
 
-        <TextBlock Grid.Row="1"
-                   Text="Map Excel columns to Area parameters"
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Text="Schedule Type:" />
+            <ComboBox x:Name="TargetTypeCombo"
+                      Grid.Column="1"
+                      Margin="8,0,0,0"
+                      MinWidth="260" />
+        </Grid>
+
+        <TextBlock Grid.Row="2"
+                   Text="Map Excel columns to parameters"
                    FontWeight="SemiBold"
                    Margin="0,0,0,6" />
 
         <DataGrid x:Name="MappingGrid"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   CanUserDeleteRows="False"
@@ -71,24 +86,6 @@
                                         Width="3*" />
             </DataGrid.Columns>
         </DataGrid>
-
-        <Grid Grid.Row="3" Margin="0,0,0,8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0"
-                       Text="Preview (first rows)"
-                       FontWeight="SemiBold"
-                       Margin="0,0,0,6" />
-            <TextBox x:Name="PreviewBox"
-                     Grid.Row="1"
-                     IsReadOnly="True"
-                     TextWrapping="NoWrap"
-                     VerticalScrollBarVisibility="Auto"
-                     HorizontalScrollBarVisibility="Auto"
-                     MinHeight="120" />
-        </Grid>
 
         <DockPanel Grid.Row="4">
             <Image x:Name="LogoImage"

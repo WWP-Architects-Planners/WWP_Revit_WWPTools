@@ -10,6 +10,7 @@ from pyrevit import DB, revit, script
 TITLE = "Import Area Key Schedule"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
+TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 
 
@@ -83,20 +84,8 @@ def _is_bic_value(cat_id, bic):
         return False
 
 
-def choose_schedule_target(ui):
-    options = ["Area Key Schedule", "Room Key Schedule"]
-    selected = ui.uiUtils_select_indices(
-        options,
-        title=TITLE,
-        prompt="Choose key schedule type to import:",
-        multiselect=False,
-        width=460,
-        height=280,
-    )
-    if not selected:
-        return None
-    idx = selected[0]
-    if idx == 1:
+def resolve_schedule_target(selected_target_type):
+    if _normalize_name(selected_target_type) == _normalize_name(TARGET_OPTIONS[1]):
         return {"bic": DB.BuiltInCategory.OST_Rooms, "label": "Room"}
     return {"bic": DB.BuiltInCategory.OST_Areas, "label": "Area"}
 
@@ -680,37 +669,25 @@ def main():
     doc = revit.doc
     ui = load_uiutils()
     config = _get_config()
-
-    target = choose_schedule_target(ui)
-    if not target:
-        return
+    selected_target_type = _safe_config_get(config, "area_key_import_target", "") or TARGET_OPTIONS[0]
+    target = resolve_schedule_target(selected_target_type)
     category_bic = target["bic"]
     category_label = target["label"]
     category_key = _normalize_name(category_label)
 
     param_names, param_map = get_category_parameter_options(doc, category_bic)
-    if not param_names:
-        ui.uiUtils_alert(
-            "No {} instances found to read parameters from.".format(category_label),
-            title=TITLE,
-        )
-        return
-
     parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
 
     last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
-    last_target = _safe_config_get(config, "area_key_import_target", "") or ""
-    if _normalize_name(last_target) != category_key:
-        last_file_path = ""
 
     state = {
         "file_path": last_file_path,
         "headers": [],
         "column_labels": [],
         "rows": [],
-        "preview": [],
         "defaults": [],
         "schedule_name": "",
+        "selected_target_type": selected_target_type,
     }
 
     # Preload the most recently used workbook for this target type.
@@ -733,7 +710,6 @@ def main():
                         "headers": headers,
                         "column_labels": column_labels,
                         "rows": rows,
-                        "preview": build_preview_lines(headers, rows),
                         "defaults": defaults,
                     }
                 )
@@ -750,7 +726,8 @@ def main():
             title=TITLE,
             file_path=state["file_path"],
             column_names=state["column_labels"],
-            preview_lines=state["preview"],
+            target_types=TARGET_OPTIONS,
+            selected_target_type=state.get("selected_target_type", TARGET_OPTIONS[0]),
             parameter_options=parameter_options,
             default_selections=state["defaults"],
             width=980,
@@ -759,12 +736,39 @@ def main():
         if result is None:
             return
 
+        selected_target_type = result.get("selected_target_type") or state.get("selected_target_type", TARGET_OPTIONS[0])
+        next_target = resolve_schedule_target(selected_target_type)
+        next_category_bic = next_target["bic"]
+        next_category_label = next_target["label"]
+        next_category_key = _normalize_name(next_category_label)
+        target_changed = next_category_bic != category_bic
+        if target_changed:
+            category_bic = next_category_bic
+            category_label = next_category_label
+            category_key = next_category_key
+            state["selected_target_type"] = selected_target_type
+            param_names, param_map = get_category_parameter_options(doc, category_bic)
+            parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
+            state["defaults"] = []
+            state["schedule_name"] = _safe_config_get(
+                config,
+                "area_key_import_schedule_name_{}".format(category_key),
+                "",
+            ) or _default_schedule_name(state.get("file_path", ""), category_label)
+
         file_path = result.get("file_path") or ""
         state["file_path"] = file_path
 
         if result.get("load_requested"):
+            state["selected_target_type"] = selected_target_type
             if not file_path:
                 ui.uiUtils_alert("Please select an Excel file.", title=TITLE)
+                continue
+            if not param_names:
+                ui.uiUtils_alert(
+                    "No {} instances found to read parameters from.".format(category_label),
+                    title=TITLE,
+                )
                 continue
             workbook = read_workbook(file_path, ui)
             if workbook is None:
@@ -773,7 +777,6 @@ def main():
             if not column_labels:
                 ui.uiUtils_alert("No data found in the Excel file.", title=TITLE)
                 continue
-            preview = build_preview_lines(headers, rows)
             signature = _header_signature(headers)
             saved_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
             saved_target = _safe_config_get(config, "area_key_import_target", "") or ""
@@ -788,11 +791,19 @@ def main():
                     "headers": headers,
                     "column_labels": column_labels,
                     "rows": rows,
-                    "preview": preview,
                     "defaults": defaults,
                 }
             )
-            state["schedule_name"] = _default_schedule_name(state["file_path"], category_label)
+            saved_name = _safe_config_get(
+                config,
+                "area_key_import_schedule_name_{}".format(category_key),
+                "",
+            ) or ""
+            state["schedule_name"] = saved_name or _default_schedule_name(state["file_path"], category_label)
+            continue
+
+        if target_changed:
+            # Re-open once to refresh mapping options for the newly selected target type.
             continue
 
         if not state["column_labels"]:
@@ -965,7 +976,7 @@ def main():
                     errors.append("Failed to delete old key '{}'".format(key_norm))
 
         # Persist latest choices for the next run.
-        _safe_config_set(config, "area_key_import_target", category_label)
+        _safe_config_set(config, "area_key_import_target", state.get("selected_target_type", TARGET_OPTIONS[0]))
         _safe_config_set(config, "area_key_import_file_path", state.get("file_path", ""))
         _safe_config_set(config, "area_key_import_headers_signature", _header_signature(state.get("headers", [])))
         _safe_config_set(config, "area_key_import_selected_options", selections)
