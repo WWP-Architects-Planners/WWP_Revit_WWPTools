@@ -7,6 +7,7 @@ from pyrevit import DB, revit
 from pyrevit.framework import EventHandler
 from System.IO import File, StringReader
 from System.Windows import Visibility
+from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Xml import XmlReader
@@ -15,6 +16,7 @@ script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.append(lib_path)
+import WWP_colorSchemeUtils as csu
 
 def _load_uiutils():
     try:
@@ -62,8 +64,11 @@ def _show_setup_dialog(scheme_names, level_names):
     for name in scheme_names:
         source_combo.Items.Add(name)
         target_combo.Items.Add(name)
-    for level_name in level_names:
-        levels_list.Items.Add(level_name)
+    for i, level_name in enumerate(level_names):
+        item = ListBoxItem()
+        item.Content = level_name
+        item.Tag = i
+        levels_list.Items.Add(item)
 
     if source_combo.Items.Count > 0:
         source_combo.SelectedIndex = 0
@@ -85,7 +90,12 @@ def _show_setup_dialog(scheme_names, level_names):
     def _on_ok(sender, args):
         source_index = int(source_combo.SelectedIndex)
         target_index = int(target_combo.SelectedIndex)
-        level_indices = [int(i) for i in levels_list.SelectedIndices]
+        level_indices = []
+        for selected_item in levels_list.SelectedItems:
+            try:
+                level_indices.append(int(selected_item.Tag))
+            except Exception:
+                pass
         if source_index < 0 or target_index < 0:
             _set_validation("Please select both source and target area schemes.")
             return
@@ -486,6 +496,19 @@ def _collect_color_fill_schemes(doc):
         return []
 
 
+def _element_id_value(elem_id):
+    try:
+        return int(elem_id.IntegerValue)
+    except Exception:
+        return None
+
+
+def _same_element_id(a, b):
+    av = _element_id_value(a)
+    bv = _element_id_value(b)
+    return av is not None and bv is not None and av == bv
+
+
 def _get_area_scheme_id_from_color_scheme(scheme):
     try:
         if hasattr(scheme, "AreaSchemeId"):
@@ -575,10 +598,10 @@ def _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id
         try:
             if getattr(scheme, "Name", "") != source_name:
                 continue
-            if source_category_id and getattr(scheme, "CategoryId", None) != source_category_id:
+            if source_category_id and not _same_element_id(getattr(scheme, "CategoryId", None), source_category_id):
                 continue
             scheme_area_scheme_id = _get_area_scheme_id_from_color_scheme(scheme)
-            if scheme_area_scheme_id != target_area_scheme_id:
+            if not _same_element_id(scheme_area_scheme_id, target_area_scheme_id):
                 continue
             return scheme
         except Exception:
@@ -586,24 +609,41 @@ def _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id
     return None
 
 
-def _copy_view_area_color_scheme(doc, source_view, target_view, target_area_scheme_id):
+def _list_target_area_color_schemes(doc, target_area_scheme_id):
     area_category_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
-    source_scheme_id = _get_view_color_fill_scheme_id(source_view, area_category_id)
-    if source_scheme_id is None or source_scheme_id == DB.ElementId.InvalidElementId:
-        return False, "source view has no area color scheme assignment"
-    source_scheme = doc.GetElement(source_scheme_id)
-    if source_scheme is None:
-        return False, "source color scheme element not found"
+    matches = []
+    for scheme in _collect_color_fill_schemes(doc):
+        try:
+            if not _same_element_id(_get_area_scheme_id_from_color_scheme(scheme), target_area_scheme_id):
+                continue
+            if not _same_element_id(getattr(scheme, "CategoryId", None), area_category_id):
+                continue
+            matches.append(scheme)
+        except Exception:
+            continue
+    return matches
 
-    target_scheme = _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id)
-    if target_scheme is None:
-        return False, "no matching target color scheme found (same name/category in target area scheme)"
 
-    if not _copy_color_fill_scheme_data(source_scheme, target_scheme):
-        return False, "failed to copy color scheme entries"
-    if not _set_view_color_fill_scheme_id(target_view, area_category_id, target_scheme.Id):
-        return False, "failed to assign target color scheme to target view"
-    return True, ""
+def _create_target_color_scheme(doc, source_scheme, target_area_scheme_id):
+    candidates = _list_target_area_color_schemes(doc, target_area_scheme_id)
+    if not candidates:
+        return None, "target area scheme has no area color scheme to duplicate from"
+    template = candidates[0]
+    source_name = getattr(source_scheme, "Name", "") or "Color Scheme"
+    try:
+        new_id = template.Duplicate(source_name)
+        created = doc.GetElement(new_id)
+        if created is None:
+            return None, "failed to create target color scheme"
+        return created, ""
+    except Exception as ex:
+        return None, "failed to create target color scheme ({})".format(ex)
+
+
+def _copy_view_area_color_scheme(doc, source_view, target_view, target_area_scheme_id):
+    return csu.copy_view_area_color_scheme_with_scope(
+        doc, source_view, target_view, target_area_scheme_id
+    )
 
 
 def main():

@@ -1,275 +1,200 @@
+#!python3
 # -*- coding: utf-8 -*-
 
+import os
+import sys
 from pyrevit import revit, DB
 import WWP_uiUtils as ui
+from pyrevit.framework import EventHandler
+from System.IO import File
+from System.Windows import Visibility
+from System.Windows.Interop import WindowInteropHelper
+from System.Windows.Markup import XamlReader
 
-try:
-	import clr
-	from System.Collections.Generic import List
-except Exception:
-	clr = None
-	List = None
+script_dir = os.path.dirname(__file__)
+lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+if lib_path not in sys.path:
+    sys.path.append(lib_path)
 
-
-def _collect_color_fill_schemes(doc):
-	# ColorFillScheme exists in Revit 2022+
-	schemes = list(DB.FilteredElementCollector(doc).OfClass(DB.ColorFillScheme).ToElements())
-	# Sort by name for nicer UX
-	schemes.sort(key=lambda s: (getattr(s, "Name", "") or "").lower())
-	return schemes
-
-
-def _unique_scheme_name(existing_names, desired_name):
-	base = (desired_name or "").strip()
-	if not base:
-		base = "New Color Scheme"
-	name = base
-	i = 2
-	while name.lower() in existing_names:
-		name = "{} ({})".format(base, i)
-		i += 1
-	return name
-
-
-def _call_if_exists(obj, method_name, *args):
-	method = getattr(obj, method_name, None)
-	if callable(method):
-		return method(*args)
-	return None
+import WWP_colorSchemeUtils as csu
 
 
 def _scheme_area_scheme_name(doc, scheme):
-	try:
-		area_scheme_id = getattr(scheme, "AreaSchemeId", None)
-		if area_scheme_id:
-			area_scheme = doc.GetElement(area_scheme_id)
-			if area_scheme:
-				return getattr(area_scheme, "Name", "") or ""
-	except Exception:
-		pass
-	try:
-		get_area_scheme_id = getattr(scheme, "GetAreaSchemeId", None)
-		if callable(get_area_scheme_id):
-			area_scheme_id = get_area_scheme_id()
-			if area_scheme_id:
-				area_scheme = doc.GetElement(area_scheme_id)
-				if area_scheme:
-					return getattr(area_scheme, "Name", "") or ""
-	except Exception:
-		pass
-	try:
-		param = scheme.LookupParameter("Area Scheme")
-		if param:
-			return param.AsString() or param.AsValueString() or ""
-	except Exception:
-		pass
-	return ""
+    try:
+        area_scheme_id = getattr(scheme, "AreaSchemeId", None)
+        if area_scheme_id:
+            area_scheme = doc.GetElement(area_scheme_id)
+            if area_scheme:
+                return getattr(area_scheme, "Name", "") or ""
+    except Exception:
+        pass
+    try:
+        get_area_scheme_id = getattr(scheme, "GetAreaSchemeId", None)
+        if callable(get_area_scheme_id):
+            area_scheme_id = get_area_scheme_id()
+            if area_scheme_id:
+                area_scheme = doc.GetElement(area_scheme_id)
+                if area_scheme:
+                    return getattr(area_scheme, "Name", "") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _category_name(doc, category_id):
+    if category_id is None:
+        return "Unknown Category"
+    try:
+        cat = doc.GetElement(category_id)
+        cat_name = getattr(cat, "Name", "") if cat else ""
+        if cat_name:
+            return cat_name
+    except Exception:
+        pass
+    try:
+        return DB.LabelUtils.GetLabelFor(category_id)
+    except Exception:
+        pass
+    try:
+        import System
+        cat_int = int(category_id.IntegerValue)
+        bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
+        label = DB.LabelUtils.GetLabelFor(bic)
+        if label:
+            return label
+        return "Category {}".format(cat_int)
+    except Exception:
+        return "Unknown Category"
 
 
 def _scheme_display_name(doc, scheme):
-	scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
-	area_scheme_name = _scheme_area_scheme_name(doc, scheme)
-	if area_scheme_name:
-		return "Area({}):{}".format(area_scheme_name, scheme_name)
-	try:
-		cat = doc.GetElement(scheme.CategoryId)
-		cat_name = getattr(cat, "Name", "") if cat else ""
-	except Exception:
-		cat_name = ""
-	if not cat_name:
-		try:
-			cat_name = DB.LabelUtils.GetLabelFor(scheme.CategoryId)
-		except Exception:
-			cat_name = ""
-	if not cat_name:
-		try:
-			cat_id = scheme.CategoryId
-			cat_int = cat_id.IntegerValue if hasattr(cat_id, "IntegerValue") else int(cat_id)
-			try:
-				import System
-				bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
-				cat_name = DB.LabelUtils.GetLabelFor(bic)
-			except Exception:
-				cat_name = "Category {}".format(cat_int)
-		except Exception:
-			cat_name = "Unknown Category"
-	return "{}: {}".format(cat_name, scheme_name)
+    scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
+    area_name = _scheme_area_scheme_name(doc, scheme)
+    if area_name:
+        return "Area({}):{}".format(area_name, scheme_name)
+    return "{}: {}".format(_category_name(doc, scheme.CategoryId), scheme_name)
 
 
-class _SchemeOption(object):
-	def __init__(self, name, scheme):
-		self.name = name
-		self.scheme = scheme
+def _set_owner(window):
+    try:
+        helper = WindowInteropHelper(window)
+        helper.Owner = revit.uidoc.Application.MainWindowHandle
+    except Exception:
+        pass
 
 
-def _copy_scheme_data(source, target, allow_category_mismatch=False):
-	try:
-		if hasattr(source, "CategoryId") and hasattr(target, "CategoryId"):
-			if source.CategoryId != target.CategoryId:
-				if not allow_category_mismatch:
-					return False, "Source and target schemes use different categories."
-	except Exception:
-		pass
+def _show_selection_dialog(display_names):
+    xaml_path = os.path.join(script_dir, "CopyColorSchemeSetup.xaml")
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
-	for attr in ("Title", "IsByRange", "IsByValue", "IsByPercentage"):
-		if hasattr(source, attr) and hasattr(target, attr):
-			try:
-				setattr(target, attr, getattr(source, attr))
-			except Exception:
-				pass
+    xaml_text = File.ReadAllText(xaml_path)
+    window = XamlReader.Parse(xaml_text)
+    _set_owner(window)
 
-	try:
-		source_entries = list(source.GetEntries())
-	except Exception:
-		return False, "Unable to read entries from the source scheme."
+    source_combo = window.FindName("SourceSchemeCombo")
+    target_combo = window.FindName("TargetSchemeCombo")
+    validation = window.FindName("ValidationText")
+    ok_btn = window.FindName("OkButton")
+    cancel_btn = window.FindName("CancelButton")
 
-	if _call_if_exists(target, "ClearEntries") is None:
-		try:
-			for entry in list(target.GetEntries()):
-				_call_if_exists(target, "RemoveEntry", entry)
-		except Exception:
-			pass
+    for name in display_names:
+        source_combo.Items.Add(name)
+        target_combo.Items.Add(name)
 
-	try:
-		if List is not None:
-			entry_list = List[DB.ColorFillSchemeEntry](source_entries)
-		else:
-			entry_list = list(source_entries)
-		if _call_if_exists(target, "SetEntries", entry_list) is not None:
-			return True, None
-	except Exception:
-		pass
+    if source_combo.Items.Count > 0:
+        source_combo.SelectedIndex = 0
+    if target_combo.Items.Count > 1:
+        target_combo.SelectedIndex = 1
+    elif target_combo.Items.Count > 0:
+        target_combo.SelectedIndex = 0
 
-	for entry in source_entries:
-		try:
-			new_entry = entry
-			clone = getattr(entry, "Clone", None)
-			if callable(clone):
-				try:
-					new_entry = clone()
-				except Exception:
-					new_entry = entry
-			_call_if_exists(target, "AddEntry", new_entry)
-		except Exception:
-			pass
+    result = {"ok": False}
 
-	return True, None
+    def _set_validation(msg):
+        if msg:
+            validation.Text = msg
+            validation.Visibility = Visibility.Visible
+        else:
+            validation.Text = ""
+            validation.Visibility = Visibility.Collapsed
 
-doc = revit.doc
+    def _on_ok(sender, args):
+        source_idx = int(source_combo.SelectedIndex)
+        target_idx = int(target_combo.SelectedIndex)
+        if source_idx < 0 or target_idx < 0:
+            _set_validation("Please select both source and target schemes.")
+            return
+        if source_idx == target_idx:
+            _set_validation("Source and target must be different schemes.")
+            return
+        result["ok"] = True
+        result["source_index"] = source_idx
+        result["target_index"] = target_idx
+        window.DialogResult = True
+        window.Close()
 
-schemes = _collect_color_fill_schemes(doc)
-if not schemes:
-	ui.uiUtils_alert("No Color Fill Schemes found in this model.", title="Copy Color Scheme")
-	raise SystemExit
+    def _on_cancel(sender, args):
+        window.DialogResult = False
+        window.Close()
 
-source_names = [_scheme_display_name(doc, s) for s in schemes]
-source_indices = ui.uiUtils_select_indices(
-	source_names,
-	title="Source Color Scheme",
-	prompt="Select source scheme:",
-	multiselect=False,
-	width=720,
-	height=520,
-)
-if not source_indices:
-	raise SystemExit
-source = schemes[source_indices[0]]
+    ok_btn.Click += EventHandler(_on_ok)
+    cancel_btn.Click += EventHandler(_on_cancel)
+    if window.ShowDialog() != True:
+        return None
+    return result if result.get("ok") else None
 
-targets = [scheme for scheme in schemes if scheme.Id != source.Id]
-if not targets:
-	ui.uiUtils_alert("No other Color Fill Scheme found to copy into.", title="Copy Color Scheme")
-	raise SystemExit
 
-category_map = {}
-for scheme in targets:
-	try:
-		cat = doc.GetElement(scheme.CategoryId)
-		cat_name = getattr(cat, "Name", "") if cat else ""
-	except Exception:
-		cat_name = ""
-	if not cat_name:
-		try:
-			cat_name = DB.LabelUtils.GetLabelFor(scheme.CategoryId)
-		except Exception:
-			cat_name = ""
-	if not cat_name:
-		try:
-			cat_id = scheme.CategoryId
-			cat_int = cat_id.IntegerValue if hasattr(cat_id, "IntegerValue") else int(cat_id)
-			try:
-				import System
-				bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
-				cat_name = DB.LabelUtils.GetLabelFor(bic)
-			except Exception:
-				cat_name = "Category {}".format(cat_int)
-		except Exception:
-			cat_name = "Unknown Category"
-	category_map[cat_name] = scheme.CategoryId
+def main():
+    doc = revit.doc
+    schemes = csu.collect_color_fill_schemes(doc)
+    if not schemes:
+        ui.uiUtils_alert("No Color Fill Schemes found in this model.", title="Copy Color Scheme")
+        return
 
-category_names = sorted(category_map.keys(), key=lambda s: (s or "").lower())
-selected_indices, overwrite_mode = ui.uiUtils_select_items_with_mode(
-	category_names,
-	title="Target Category",
-	prompt="Select target category:",
-	mode_labels=("Overwrite existing", ""),
-	default_mode=0,
-	prechecked_indices=None,
-	width=720,
-	height=520,
-)
-if not selected_indices:
-	raise SystemExit
+    names = [_scheme_display_name(doc, s) for s in schemes]
+    pick = _show_selection_dialog(names)
+    if not pick:
+        return
 
-target_category_name = category_names[selected_indices[0]]
-target_category_id = category_map.get(target_category_name)
-overwrite = overwrite_mode == 1
+    source = schemes[int(pick["source_index"])]
+    selected_target = schemes[int(pick["target_index"])]
 
-source_name = getattr(source, "Name", "") or "Color Scheme"
-target = None
-for scheme in schemes:
-	try:
-		if scheme.Id == source.Id:
-			continue
-		if getattr(scheme, "Name", "") != source_name:
-			continue
-		if scheme.CategoryId != target_category_id:
-			continue
-		target = scheme
-		break
-	except Exception:
-		continue
+    with revit.Transaction("Copy Color Scheme"):
+        source_name = (getattr(source, "Name", "") or "Color Scheme").strip()
+        target = selected_target
 
-if target is None:
-	ui.uiUtils_alert(
-		"No target Color Scheme named '{}' found in category '{}'.\nCreate a scheme with that name first."
-		.format(source_name, target_category_name),
-		title="Copy Color Scheme",
-	)
-	raise SystemExit
+        # Target acts as scope reference unless names already match.
+        selected_name = (getattr(selected_target, "Name", "") or "").strip()
+        if selected_name.lower() != source_name.lower():
+            all_schemes = csu.collect_color_fill_schemes(doc)
+            existing_same_name = csu.find_scheme_in_scope_by_name(all_schemes, selected_target, source_name)
+            if existing_same_name is not None:
+                target = existing_same_name
+            else:
+                new_id = selected_target.Duplicate(source_name)
+                created = doc.GetElement(new_id)
+                if created is None:
+                    ui.uiUtils_alert(
+                        "Failed to create new scheme '{}' in selected target scope.".format(source_name),
+                        title="Copy Color Scheme",
+                    )
+                    return
+                target = created
 
-if not overwrite:
-	ui.uiUtils_alert(
-		"Overwrite disabled. Selected target scheme will not be modified.",
-		title="Copy Color Scheme",
-	)
-	raise SystemExit
+        ok, error = csu.copy_scheme_data(source, target)
 
-with revit.Transaction("Copy Color Scheme"):
-	try:
-		ok, error = _copy_scheme_data(source, target, allow_category_mismatch=True)
-		if not ok:
-			raise Exception(error or "Copy failed")
-	except Exception as ex:
-		error = str(ex)
-		target = None
+    if not ok:
+        ui.uiUtils_alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
+        return
 
-if not target:
-	ui.uiUtils_alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
-	raise SystemExit
+    try:
+        revit.get_selection().set_to([target.Id])
+    except Exception:
+        pass
 
-try:
-	revit.get_selection().set_to([target.Id])
-except Exception:
-	pass
+    ui.uiUtils_alert("Updated scheme: {}".format(getattr(target, "Name", "Color Scheme")), title="Copy Color Scheme")
 
-ui.uiUtils_alert("Updated scheme: {}".format(getattr(target, "Name", "Color Scheme")), title="Copy Color Scheme")
+
+if __name__ == "__main__":
+    main()
