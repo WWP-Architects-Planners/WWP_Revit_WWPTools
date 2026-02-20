@@ -275,13 +275,27 @@ def build_preview_lines(headers, rows, max_rows=8):
 
 def build_default_selections(headers, param_display_names):
     defaults = []
-    name_lookup = {name.strip().lower(): name for name in param_display_names}
+    name_lookup = {}
+    for name in param_display_names:
+        raw = (name or "").strip()
+        if not raw:
+            continue
+        key = _normalize_name(raw)
+        if key and key not in name_lookup:
+            name_lookup[key] = name
+        # Also support display names like "Param Name (Id 123)".
+        base = raw
+        if base.endswith(")") and " (id " in _normalize_name(base):
+            base = base.rsplit(" (", 1)[0].strip()
+            base_key = _normalize_name(base)
+            if base_key and base_key not in name_lookup:
+                name_lookup[base_key] = name
     for header in headers:
         header_text = (header or "").strip()
         if not header_text:
             defaults.append(SKIP_OPTION)
             continue
-        header_lower = header_text.lower()
+        header_lower = _normalize_name(header_text)
         if header_lower in ("key", "key name", "keyname"):
             defaults.append(KEY_NAME_OPTION)
             continue
