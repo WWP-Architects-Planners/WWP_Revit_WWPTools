@@ -265,6 +265,26 @@ def _collect_area_tags(doc, view):
     return tags
 
 
+def _collect_areas_by_scheme_level(doc, scheme_id, level_id):
+    areas = []
+    for elem in DB.FilteredElementCollector(doc).OfClass(DB.SpatialElement):
+        if not isinstance(elem, DB.Area):
+            continue
+        area = elem
+        try:
+            if area.AreaScheme.Id != scheme_id:
+                continue
+        except Exception:
+            continue
+        try:
+            if area.LevelId != level_id:
+                continue
+        except Exception:
+            continue
+        areas.append(area)
+    return areas
+
+
 def _get_tag_area_id(tag):
     try:
         if hasattr(tag, "TaggedLocalElementId"):
@@ -319,6 +339,32 @@ def _create_area_tag(doc, view, area, point, source_tag=None):
     return new_tag
 
 
+def _tag_untagged_areas(doc, view, areas):
+    tagged_ids = set()
+    for tag in _collect_area_tags(doc, view):
+        area_id = _get_tag_area_id(tag)
+        if area_id is not None:
+            tagged_ids.add(area_id)
+
+    created = 0
+    failed = 0
+    for area in areas:
+        if area.Id in tagged_ids:
+            continue
+        uv = _get_area_location_uv(area, view)
+        if uv is None:
+            failed += 1
+            continue
+        point = DB.XYZ(uv.U, uv.V, 0.0)
+        new_tag = _create_area_tag(doc, view, area, point, source_tag=None)
+        if new_tag is not None:
+            created += 1
+            tagged_ids.add(area.Id)
+        else:
+            failed += 1
+    return created, failed
+
+
 def _pick_index(ui, items, title, prompt):
     selected = ui.uiUtils_select_indices(
         items,
@@ -371,13 +417,13 @@ def _pick_levels(ui, items, title, prompt):
 
 def _pick_copy_tags(ui):
     options = [
-        "Copy areas + boundaries only",
-        "Copy areas + boundaries + tags",
+        "Do not create tags",
+        "Tag all untagged areas in target views",
     ]
     selected = ui.uiUtils_select_indices(
         options,
         title="Copy Areas - Options",
-        prompt="Choose what to copy:",
+        prompt="Tagging option:",
         multiselect=False,
         width=560,
         height=320,
@@ -564,8 +610,8 @@ def main():
     if not level_indices:
         ui.uiUtils_alert("Select at least one level.", title="Copy Areas")
         return
-    copy_tags = _pick_copy_tags(ui)
-    if copy_tags is None:
+    tag_untagged = _pick_copy_tags(ui)
+    if tag_untagged is None:
         return
     copy_color_scheme = _pick_copy_color_scheme(ui)
     if copy_color_scheme is None:
@@ -626,30 +672,7 @@ def main():
                     except Exception:
                         total_failed += 1
 
-            areas = []
-            for elem in DB.FilteredElementCollector(doc).OfClass(DB.SpatialElement):
-                if not isinstance(elem, DB.Area):
-                    continue
-                area = elem
-                try:
-                    if area.AreaScheme.Id != source_scheme.Id:
-                        continue
-                except Exception:
-                    continue
-                try:
-                    if area.LevelId != level_id:
-                        continue
-                except Exception:
-                    continue
-                areas.append(area)
-
-            tag_map = {}
-            if copy_tags:
-                for tag in _collect_area_tags(doc, source_view):
-                    area_id = _get_tag_area_id(tag)
-                    if area_id is None:
-                        continue
-                    tag_map.setdefault(area_id, []).append(tag)
+            areas = _collect_areas_by_scheme_level(doc, source_scheme.Id, level_id)
 
             for area in areas:
                 uv = _get_area_location_uv(area, source_view)
@@ -676,27 +699,16 @@ def main():
                 _copy_parameters(area, new_area, skip_names)
                 total_areas += 1
 
-                if copy_tags:
-                    tags = tag_map.get(area.Id, [])
-                    for tag in tags:
-                        try:
-                            point = tag.TagHeadPosition
-                        except Exception:
-                            point = None
-                        if point is None:
-                            continue
-                        new_tag = _create_area_tag(doc, target_view, new_area, point, source_tag=tag)
-                        if new_tag is not None:
-                            total_tags += 1
-                        else:
-                            total_failed += 1
-
-            if copy_tags:
-                report_lines.append("{}: areas {} | boundaries {} | tags {}{}".format(
+            if tag_untagged:
+                target_areas = _collect_areas_by_scheme_level(doc, target_scheme.Id, level_id)
+                created_tags, failed_tags = _tag_untagged_areas(doc, target_view, target_areas)
+                total_tags += created_tags
+                total_failed += failed_tags
+                report_lines.append("{}: areas {} | boundaries {} | tagged {}{}".format(
                     level.Name,
                     len(areas),
                     len(boundary_curves),
-                    len(tag_map),
+                    created_tags,
                     color_scheme_note,
                 ))
             else:
@@ -719,7 +731,7 @@ def main():
     report_lines.append("")
     report_lines.append("Created areas: {}".format(total_areas))
     report_lines.append("Created boundaries: {}".format(total_boundaries))
-    report_lines.append("Created tags: {}".format(total_tags if copy_tags else 0))
+    report_lines.append("Created tags: {}".format(total_tags if tag_untagged else 0))
     report_lines.append("Applied color schemes to target views: {}".format(
         total_color_scheme_views if copy_color_scheme else 0
     ))
