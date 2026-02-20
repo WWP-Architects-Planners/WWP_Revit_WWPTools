@@ -4,6 +4,12 @@ import sys
 import traceback
 
 from pyrevit import DB, revit
+from pyrevit.framework import EventHandler
+from System.IO import File, StringReader
+from System.Windows import Visibility
+from System.Windows.Interop import WindowInteropHelper
+from System.Windows.Markup import XamlReader
+from System.Xml import XmlReader
 
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
@@ -24,6 +30,90 @@ def _load_uiutils():
         except Exception:
             pass
         raise
+
+
+def _set_owner(window):
+    try:
+        helper = WindowInteropHelper(window)
+        helper.Owner = revit.uidoc.Application.MainWindowHandle
+    except Exception:
+        pass
+
+
+def _show_setup_dialog(scheme_names, level_names):
+    xaml_path = os.path.join(script_dir, "AreaSchemeCopySetup.xaml")
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing dialog XAML: {}".format(xaml_path))
+
+    xaml_text = File.ReadAllText(xaml_path)
+    xaml_reader = XmlReader.Create(StringReader(xaml_text))
+    window = XamlReader.Load(xaml_reader)
+    _set_owner(window)
+
+    source_combo = window.FindName("SourceSchemeCombo")
+    target_combo = window.FindName("TargetSchemeCombo")
+    levels_list = window.FindName("LevelsList")
+    tag_toggle = window.FindName("TagUntaggedToggle")
+    color_toggle = window.FindName("CopyColorSchemeToggle")
+    validation = window.FindName("ValidationText")
+    ok_btn = window.FindName("OkButton")
+    cancel_btn = window.FindName("CancelButton")
+
+    for name in scheme_names:
+        source_combo.Items.Add(name)
+        target_combo.Items.Add(name)
+    for level_name in level_names:
+        levels_list.Items.Add(level_name)
+
+    if source_combo.Items.Count > 0:
+        source_combo.SelectedIndex = 0
+    if target_combo.Items.Count > 1:
+        target_combo.SelectedIndex = 1
+    elif target_combo.Items.Count > 0:
+        target_combo.SelectedIndex = 0
+
+    result = {"ok": False}
+
+    def _set_validation(msg):
+        if msg:
+            validation.Text = msg
+            validation.Visibility = Visibility.Visible
+        else:
+            validation.Text = ""
+            validation.Visibility = Visibility.Collapsed
+
+    def _on_ok(sender, args):
+        source_index = int(source_combo.SelectedIndex)
+        target_index = int(target_combo.SelectedIndex)
+        level_indices = [int(i) for i in levels_list.SelectedIndices]
+        if source_index < 0 or target_index < 0:
+            _set_validation("Please select both source and target area schemes.")
+            return
+        if source_index == target_index:
+            _set_validation("Source and target area schemes must be different.")
+            return
+        if not level_indices:
+            _set_validation("Select at least one level.")
+            return
+        result["ok"] = True
+        result["source_scheme_index"] = source_index
+        result["target_scheme_index"] = target_index
+        result["selected_level_indices"] = level_indices
+        result["copy_tags"] = bool(tag_toggle.IsChecked)
+        result["copy_color_scheme"] = bool(color_toggle.IsChecked)
+        window.DialogResult = True
+        window.Close()
+
+    def _on_cancel(sender, args):
+        window.DialogResult = False
+        window.Close()
+
+    ok_btn.Click += EventHandler(_on_ok)
+    cancel_btn.Click += EventHandler(_on_cancel)
+
+    if window.ShowDialog() != True:
+        return None
+    return result if result.get("ok") else None
 
 
 def _get_area_schemes(doc):
@@ -377,32 +467,6 @@ def _pick_index(ui, items, title, prompt):
     return selected[0] if selected else -1
 
 
-def _pick_source_target_schemes(ui, scheme_names):
-    result = ui.uiUtils_select_sheet_renumber_inputs(
-        categories=scheme_names,
-        print_sets=scheme_names,
-        title="Copy Areas - Schemes",
-        category_label="Source area scheme:",
-        printset_label="Target area scheme:",
-        starting_label="(Optional note)",
-        cancel_text="Cancel",
-        width=620,
-        height=340,
-    )
-    if not result:
-        return -1, -1
-    source_name = (result.get("category") or "").strip()
-    target_name = (result.get("printset") or "").strip()
-    if not source_name or not target_name:
-        return -1, -1
-    try:
-        source_index = scheme_names.index(source_name)
-        target_index = scheme_names.index(target_name)
-    except Exception:
-        return -1, -1
-    return source_index, target_index
-
-
 def _pick_levels(ui, items, title, prompt):
     selected = ui.uiUtils_select_indices(
         items,
@@ -413,42 +477,6 @@ def _pick_levels(ui, items, title, prompt):
         height=620,
     )
     return selected or []
-
-
-def _pick_copy_tags(ui):
-    options = [
-        "Do not create tags",
-        "Tag all untagged areas in target views",
-    ]
-    selected = ui.uiUtils_select_indices(
-        options,
-        title="Copy Areas - Options",
-        prompt="Tagging option:",
-        multiselect=False,
-        width=560,
-        height=320,
-    )
-    if not selected:
-        return None
-    return selected[0] == 1
-
-
-def _pick_copy_color_scheme(ui):
-    options = [
-        "Do not copy area color schemes",
-        "Copy area color schemes (source -> target views)",
-    ]
-    selected = ui.uiUtils_select_indices(
-        options,
-        title="Copy Areas - Options",
-        prompt="Include color scheme?",
-        multiselect=False,
-        width=620,
-        height=320,
-    )
-    if not selected:
-        return None
-    return selected[0] == 1
 
 
 def _collect_color_fill_schemes(doc):
@@ -595,27 +623,18 @@ def main():
         ui.uiUtils_alert("No levels found in this project.", title="Copy Areas")
         return
 
-    scheme_names = [s.Name for s in schemes]
-    level_names = [l.Name for l in levels]
-
-    source_index, target_index = _pick_source_target_schemes(ui, scheme_names)
-    if source_index < 0 or target_index < 0:
+    setup = _show_setup_dialog(
+        [s.Name for s in schemes],
+        [l.Name for l in levels],
+    )
+    if not setup:
         return
 
-    if source_index == target_index:
-        ui.uiUtils_alert("Source and target area schemes must be different.", title="Copy Areas")
-        return
-
-    level_indices = _pick_levels(ui, level_names, "Copy Areas - Levels", "Levels to copy:")
-    if not level_indices:
-        ui.uiUtils_alert("Select at least one level.", title="Copy Areas")
-        return
-    tag_untagged = _pick_copy_tags(ui)
-    if tag_untagged is None:
-        return
-    copy_color_scheme = _pick_copy_color_scheme(ui)
-    if copy_color_scheme is None:
-        return
+    source_index = int(setup.get("source_scheme_index", -1))
+    target_index = int(setup.get("target_scheme_index", -1))
+    level_indices = setup.get("selected_level_indices") or []
+    tag_untagged = bool(setup.get("copy_tags", False))
+    copy_color_scheme = bool(setup.get("copy_color_scheme", False))
 
     source_scheme = schemes[source_index]
     target_scheme = schemes[target_index]
