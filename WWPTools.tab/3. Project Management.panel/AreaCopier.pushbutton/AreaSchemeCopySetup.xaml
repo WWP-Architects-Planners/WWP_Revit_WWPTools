@@ -1,0 +1,82 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Copy Areas - Setup"
+        Width="700"
+        Height="760"
+        MinWidth="620"
+        MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Source area scheme:"
+                   Margin="0,0,0,6"/>
+        <ComboBox x:Name="SourceSchemeCombo"
+                  Grid.Row="1"
+                  Height="30"
+                  Margin="0,0,0,10"/>
+
+        <StackPanel Grid.Row="2"
+                    Margin="0,0,0,10">
+            <TextBlock Text="Target area scheme:"
+                       Margin="0,0,0,6"/>
+            <ComboBox x:Name="TargetSchemeCombo"
+                      Height="30"
+                      Margin="0,0,0,10"/>
+
+            <TextBlock Text="Levels to copy:"
+                       Margin="0,0,0,6"/>
+            <ListBox x:Name="LevelsList"
+                     MinHeight="220"
+                     SelectionMode="Extended"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Vertical"
+                    Margin="0,0,0,12">
+            <ToggleButton x:Name="TagUntaggedToggle"
+                          Height="30"
+                          IsChecked="True"
+                          HorizontalAlignment="Left"
+                          MinWidth="300"
+                          Content="Tag all untagged areas in target views"/>
+            <ToggleButton x:Name="CopyColorSchemeToggle"
+                          Height="30"
+                          Margin="0,8,0,0"
+                          IsChecked="False"
+                          HorizontalAlignment="Left"
+                          MinWidth="300"
+                          Content="Copy area color schemes (source -&gt; target views)"/>
+        </StackPanel>
+
+        <TextBlock x:Name="ValidationText"
+                   Grid.Row="4"
+                   Foreground="#AA1111"
+                   Visibility="Collapsed"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8"/>
+
+        <StackPanel Grid.Row="5"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button x:Name="OkButton"
+                    Width="100"
+                    Height="32"
+                    Margin="0,0,8,0"
+                    Content="OK"/>
+            <Button x:Name="CancelButton"
+                    Width="100"
+                    Height="32"
+                    Content="Cancel"/>
+        </StackPanel>
+    </Grid>
+</Window>
