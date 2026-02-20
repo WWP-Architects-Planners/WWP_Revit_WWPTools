@@ -343,6 +343,169 @@ def _pick_levels(ui, items, title, prompt):
     return selected or []
 
 
+def _pick_copy_tags(ui):
+    options = [
+        "Copy areas + boundaries only",
+        "Copy areas + boundaries + tags",
+    ]
+    selected = ui.uiUtils_select_indices(
+        options,
+        title="Copy Areas - Options",
+        prompt="Choose what to copy:",
+        multiselect=False,
+        width=560,
+        height=320,
+    )
+    if not selected:
+        return None
+    return selected[0] == 1
+
+
+def _pick_copy_color_scheme(ui):
+    options = [
+        "Do not copy area color schemes",
+        "Copy area color schemes (source -> target views)",
+    ]
+    selected = ui.uiUtils_select_indices(
+        options,
+        title="Copy Areas - Options",
+        prompt="Include color scheme?",
+        multiselect=False,
+        width=620,
+        height=320,
+    )
+    if not selected:
+        return None
+    return selected[0] == 1
+
+
+def _collect_color_fill_schemes(doc):
+    try:
+        return list(DB.FilteredElementCollector(doc).OfClass(DB.ColorFillScheme).ToElements())
+    except Exception:
+        return []
+
+
+def _get_area_scheme_id_from_color_scheme(scheme):
+    try:
+        if hasattr(scheme, "AreaSchemeId"):
+            return scheme.AreaSchemeId
+    except Exception:
+        pass
+    try:
+        method = getattr(scheme, "GetAreaSchemeId", None)
+        if callable(method):
+            return method()
+    except Exception:
+        pass
+    return None
+
+
+def _copy_color_fill_scheme_data(source, target):
+    for attr in ("Title", "IsByRange", "IsByValue", "IsByPercentage"):
+        if hasattr(source, attr) and hasattr(target, attr):
+            try:
+                setattr(target, attr, getattr(source, attr))
+            except Exception:
+                pass
+
+    try:
+        source_entries = list(source.GetEntries())
+    except Exception:
+        return False
+
+    try:
+        clear_entries = getattr(target, "ClearEntries", None)
+        if callable(clear_entries):
+            clear_entries()
+        else:
+            remove_entry = getattr(target, "RemoveEntry", None)
+            if callable(remove_entry):
+                for entry in list(target.GetEntries()):
+                    remove_entry(entry)
+    except Exception:
+        pass
+
+    try:
+        set_entries = getattr(target, "SetEntries", None)
+        if callable(set_entries):
+            set_entries(source_entries)
+            return True
+    except Exception:
+        pass
+
+    add_entry = getattr(target, "AddEntry", None)
+    if not callable(add_entry):
+        return False
+    for entry in source_entries:
+        try:
+            clone = getattr(entry, "Clone", None)
+            new_entry = clone() if callable(clone) else entry
+            add_entry(new_entry)
+        except Exception:
+            continue
+    return True
+
+
+def _get_view_color_fill_scheme_id(view, category_id):
+    try:
+        method = getattr(view, "GetColorFillSchemeId", None)
+        if callable(method):
+            return method(category_id)
+    except Exception:
+        pass
+    return None
+
+
+def _set_view_color_fill_scheme_id(view, category_id, scheme_id):
+    try:
+        method = getattr(view, "SetColorFillSchemeId", None)
+        if callable(method):
+            method(category_id, scheme_id)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id):
+    source_name = getattr(source_scheme, "Name", "") or ""
+    source_category_id = getattr(source_scheme, "CategoryId", None)
+    for scheme in _collect_color_fill_schemes(doc):
+        try:
+            if getattr(scheme, "Name", "") != source_name:
+                continue
+            if source_category_id and getattr(scheme, "CategoryId", None) != source_category_id:
+                continue
+            scheme_area_scheme_id = _get_area_scheme_id_from_color_scheme(scheme)
+            if scheme_area_scheme_id != target_area_scheme_id:
+                continue
+            return scheme
+        except Exception:
+            continue
+    return None
+
+
+def _copy_view_area_color_scheme(doc, source_view, target_view, target_area_scheme_id):
+    area_category_id = DB.ElementId(DB.BuiltInCategory.OST_Areas)
+    source_scheme_id = _get_view_color_fill_scheme_id(source_view, area_category_id)
+    if source_scheme_id is None or source_scheme_id == DB.ElementId.InvalidElementId:
+        return False, "source view has no area color scheme assignment"
+    source_scheme = doc.GetElement(source_scheme_id)
+    if source_scheme is None:
+        return False, "source color scheme element not found"
+
+    target_scheme = _find_matching_target_color_scheme(doc, source_scheme, target_area_scheme_id)
+    if target_scheme is None:
+        return False, "no matching target color scheme found (same name/category in target area scheme)"
+
+    if not _copy_color_fill_scheme_data(source_scheme, target_scheme):
+        return False, "failed to copy color scheme entries"
+    if not _set_view_color_fill_scheme_id(target_view, area_category_id, target_scheme.Id):
+        return False, "failed to assign target color scheme to target view"
+    return True, ""
+
+
 def main():
     ui = _load_uiutils()
     doc = revit.doc
@@ -379,6 +542,12 @@ def main():
     if not level_indices:
         ui.uiUtils_alert("Select at least one level.", title="Copy Areas")
         return
+    copy_tags = _pick_copy_tags(ui)
+    if copy_tags is None:
+        return
+    copy_color_scheme = _pick_copy_color_scheme(ui)
+    if copy_color_scheme is None:
+        return
 
     source_scheme = schemes[source_index]
     target_scheme = schemes[target_index]
@@ -391,6 +560,7 @@ def main():
     total_areas = 0
     total_boundaries = 0
     total_tags = 0
+    total_color_scheme_views = 0
     total_failed = 0
 
     transaction = DB.Transaction(doc, "Copy Areas Between Schemes")
@@ -412,6 +582,17 @@ def main():
                     report_lines.append("{}: failed to create target area plan ({})".format(level.Name, ex))
                     total_failed += 1
                     continue
+
+            color_scheme_note = ""
+            if copy_color_scheme:
+                ok_scheme, scheme_msg = _copy_view_area_color_scheme(
+                    doc, source_view, target_view, target_scheme.Id
+                )
+                if ok_scheme:
+                    total_color_scheme_views += 1
+                else:
+                    total_failed += 1
+                    color_scheme_note = " | color scheme: {}".format(scheme_msg)
 
             boundary_curves = _get_boundary_curves(doc, source_view)
             if boundary_curves:
@@ -441,11 +622,12 @@ def main():
                 areas.append(area)
 
             tag_map = {}
-            for tag in _collect_area_tags(doc, source_view):
-                area_id = _get_tag_area_id(tag)
-                if area_id is None:
-                    continue
-                tag_map.setdefault(area_id, []).append(tag)
+            if copy_tags:
+                for tag in _collect_area_tags(doc, source_view):
+                    area_id = _get_tag_area_id(tag)
+                    if area_id is None:
+                        continue
+                    tag_map.setdefault(area_id, []).append(tag)
 
             for area in areas:
                 uv = _get_area_location_uv(area, source_view)
@@ -472,26 +654,36 @@ def main():
                 _copy_parameters(area, new_area, skip_names)
                 total_areas += 1
 
-                tags = tag_map.get(area.Id, [])
-                for tag in tags:
-                    try:
-                        point = tag.TagHeadPosition
-                    except Exception:
-                        point = None
-                    if point is None:
-                        continue
-                    new_tag = _create_area_tag(doc, target_view, new_area, point, source_tag=tag)
-                    if new_tag is not None:
-                        total_tags += 1
-                    else:
-                        total_failed += 1
+                if copy_tags:
+                    tags = tag_map.get(area.Id, [])
+                    for tag in tags:
+                        try:
+                            point = tag.TagHeadPosition
+                        except Exception:
+                            point = None
+                        if point is None:
+                            continue
+                        new_tag = _create_area_tag(doc, target_view, new_area, point, source_tag=tag)
+                        if new_tag is not None:
+                            total_tags += 1
+                        else:
+                            total_failed += 1
 
-            report_lines.append("{}: areas {} | boundaries {} | tags {}".format(
-                level.Name,
-                len(areas),
-                len(boundary_curves),
-                len(tag_map)
-            ))
+            if copy_tags:
+                report_lines.append("{}: areas {} | boundaries {} | tags {}{}".format(
+                    level.Name,
+                    len(areas),
+                    len(boundary_curves),
+                    len(tag_map),
+                    color_scheme_note,
+                ))
+            else:
+                report_lines.append("{}: areas {} | boundaries {}{}".format(
+                    level.Name,
+                    len(areas),
+                    len(boundary_curves),
+                    color_scheme_note,
+                ))
 
         transaction.Commit()
     except Exception:
@@ -505,7 +697,10 @@ def main():
     report_lines.append("")
     report_lines.append("Created areas: {}".format(total_areas))
     report_lines.append("Created boundaries: {}".format(total_boundaries))
-    report_lines.append("Created tags: {}".format(total_tags))
+    report_lines.append("Created tags: {}".format(total_tags if copy_tags else 0))
+    report_lines.append("Applied color schemes to target views: {}".format(
+        total_color_scheme_views if copy_color_scheme else 0
+    ))
     report_lines.append("Failures: {}".format(total_failed))
 
     ui.uiUtils_show_text_report(
