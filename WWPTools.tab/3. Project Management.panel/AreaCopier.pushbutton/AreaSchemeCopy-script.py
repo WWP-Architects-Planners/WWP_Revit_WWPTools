@@ -331,6 +331,32 @@ def _pick_index(ui, items, title, prompt):
     return selected[0] if selected else -1
 
 
+def _pick_source_target_schemes(ui, scheme_names):
+    result = ui.uiUtils_select_sheet_renumber_inputs(
+        categories=scheme_names,
+        print_sets=scheme_names,
+        title="Copy Areas - Schemes",
+        category_label="Source area scheme:",
+        printset_label="Target area scheme:",
+        starting_label="(Optional note)",
+        cancel_text="Cancel",
+        width=620,
+        height=340,
+    )
+    if not result:
+        return -1, -1
+    source_name = (result.get("category") or "").strip()
+    target_name = (result.get("printset") or "").strip()
+    if not source_name or not target_name:
+        return -1, -1
+    try:
+        source_index = scheme_names.index(source_name)
+        target_index = scheme_names.index(target_name)
+    except Exception:
+        return -1, -1
+    return source_index, target_index
+
+
 def _pick_levels(ui, items, title, prompt):
     selected = ui.uiUtils_select_indices(
         items,
@@ -526,12 +552,8 @@ def main():
     scheme_names = [s.Name for s in schemes]
     level_names = [l.Name for l in levels]
 
-    source_index = _pick_index(ui, scheme_names, "Copy Areas - Source", "Source area scheme:")
-    if source_index < 0:
-        return
-
-    target_index = _pick_index(ui, scheme_names, "Copy Areas - Target", "Target area scheme:")
-    if target_index < 0:
+    source_index, target_index = _pick_source_target_schemes(ui, scheme_names)
+    if source_index < 0 or target_index < 0:
         return
 
     if source_index == target_index:
