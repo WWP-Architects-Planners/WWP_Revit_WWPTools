@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import importlib
+import json
 import os
 import re
 import shutil
@@ -13,7 +14,7 @@ import clr
 from System import String
 from System.Collections.Generic import List
 
-from pyrevit import DB, revit, script
+from pyrevit import DB
 
 
 
@@ -28,6 +29,7 @@ CONFIG_LAST_CSV_COLUMN_HEADERS = "last_csv_column_headers"
 CONFIG_LAST_CSV_GROUP_HEADERS = "last_csv_group_headers"
 CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
 CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
+ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 
 
 def sanitize_sheet_name(name):
@@ -43,6 +45,79 @@ def sanitize_file_name(name):
     invalid = r'[<>:"/\\|?*]'
     safe = re.sub(invalid, "_", name).strip()
     return safe or "Schedule"
+
+
+def normalize_excel_output_path(path, default_ext=".xlsx"):
+    value = (path or "").strip()
+    if not value:
+        return ""
+    root, ext = os.path.splitext(value)
+    if not ext:
+        return value + default_ext
+    if ext.lower() in ALLOWED_EXCEL_EXTENSIONS:
+        return value
+    return ""
+
+
+def get_active_doc():
+    """Resolve current document without importing pyrevit.revit (CPython 6.1 safety)."""
+    try:
+        uidoc = __revit__.ActiveUIDocument
+        if uidoc:
+            return uidoc.Document
+    except Exception:
+        pass
+    return None
+
+
+class _LocalConfig(object):
+    def __init__(self, file_path, data):
+        object.__setattr__(self, "_file_path", file_path)
+        object.__setattr__(self, "_data", data or {})
+
+    def __getattr__(self, name):
+        return self._data.get(name)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+        else:
+            self._data[name] = value
+
+    def save(self):
+        folder = os.path.dirname(self._file_path)
+        if folder and not os.path.isdir(folder):
+            os.makedirs(folder)
+        with open(self._file_path, "w") as fp:
+            json.dump(self._data, fp, indent=2)
+
+
+def _local_config_path():
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    return os.path.join(appdata, "pyRevit", "WWPTools", "Export2Ex.config.json")
+
+
+def get_config_and_saver():
+    """Use pyRevit config when available; fallback to local JSON on CPython 6.1 issues."""
+    try:
+        from pyrevit import script as pyrevit_script
+        cfg = pyrevit_script.get_config()
+        return cfg, pyrevit_script.save_config
+    except Exception:
+        cfg_path = _local_config_path()
+        data = {}
+        if os.path.isfile(cfg_path):
+            try:
+                with open(cfg_path, "r") as fp:
+                    loaded = json.load(fp)
+                if isinstance(loaded, dict):
+                    data = loaded
+            except Exception:
+                data = {}
+        cfg = _LocalConfig(cfg_path, data)
+        return cfg, cfg.save
 
 
 def get_default_dir(doc):
@@ -432,7 +507,7 @@ def _show_export_form(
         init_dir = os.path.dirname(current) if current else ""
         file_path = ui.uiUtils_save_file_dialog(
             title="Export Schedules",
-            filter_text="Excel Workbook (*.xlsx)|*.xlsx",
+            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
             default_extension="xlsx",
             initial_directory=init_dir,
             file_name=os.path.basename(current) if current else "Schedules.xlsx",
@@ -783,7 +858,10 @@ def export_to_excel(
 
     used_names = set()
     if os.path.exists(file_path):
-        workbook = openpyxl.load_workbook(file_path)
+        load_kwargs = {}
+        if os.path.splitext(file_path)[1].lower() == ".xlsm":
+            load_kwargs["keep_vba"] = True
+        workbook = openpyxl.load_workbook(file_path, **load_kwargs)
     else:
         workbook = openpyxl.Workbook()
     temp_dir = tempfile.mkdtemp(prefix="wwp_schedules_")
@@ -957,8 +1035,12 @@ def select_csv_delimiter(ui, default_delimiter=","):
 
 
 def main():
-    doc = revit.doc
-    config = script.get_config()
+    doc = get_active_doc()
+    if doc is None:
+        ui = load_uiutils()
+        ui.uiUtils_alert("No active Revit document found.", title="Multiple Schedules Exporter")
+        return
+    config, save_config = get_config_and_saver()
     ui = load_uiutils()
 
     schedules = collect_schedules(doc)
@@ -1023,12 +1105,13 @@ def main():
         quote_all = bool(inputs.get("csv_quote_all"))
         mode = int(inputs.get("mode", 0))
         if mode == 0:
-            file_path = (inputs.get("excel_path") or "").strip()
+            file_path = normalize_excel_output_path(inputs.get("excel_path"))
             if not file_path:
-                ui.uiUtils_alert("Choose an Excel file path.", title="Multiple Schedules Exporter")
+                ui.uiUtils_alert(
+                    "Choose an Excel file path ending with .xlsx or .xlsm.",
+                    title="Multiple Schedules Exporter",
+                )
                 return
-            if not file_path.lower().endswith(".xlsx"):
-                file_path = "{}.xlsx".format(file_path)
             success = export_to_excel(
                 doc,
                 selected_views,
@@ -1074,7 +1157,7 @@ def main():
         config.last_csv_column_headers = export_column_headers
         config.last_csv_group_headers = export_group_headers
         config.last_csv_grouped_column_headers = export_grouped_column_headers
-        script.save_config()
+        save_config()
         ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
         return
 
@@ -1108,15 +1191,18 @@ def main():
         init_dir = ensure_existing_dir(last_excel_dir, default_dir)
         file_path = ui.uiUtils_save_file_dialog(
             title="Export Schedules",
-            filter_text="Excel Workbook (*.xlsx)|*.xlsx",
+            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
             default_extension="xlsx",
             initial_directory=init_dir,
             file_name=os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx",
         )
+        file_path = normalize_excel_output_path(file_path)
         if not file_path:
+            ui.uiUtils_alert(
+                "Choose an Excel file path ending with .xlsx or .xlsm.",
+                title="Multiple Schedules Exporter",
+            )
             return
-        if not file_path.lower().endswith(".xlsx"):
-            file_path = "{}.xlsx".format(file_path)
         success = export_to_excel(doc, selected_views, file_path, ui)
         if not success:
             return
@@ -1144,7 +1230,7 @@ def main():
         config.last_csv_mode = csv_mode
         config.last_csv_delim = csv_delim
 
-    script.save_config()
+    save_config()
     ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
 
 
