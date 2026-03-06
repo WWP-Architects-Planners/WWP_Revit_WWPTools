@@ -5,11 +5,15 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.9.1] - 2026-02-27
+## [1.2.0] - 2026-03-06
+- Installer refresh release so users on installer `1.1.9` can reinstall and pull the latest script set from `main`
 - Schedule2Excel/CSV: fixed Excel save path handling so `.xlsm` stays `.xlsm` (no forced `.xlsx` append)
 - Schedule2Excel/CSV: Excel picker now supports both `.xlsx` and `.xlsm`
 - Schedule2Excel/CSV: preserve VBA when exporting into existing `.xlsm` files
 - Schedule2Excel/CSV: hardened CPython compatibility for pyRevit 6.1 by removing `pyrevit.revit` dependency path and adding safe config fallback
+- Copy Color Scheme: added overwrite-vs-create target scope option and fixed overwrite persistence for `In Use` entries
+- Copy Color Scheme: simplified logging to show only actionable copy/finalize results
+- Room to Area Boundary: added multi-area-plan processing and consolidated reporting
 
 ## [1.1.8] - 2026-02-17
 - Sheet Scale Updater: ignore legend viewports when calculating sheet scale
@@ -137,3 +141,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.1]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.1
 [1.1.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.0
 [1.0.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.0.0
+[1.2.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.2.0
