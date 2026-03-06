@@ -470,6 +470,39 @@ def _copy_room_params_to_area(room, area, skip_names=None):
     return copied, failed
 
 
+def _get_room_name_number(room):
+    """Return (name, number) using Revit's built-in room parameters."""
+    name = None
+    number = None
+
+    try:
+        p_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME)
+        if p_name:
+            name = p_name.AsString()
+    except Exception:
+        name = None
+
+    try:
+        p_num = room.get_Parameter(DB.BuiltInParameter.ROOM_NUMBER)
+        if p_num:
+            number = p_num.AsString()
+    except Exception:
+        number = None
+
+    if name is None:
+        try:
+            name = getattr(room, "Name", None)
+        except Exception:
+            name = None
+    if number is None:
+        try:
+            number = getattr(room, "Number", None)
+        except Exception:
+            number = None
+
+    return (name or ""), (number or "")
+
+
 def main():
     ui = _load_uiutils()
     doc = revit.doc
@@ -483,67 +516,50 @@ def main():
         return
 
     labels = [_format_area_plan_label(doc, v) for v in area_plans]
-    selected = ui.uiUtils_select_indices(
+    selected_indices = ui.uiUtils_select_indices(
         labels,
         title="Room → Area Boundaries",
-        prompt="Select target Area Plan (level):",
-        multiselect=False,
+        prompt="Select target Area Plan(s) (levels):",
+        multiselect=True,
         width=980,
         height=540,
     )
-    if not selected:
+    if not selected_indices:
         return
 
-    target_view = area_plans[int(selected[0])]
-    target_level = None
-    try:
-        target_level = target_view.GenLevel
-    except Exception:
-        target_level = None
+    target_views = []
+    for idx in selected_indices:
+        try:
+            i = int(idx)
+        except Exception:
+            continue
+        if 0 <= i < len(area_plans):
+            target_views.append(area_plans[i])
 
-    if target_level is None:
-        ui.uiUtils_alert("Selected Area Plan does not have an associated level.", title="Room → Area Boundaries")
+    if not target_views:
         return
 
-    # Determine rooms to process
+    # Determine room set once (then filter per level)
     selected_rooms = _get_selected_rooms(doc)
-    if selected_rooms:
-        rooms = [r for r in selected_rooms if getattr(r, "LevelId", None) == target_level.Id]
-        if not rooms:
-            if not ui.uiUtils_confirm(
-                "Selected elements are Rooms, but none are on level '{}'.\nProcess ALL Rooms on this level instead?".format(target_level.Name),
-                title="Room → Area Boundaries",
-            ):
-                return
-            rooms = _collect_rooms_on_level(doc, target_level.Id)
-    else:
+    if not selected_rooms:
         if not ui.uiUtils_confirm(
-            "No Rooms selected.\nProcess ALL Rooms on level '{}'?".format(target_level.Name),
+            "No Rooms selected.\nProcess ALL Rooms on the selected level(s)?",
             title="Room → Area Boundaries",
         ):
             return
-        rooms = _collect_rooms_on_level(doc, target_level.Id)
+    
+    # Totals across all targets
+    total_created_boundaries = 0
+    total_failed_boundaries = 0
+    total_skipped_overlapped = 0
+    total_deleted_overlapped = 0
+    total_created_areas = 0
+    total_failed_areas = 0
+    total_copied_params = 0
+    total_failed_params = 0
+    total_rooms_processed = 0
 
-    if not rooms:
-        ui.uiUtils_alert("No Rooms found on level '{}'.".format(target_level.Name), title="Room → Area Boundaries")
-        return
-
-    elevation = 0.0
-    try:
-        elevation = float(target_level.Elevation)
-    except Exception:
-        elevation = 0.0
-
-    sketch_plane = _ensure_sketch_plane(doc, target_view)
-
-    created_boundaries = 0
-    failed_boundaries = 0
-    skipped_overlapped_boundaries = 0
-    deleted_overlapped_boundaries = 0
-    created_areas = 0
-    failed_areas = 0
-    copied_params = 0
-    failed_params = 0
+    report = []
 
     # Avoid copying these since Name/Number are handled directly
     skip_names = {"Name", "Number", "Area", "Perimeter", "Level"}
@@ -552,62 +568,119 @@ def main():
     try:
         t.Start()
 
-        # Kill existing overlapped boundaries in the target view first.
-        # Also capture a geometry-key set so we can skip creating duplicates.
-        deleted_overlapped_boundaries, existing_keys = _delete_duplicate_boundaries_in_view(
-            doc,
-            target_view,
-            step=1e-4,
-        )
-        if existing_keys is None:
-            existing_keys = set()
+        for target_view in target_views:
+            target_level = None
+            try:
+                target_level = target_view.GenLevel
+            except Exception:
+                target_level = None
+            if target_level is None:
+                report.append("{}: skipped (no associated level)".format(target_view.Name))
+                continue
 
-        for room in rooms:
-            # Create boundaries
-            curves = _get_room_boundary_curves(room)
-            for c in curves:
-                tc = _move_curve_to_elevation(c, elevation)
-                key = _curve_key(tc, step=1e-4)
-                if key is not None and key in existing_keys:
-                    skipped_overlapped_boundaries += 1
+            elevation = 0.0
+            try:
+                elevation = float(target_level.Elevation)
+            except Exception:
+                elevation = 0.0
+
+            rooms = []
+            if selected_rooms:
+                rooms = [r for r in selected_rooms if getattr(r, "LevelId", None) == target_level.Id and _is_valid_room(r)]
+            else:
+                rooms = _collect_rooms_on_level(doc, target_level.Id)
+
+            if not rooms:
+                report.append("{}: {} | rooms 0 (nothing to do)".format(
+                    _format_area_plan_label(doc, target_view),
+                    target_level.Name,
+                ))
+                continue
+
+            sketch_plane = _ensure_sketch_plane(doc, target_view)
+
+            created_boundaries = 0
+            failed_boundaries = 0
+            skipped_overlapped_boundaries = 0
+            deleted_overlapped_boundaries = 0
+            created_areas = 0
+            failed_areas = 0
+            copied_params = 0
+            failed_params = 0
+
+            deleted_overlapped_boundaries, existing_keys = _delete_duplicate_boundaries_in_view(
+                doc,
+                target_view,
+                step=1e-4,
+            )
+            if existing_keys is None:
+                existing_keys = set()
+
+            for room in rooms:
+                curves = _get_room_boundary_curves(room)
+                for c in curves:
+                    tc = _move_curve_to_elevation(c, elevation)
+                    key = _curve_key(tc, step=1e-4)
+                    if key is not None and key in existing_keys:
+                        skipped_overlapped_boundaries += 1
+                        continue
+                    try:
+                        doc.Create.NewAreaBoundaryLine(sketch_plane, tc, target_view)
+                        created_boundaries += 1
+                        if key is not None:
+                            existing_keys.add(key)
+                    except Exception:
+                        failed_boundaries += 1
+
+                uv = _get_location_uv(room)
+                if uv is None:
+                    failed_areas += 1
                     continue
+
                 try:
-                    doc.Create.NewAreaBoundaryLine(sketch_plane, tc, target_view)
-                    created_boundaries += 1
-                    if key is not None:
-                        existing_keys.add(key)
+                    area = doc.Create.NewArea(target_view, uv)
                 except Exception:
-                    failed_boundaries += 1
+                    failed_areas += 1
+                    continue
 
-            # Place area
-            uv = _get_location_uv(room)
-            if uv is None:
-                failed_areas += 1
-                continue
+                created_areas += 1
 
-            try:
-                area = doc.Create.NewArea(target_view, uv)
-            except Exception:
-                failed_areas += 1
-                continue
+                room_name, room_number = _get_room_name_number(room)
+                try:
+                    if room_number:
+                        area.Number = room_number
+                except Exception:
+                    pass
+                try:
+                    if room_name:
+                        area.Name = room_name
+                except Exception:
+                    pass
 
-            created_areas += 1
+                c_ok, c_fail = _copy_room_params_to_area(room, area, skip_names=skip_names)
+                copied_params += c_ok
+                failed_params += c_fail
 
-            # Set Name/Number
-            try:
-                if hasattr(room, "Number"):
-                    area.Number = room.Number
-            except Exception:
-                pass
-            try:
-                if hasattr(room, "Name"):
-                    area.Name = room.Name
-            except Exception:
-                pass
+            report.append(
+                "{} | rooms {} | areas {} | boundaries {} | skipped dup {} | deleted dup {}".format(
+                    _format_area_plan_label(doc, target_view),
+                    len(rooms),
+                    created_areas,
+                    created_boundaries,
+                    skipped_overlapped_boundaries,
+                    deleted_overlapped_boundaries,
+                )
+            )
 
-            c_ok, c_fail = _copy_room_params_to_area(room, area, skip_names=skip_names)
-            copied_params += c_ok
-            failed_params += c_fail
+            total_rooms_processed += len(rooms)
+            total_created_boundaries += created_boundaries
+            total_failed_boundaries += failed_boundaries
+            total_skipped_overlapped += skipped_overlapped_boundaries
+            total_deleted_overlapped += deleted_overlapped_boundaries
+            total_created_areas += created_areas
+            total_failed_areas += failed_areas
+            total_copied_params += copied_params
+            total_failed_params += failed_params
 
         t.Commit()
 
@@ -619,27 +692,26 @@ def main():
         ui.uiUtils_alert(traceback.format_exc(), title="Room → Area Boundaries")
         return
 
-    report = []
-    report.append("Target Area Plan: {}".format(target_view.Name))
-    report.append("Level: {}".format(target_level.Name))
-    report.append("Rooms processed: {}".format(len(rooms)))
     report.append("")
-    report.append("Created Area Boundary Lines: {}".format(created_boundaries))
-    report.append("Failed Area Boundary Lines: {}".format(failed_boundaries))
-    report.append("Skipped overlapped boundary curves: {}".format(skipped_overlapped_boundaries))
-    report.append("Deleted overlapped existing boundaries: {}".format(deleted_overlapped_boundaries))
-    report.append("Created Areas: {}".format(created_areas))
-    report.append("Failed Areas: {}".format(failed_areas))
-    report.append("Copied parameter values: {}".format(copied_params))
-    report.append("Failed parameter sets (writable match but Set failed): {}".format(failed_params))
+    report.append("Totals")
+    report.append("Targets processed: {}".format(len(target_views)))
+    report.append("Rooms processed: {}".format(total_rooms_processed))
+    report.append("Created Area Boundary Lines: {}".format(total_created_boundaries))
+    report.append("Failed Area Boundary Lines: {}".format(total_failed_boundaries))
+    report.append("Skipped overlapped boundary curves: {}".format(total_skipped_overlapped))
+    report.append("Deleted overlapped existing boundaries: {}".format(total_deleted_overlapped))
+    report.append("Created Areas: {}".format(total_created_areas))
+    report.append("Failed Areas: {}".format(total_failed_areas))
+    report.append("Copied parameter values: {}".format(total_copied_params))
+    report.append("Failed parameter sets (writable match but Set failed): {}".format(total_failed_params))
 
     ui.uiUtils_show_text_report(
         "Room → Area Boundaries - Results",
         "\n".join(report),
         ok_text="Close",
         cancel_text=None,
-        width=780,
-        height=520,
+        width=900,
+        height=620,
     )
 
 
