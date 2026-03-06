@@ -9,6 +9,23 @@ except Exception:
     List = None
 
 
+def _log(log, message):
+    if callable(log):
+        try:
+            log(message)
+        except Exception:
+            pass
+
+
+def _to_entry_collection(entries):
+    if List is None:
+        return list(entries)
+    net_list = List[DB.ColorFillSchemeEntry]()
+    for entry in entries:
+        net_list.Add(entry)
+    return net_list
+
+
 def _elem_id_int(elem_id):
     try:
         return int(elem_id.IntegerValue)
@@ -171,6 +188,57 @@ def _entry_caption(entry):
     return ""
 
 
+def _storage_type_name(storage_type):
+    try:
+        return str(storage_type)
+    except Exception:
+        return "<unknown>"
+
+
+def _format_entry_value(entry):
+    try:
+        storage_type = getattr(entry, "StorageType", None)
+        value = _entry_get_value(entry, storage_type)
+        if storage_type == DB.StorageType.ElementId:
+            return "ElementId({})".format(_elem_id_int(value))
+        if storage_type == DB.StorageType.Double:
+            return "{:.6f}".format(float(value))
+        if value is None:
+            return "<None>"
+        return str(value)
+    except Exception:
+        return "<unreadable>"
+
+
+def _format_visual_signature(sig):
+    if sig is None:
+        return "visuals=<unreadable>"
+    rgb, fill_pattern_id, visible = sig
+    return "rgb={}, fillPatternId={}, visible={}".format(rgb, fill_pattern_id, visible)
+
+
+def _describe_entry(entry, index=None):
+    prefix = "entry"
+    if index is not None:
+        prefix = "entry[{}]".format(index)
+    return "{} caption='{}' storage={} value={} {}".format(
+        prefix,
+        _entry_caption(entry),
+        _storage_type_name(getattr(entry, "StorageType", None)),
+        _format_entry_value(entry),
+        _format_visual_signature(_entry_visual_signature(entry)),
+    )
+
+
+def _describe_scheme(scheme):
+    return "scheme='{}' id={} categoryId={} areaSchemeId={}".format(
+        getattr(scheme, "Name", "<unnamed>"),
+        _elem_id_int(getattr(scheme, "Id", None)),
+        _elem_id_int(getattr(scheme, "CategoryId", None)),
+        _elem_id_int(_scheme_area_scheme_id(scheme)),
+    )
+
+
 def _build_custom_entry_from_source(source_entry):
     try:
         storage_type = getattr(source_entry, "StorageType", None)
@@ -181,29 +249,158 @@ def _build_custom_entry_from_source(source_entry):
         return None
 
     value = _entry_get_value(source_entry, storage_type)
-    if storage_type == DB.StorageType.ElementId:
-        value = DB.ElementId.InvalidElementId
     if not _entry_set_value(custom, storage_type, value):
         return None
 
-    for attr in ("Color", "FillPatternId", "IsVisible", "Visible"):
-        if hasattr(source_entry, attr) and hasattr(custom, attr):
+    _copy_entry_visuals(source_entry, custom)
+    return custom
+
+
+def _clone_revit_color(color_obj):
+    try:
+        if color_obj is None:
+            return None
+        r = int(getattr(color_obj, "Red"))
+        g = int(getattr(color_obj, "Green"))
+        b = int(getattr(color_obj, "Blue"))
+        return DB.Color(r, g, b)
+    except Exception:
+        return color_obj
+
+
+def _copy_entry_visuals(source_entry, target_entry):
+    # Some Revit versions are picky about mutating the Color object directly.
+    if hasattr(source_entry, "Color") and hasattr(target_entry, "Color"):
+        try:
+            target_entry.Color = _clone_revit_color(getattr(source_entry, "Color"))
+        except Exception:
+            pass
+
+    for attr in ("FillPatternId", "IsVisible", "Visible"):
+        if hasattr(source_entry, attr) and hasattr(target_entry, attr):
             try:
-                setattr(custom, attr, getattr(source_entry, attr))
+                setattr(target_entry, attr, getattr(source_entry, attr))
             except Exception:
                 pass
 
     caption = _entry_caption(source_entry)
     if caption:
         try:
-            setter = getattr(custom, "SetCaption", None)
+            setter = getattr(target_entry, "SetCaption", None)
             if callable(setter):
                 setter(caption)
-            elif hasattr(custom, "Caption"):
-                custom.Caption = caption
+            elif hasattr(target_entry, "Caption"):
+                target_entry.Caption = caption
         except Exception:
             pass
-    return custom
+
+
+def _patch_entry_colors(target_entries, source_entries, log=None, stage="patch"):
+    """Re-apply source visuals onto target entries.
+
+    Called after SetEntries to fix visuals that Revit may auto-reset for entries that
+    are currently "In Use".
+
+    Match order:
+      1) caption (case-insensitive)
+      2) entry value (storage-type aware)
+      3) index fallback (when counts align)
+    """
+    src_by_cap = {}
+    for se in source_entries:
+        cap = _entry_caption(se).strip().lower()
+        if cap:
+            src_by_cap[cap] = se
+
+    unmatched_targets = []
+    matched_count = 0
+    mismatch_count = 0
+    for target_index, te in enumerate(target_entries):
+        cap = _entry_caption(te).strip().lower()
+        se = src_by_cap.get(cap)
+        match_reason = None
+        if se is None:
+            for source_index, _se in enumerate(source_entries):
+                if _same_entry_value(_se, te):
+                    se = _se
+                    match_reason = "value"
+                    break
+        else:
+            match_reason = "caption"
+        if se is None:
+            unmatched_targets.append((target_index, te))
+            _log(log, "[{}] skipped target {} reason=no source match".format(stage, _describe_entry(te, target_index)))
+            continue
+        matched_count += 1
+        _copy_entry_visuals(se, te)
+        if not _visuals_match_enough(se, te):
+            mismatch_count += 1
+            _log(log, "[{}] visual mismatch target {} matchedBy={}".format(stage, _describe_entry(te, target_index), match_reason or "unknown"))
+
+    # Index fallback: common case for range schemes where captions may be empty and
+    # values can be regenerated; if counts match, treat index as authoritative.
+    try:
+        if unmatched_targets and len(target_entries) == len(source_entries) and matched_count == 0:
+            for idx, te in unmatched_targets:
+                try:
+                    _copy_entry_visuals(source_entries[idx], te)
+                except Exception:
+                    _log(log, "[{}] index fallback failed for target {}".format(stage, _describe_entry(te, idx)))
+                    continue
+        elif unmatched_targets:
+            _log(
+                log,
+                "[{}] index fallback skipped reason=partial value/caption matching already succeeded".format(stage),
+            )
+    except Exception:
+        pass
+    _log(log, "[{}] summary matched={} unmatched={} mismatched={}".format(stage, matched_count, len(unmatched_targets), mismatch_count))
+
+
+def _entry_visual_signature(entry):
+    """Extract a minimal signature to compare if visuals match."""
+    try:
+        color = getattr(entry, "Color", None)
+        rgb = None
+        if color is not None:
+            try:
+                rgb = (int(color.Red), int(color.Green), int(color.Blue))
+            except Exception:
+                rgb = None
+        fp = getattr(entry, "FillPatternId", None)
+        fp_i = None
+        try:
+            fp_i = int(fp.IntegerValue) if fp is not None else None
+        except Exception:
+            fp_i = None
+        vis = None
+        for attr in ("IsVisible", "Visible"):
+            if hasattr(entry, attr):
+                try:
+                    vis = bool(getattr(entry, attr))
+                    break
+                except Exception:
+                    continue
+        return (rgb, fp_i, vis)
+    except Exception:
+        return None
+
+
+def _visuals_match_enough(source_entry, target_entry):
+    try:
+        return _entry_visual_signature(source_entry) == _entry_visual_signature(target_entry)
+    except Exception:
+        return False
+
+
+def _regenerate_scheme_document(scheme):
+    """Best-effort Document.Regenerate to let Revit settle scheme entry state."""
+    try:
+        doc = getattr(scheme, "Document", None)
+        if doc is not None:
+            doc.Regenerate()
+    except Exception:
+        pass
 
 
 def _same_entry_value(a, b):
@@ -221,118 +418,153 @@ def _same_entry_value(a, b):
                 return ai == bi
             except Exception:
                 return False
+        if st_a == DB.StorageType.Double:
+            try:
+                fa = float(va)
+                fb = float(vb)
+                return abs(fa - fb) <= 1e-8
+            except Exception:
+                return False
+        if st_a == DB.StorageType.String:
+            try:
+                return ("" if va is None else str(va)).strip() == ("" if vb is None else str(vb)).strip()
+            except Exception:
+                return False
         return va == vb
     except Exception:
         return False
 
 
-def _overwrite_existing_matching_entry(target, source_entry):
+def _overwrite_existing_matching_entry(target, source_entry, log=None, source_index=None):
     try:
         entries = list(target.GetEntries())
     except Exception:
         entries = []
     src_caption = _entry_caption(source_entry).strip().lower()
-    for existing in entries:
+    for target_index, existing in enumerate(entries):
         try:
             same = _same_entry_value(existing, source_entry)
+            match_reason = "value" if same else None
             if not same and src_caption:
                 ex_caption = _entry_caption(existing).strip().lower()
                 same = ex_caption and ex_caption == src_caption
+                if same:
+                    match_reason = "caption"
             if not same:
                 continue
-            for attr in ("Color", "FillPatternId", "IsVisible", "Visible"):
-                if hasattr(source_entry, attr) and hasattr(existing, attr):
-                    try:
-                        setattr(existing, attr, getattr(source_entry, attr))
-                    except Exception:
-                        pass
+            _copy_entry_visuals(source_entry, existing)
+            if not _visuals_match_enough(source_entry, existing):
+                _log(log, "[fallback-overwrite] visual mismatch target {} matchedBy={}".format(_describe_entry(existing, target_index), match_reason or "unknown"))
             return True
         except Exception:
             continue
+    _log(log, "[fallback-overwrite] skipped source {} reason=no matching target entry".format(_describe_entry(source_entry, source_index)))
     return False
 
 
-def copy_scheme_data(source, target):
-    for attr in ("Name", "Title", "IsByRange", "IsByValue", "IsByPercentage"):
+def copy_scheme_data(source, target, log=None):
+    _log(log, "[copy] start {} -> {}".format(_describe_scheme(source), _describe_scheme(target)))
+    for attr in ("Title", "IsByRange", "IsByValue", "IsByPercentage"):
         if hasattr(source, attr) and hasattr(target, attr):
             try:
                 setattr(target, attr, getattr(source, attr))
             except Exception:
+                _log(log, "[copy] skipped scheme attr {} reason=setattr-failed".format(attr))
                 pass
     for attr in ("ParameterDefinition", "ParameterId"):
         if hasattr(source, attr) and hasattr(target, attr):
             try:
                 setattr(target, attr, getattr(source, attr))
             except Exception:
+                _log(log, "[copy] skipped scheme attr {} reason=setattr-failed".format(attr))
                 pass
 
     try:
         source_entries = list(source.GetEntries())
     except Exception:
         return False, "Unable to read entries from source scheme."
+    _log(log, "[copy] source entries count={}".format(len(source_entries)))
 
-    try:
-        clear_entries = getattr(target, "ClearEntries", None)
-        if callable(clear_entries):
-            clear_entries()
-        else:
-            remove_entry = getattr(target, "RemoveEntry", None)
-            if callable(remove_entry):
-                for entry in list(target.GetEntries()):
-                    remove_entry(entry)
-    except Exception:
-        pass
+    # Clone each entry so the target scheme receives fresh, independent objects.
+    # Passing source entries directly can cause Revit to regenerate "in use" colors.
+    entries_to_set = []
+    for idx, _e in enumerate(source_entries):
+        _clone_fn = getattr(_e, "Clone", None)
+        if callable(_clone_fn):
+            try:
+                entries_to_set.append(_clone_fn())
+                continue
+            except Exception:
+                pass
+        _custom = _build_custom_entry_from_source(_e)
+        entries_to_set.append(_custom if _custom is not None else _e)
 
     set_entries_applied = False
     try:
         set_entries = getattr(target, "SetEntries", None)
         if callable(set_entries):
-            if List is not None:
-                set_entries(List[DB.ColorFillSchemeEntry](source_entries))
-            else:
-                set_entries(list(source_entries))
+            _log(log, "[copy] applying SetEntries targetCountBefore={}".format(len(list(target.GetEntries()))))
+            set_entries(_to_entry_collection(entries_to_set))
+            _log(log, "[copy] SetEntries applied candidateCount={}".format(len(entries_to_set)))
+
+            # Revit can auto-reset colors for entries that are currently "In Use" in the
+            # model shortly after SetEntries. Regenerate, then patch the now-live target
+            # entries in-place using source as truth.
+            _regenerate_scheme_document(target)
+            _log(log, "[copy] regenerated document after SetEntries")
             try:
-                if len(list(target.GetEntries())) == len(source_entries):
+                refreshed = list(target.GetEntries())
+                _log(log, "[copy] target entries after SetEntries count={}".format(len(refreshed)))
+                if refreshed:
+                    _patch_entry_colors(refreshed, source_entries, log=log, stage="post-set")
+                    _regenerate_scheme_document(target)
+                    _log(log, "[copy] regenerated document after post-set patch")
+            except Exception:
+                _log(log, "[copy] skipped post-set patch reason=exception")
+                pass
+            try:
+                final_entries = list(target.GetEntries())
+                _log(log, "[copy] target entries final count after SetEntries path={}".format(len(final_entries)))
+                if len(final_entries) == len(entries_to_set):
                     set_entries_applied = True
+                    _log(log, "[copy] SetEntries path succeeded")
                     return True, None
             except Exception:
                 set_entries_applied = True
+                _log(log, "[copy] SetEntries path succeeded; target entry recount unavailable")
                 return True, None
-    except Exception:
+        else:
+            _log(log, "[copy] SetEntries unavailable on target")
+    except Exception as ex:
+        _log(log, "[copy] SetEntries failed; falling back to overwrite/add path reason={}".format(str(ex)))
         pass
-
-    if not set_entries_applied:
-        try:
-            clear_entries = getattr(target, "ClearEntries", None)
-            if callable(clear_entries):
-                clear_entries()
-            else:
-                remove_entry = getattr(target, "RemoveEntry", None)
-                if callable(remove_entry):
-                    for entry in list(target.GetEntries()):
-                        remove_entry(entry)
-        except Exception:
-            pass
 
     add_entry = getattr(target, "AddEntry", None)
     if not callable(add_entry):
         return False, "Target scheme API does not support SetEntries/AddEntry."
 
     added = 0
+    overwritten = 0
     failures = []
-    for entry in source_entries:
+    # Fallback: try to overwrite existing entries first (works better when entries
+    # are "in use"), then add missing ones.
+    for idx, entry in enumerate(source_entries):
+        try:
+            if _overwrite_existing_matching_entry(target, entry, log=log, source_index=idx):
+                added += 1
+                overwritten += 1
+                continue
+        except Exception:
+            _log(log, "[fallback-overwrite] exception while matching source entry[{}]".format(idx))
+            pass
+
         try:
             clone = getattr(entry, "Clone", None)
             new_entry = clone() if callable(clone) else entry
             add_entry(new_entry)
             added += 1
+            continue
         except Exception as ex_add:
-            try:
-                if _overwrite_existing_matching_entry(target, entry):
-                    added += 1
-                    continue
-            except Exception:
-                pass
             try:
                 custom_entry = _build_custom_entry_from_source(entry)
                 if custom_entry is not None:
@@ -344,11 +576,55 @@ def copy_scheme_data(source, target):
                     failures.append(str(ex))
             if len(failures) < 5:
                 failures.append(str(ex_add) or "failed to add entry")
+            _log(log, "[fallback-add] skipped source {} reason={}".format(_describe_entry(entry, idx), str(ex_add) or "failed to add entry"))
+
+    _regenerate_scheme_document(target)
+    _log(log, "[fallback] regenerated document after overwrite/add path")
 
     if added < len(source_entries):
         detail = (" Errors: " + " | ".join(failures)) if failures else ""
+        _log(log, "[fallback] incomplete overwritten={} addedNew={} sourceCount={}".format(overwritten, added - overwritten, len(source_entries)))
         return False, "Only copied {} of {} entries.{}".format(added, len(source_entries), detail)
+    _log(log, "[fallback] completed overwritten={} addedNew={} sourceCount={}".format(overwritten, added - overwritten, len(source_entries)))
     return True, None
+
+
+def force_overwrite_scheme_visuals(source, target, log=None):
+    """Force overwrite entry visuals on the target scheme.
+
+    Some Revit versions can reset/randomize colors for schemes that are currently
+    in use, especially at transaction commit. Calling this again in a follow-up
+    transaction (after the initial copy) increases reliability.
+    """
+    try:
+        source_entries = list(source.GetEntries())
+    except Exception:
+        return False, "Unable to read entries from source scheme."
+    _log(log, "[finalize] start {} -> {}".format(_describe_scheme(source), _describe_scheme(target)))
+    _log(log, "[finalize] source entries count={}".format(len(source_entries)))
+
+    set_entries = getattr(target, "SetEntries", None)
+    if not callable(set_entries):
+        return False, "Target scheme API does not support SetEntries."
+
+    try:
+        _regenerate_scheme_document(target)
+        _log(log, "[finalize] regenerated document before overwrite")
+        current = list(target.GetEntries())
+        if not current:
+            return False, "Target scheme has no entries to overwrite."
+        _log(log, "[finalize] target entries before overwrite count={}".format(len(current)))
+
+        _patch_entry_colors(current, source_entries, log=log, stage="finalize")
+        set_entries(_to_entry_collection(current))
+        _log(log, "[finalize] SetEntries re-applied with patched target entries")
+        _regenerate_scheme_document(target)
+        refreshed = list(target.GetEntries())
+        _log(log, "[finalize] target entries after overwrite count={}".format(len(refreshed)))
+        return True, None
+    except Exception as ex:
+        _log(log, "[finalize] failed reason={}".format(str(ex)))
+        return False, str(ex)
 
 
 def _get_view_color_fill_scheme_id(view, category_id):

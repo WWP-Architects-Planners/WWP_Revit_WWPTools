@@ -58,6 +58,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -75,13 +76,18 @@
                    TextWrapping="Wrap"
                    Margin="0,0,0,8"/>
 
-        <TextBlock Grid.Row="5"
+        <CheckBox x:Name="CreateNewSchemeCheck"
+              Grid.Row="5"
+              Margin="0,0,0,10"
+              Content="Create new scheme in target scope (leave selected target unchanged)" />
+
+        <TextBlock Grid.Row="6"
                    Foreground="#666666"
                    FontSize="13"
                    TextWrapping="Wrap"
-                   Text="Copies source properties and entries to selected existing target scheme."/>
+               Text="Unchecked: overwrites the selected target scheme. Checked: creates a new scheme in the selected target scope and copies into it."/>
 
-        <StackPanel Grid.Row="6"
+        <StackPanel Grid.Row="7"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
             <Button x:Name="OkButton"
