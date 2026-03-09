@@ -26,7 +26,7 @@ def _prompt_find_replace():
         ok_text="OK",
         cancel_text="Cancel",
         width=420,
-        height=220,
+        height=240,
     )
     if not result:
         return None, None
