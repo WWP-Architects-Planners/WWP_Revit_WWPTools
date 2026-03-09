@@ -122,23 +122,28 @@ namespace WWPTools.WpfUI
             int height)
         {
             var window = CreateWindow(title, width, height);
-            var content = new StackPanel { Margin = new Thickness(12) };
+            var content = new Grid { Margin = new Thickness(12) };
+            content.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var textBox = new TextBox
             {
                 Text = text ?? "",
                 IsReadOnly = true,
-                TextWrapping = TextWrapping.NoWrap,
+                TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                MinHeight = Math.Max(200, height - 140)
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 0, 0, 8),
+                MinHeight = Math.Max(200, height - 180)
             };
+            Grid.SetRow(textBox, 0);
             content.Children.Add(textBox);
 
             var buttons = CreateOkCancelButtons(okText, cancelText);
             buttons.Ok.Click += (_, __) => window.DialogResult = true;
             if (buttons.Cancel != null)
                 buttons.Cancel.Click += (_, __) => window.DialogResult = false;
+            Grid.SetRow(buttons.Panel, 1);
             content.Children.Add(buttons.Panel);
 
             window.Content = WrapWithLogo(content);

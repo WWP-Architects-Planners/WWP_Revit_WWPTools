@@ -31,6 +31,16 @@ def sanitize_sheet_name(name):
     return safe[:31]
 
 
+def get_sheet_name(label):
+    mapping = {
+        "Wall Types": "Walls_Layers",
+        "Ceiling Types": "Ceilings_Layers",
+        "Floor Types": "Floors_Layers",
+        "Roof Types": "Roof_Layers",
+    }
+    return mapping.get(label, sanitize_sheet_name(label))
+
+
 def element_id_value(elem_id):
     if elem_id is None:
         return -1
@@ -151,14 +161,39 @@ def layer_is_variable(layer):
         return False
 
 
+def ideate_function_name(layer):
+    raw_name = layer_function_name(layer)
+    mapping = {
+        "Structure": "Structure [1]",
+        "Substrate": "Substrate [2]",
+        "Insulation": "Thermal/Air Layer [3]",
+        "Finish1": "Finish 1 [4]",
+        "Finish2": "Finish 2 [5]",
+        "Membrane": "Membrane Layer",
+        "StructuralDeck": "Structural Deck [1]",
+        "None": "None",
+    }
+    return mapping.get(raw_name, raw_name)
+
+
+def ideate_row_id(elem_type, layer_index):
+    return "[{}][{}]".format(element_id_value(elem_type.Id), int(layer_index))
+
+
 def type_base_row(category_label, elem_type):
     return {
+        "IdeateId": "",
         "Category": category_label,
         "TypeName": elem_type.Name,
         "SourceTypeName": elem_type.Name,
         "FamilyName": get_family_name(elem_type),
         "TypeId": element_id_value(elem_type.Id),
         "TypeUniqueId": elem_type.UniqueId,
+        "Function": "",
+        "MaterialName": "",
+        "MaterialList": "",
+        "ThicknessMetric": "",
+        "IsVariable": "",
     }
 
 
@@ -175,15 +210,13 @@ def collect_type_rows(doc, category_label, types):
         if comp is None:
             row = dict(base)
             row.update({
+                "IdeateId": ideate_row_id(elem_type, 0),
                 "LayerIndex": "",
-                "LayerFunction": "",
-                "LayerFunctionId": "",
+                "Function": "",
                 "MaterialName": "",
-                "MaterialId": "",
-                "ThicknessInternal": "",
+                "MaterialList": "",
                 "ThicknessMetric": "",
                 "IsVariable": "",
-                "HasCompoundStructure": False,
             })
             rows.append(row)
             continue
@@ -196,15 +229,13 @@ def collect_type_rows(doc, category_label, types):
         if not layers:
             row = dict(base)
             row.update({
+                "IdeateId": ideate_row_id(elem_type, 0),
                 "LayerIndex": "",
-                "LayerFunction": "",
-                "LayerFunctionId": "",
+                "Function": "",
                 "MaterialName": "",
-                "MaterialId": "",
-                "ThicknessInternal": "",
+                "MaterialList": "",
                 "ThicknessMetric": "",
                 "IsVariable": "",
-                "HasCompoundStructure": True,
             })
             rows.append(row)
             continue
@@ -221,16 +252,15 @@ def collect_type_rows(doc, category_label, types):
             except Exception:
                 pass
             row = dict(base)
+            material_name = layer_material_name(doc, mat_id)
             row.update({
-                "LayerIndex": idx,
-                "LayerFunction": layer_function_name(layer),
-                "LayerFunctionId": layer_function_id(layer),
-                "MaterialName": layer_material_name(doc, mat_id),
-                "MaterialId": element_id_value(mat_id),
-                "ThicknessInternal": width,
+                "IdeateId": ideate_row_id(elem_type, idx),
+                "LayerIndex": idx + 1,
+                "Function": ideate_function_name(layer),
+                "MaterialName": material_name,
+                "MaterialList": material_name,
                 "ThicknessMetric": convert_length_mm(width),
                 "IsVariable": layer_is_variable(layer),
-                "HasCompoundStructure": True,
             })
             rows.append(row)
     return rows
@@ -252,40 +282,53 @@ def export_to_excel(doc, selections, file_path, ui):
         pass
 
     headers = [
+        "Id",
         "Category",
-        "TypeName",
-        "SourceTypeName",
-        "FamilyName",
-        "TypeId",
-        "TypeUniqueId",
-        "LayerIndex",
-        "LayerFunction",
-        "LayerFunctionId",
-        "MaterialName",
-        "MaterialId",
-        "ThicknessInternal",
-        "ThicknessMetric",
-        "IsVariable",
-        "HasCompoundStructure",
+        "Type: Type Name",
+        "Index",
+        "Material: Name",
+        "Function",
+        "Variable",
+        "Thickness",
+        "Family Name",
+        "Type Id",
+        "Type Unique Id",
+        "Source Type Name",
+        "Material",
     ]
 
     for label, type_class in selections:
         types = collect_types(doc, type_class)
         rows = collect_type_rows(doc, label, types)
 
-        sheet = workbook.create_sheet(title=sanitize_sheet_name(label))
+        sheet = workbook.create_sheet(title=get_sheet_name(label))
         for col_idx, header in enumerate(headers, start=1):
             cell = sheet.cell(row=1, column=col_idx, value=header)
-            if header in ("TypeId", "TypeUniqueId", "SourceTypeName"):
+            if header in ("Id", "Type Id", "Type Unique Id", "Source Type Name"):
                 cell.number_format = "@"
         row_idx = 2
         for row in rows:
-            for col_idx, header in enumerate(headers, start=1):
-                value = row.get(header, "")
-                if header in ("TypeId", "TypeUniqueId", "SourceTypeName"):
+            values = [
+                row.get("IdeateId", ""),
+                row.get("Category", ""),
+                row.get("TypeName", ""),
+                row.get("LayerIndex", ""),
+                row.get("MaterialName", ""),
+                row.get("Function", ""),
+                row.get("IsVariable", ""),
+                row.get("ThicknessMetric", ""),
+                row.get("FamilyName", ""),
+                row.get("TypeId", ""),
+                row.get("TypeUniqueId", ""),
+                row.get("SourceTypeName", ""),
+                row.get("MaterialList", ""),
+            ]
+            for col_idx, value in enumerate(values, start=1):
+                header = headers[col_idx - 1]
+                if header in ("Id", "Type Id", "Type Unique Id", "Source Type Name"):
                     value = "" if value is None else str(value)
                 cell = sheet.cell(row=row_idx, column=col_idx, value=value)
-                if header in ("TypeId", "TypeUniqueId", "SourceTypeName"):
+                if header in ("Id", "Type Id", "Type Unique Id", "Source Type Name"):
                     cell.number_format = "@"
             row_idx += 1
 
@@ -299,6 +342,7 @@ def main():
 
     options = [
         ("Wall Types", DB.WallType),
+        ("Ceiling Types", DB.CeilingType),
         ("Floor Types", DB.FloorType),
         ("Roof Types", DB.RoofType),
     ]
