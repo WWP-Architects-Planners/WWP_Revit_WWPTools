@@ -10,6 +10,8 @@ import re
 import shutil
 import sys
 import tempfile
+import time
+import traceback
 
 import clr
 from System import String
@@ -32,6 +34,7 @@ CONFIG_LAST_CSV_COLUMN_HEADERS = "last_csv_column_headers"
 CONFIG_LAST_CSV_GROUP_HEADERS = "last_csv_group_headers"
 CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS = "last_csv_grouped_column_headers"
 CONFIG_LAST_CSV_TEXT_QUALIFIER = "last_csv_text_qualifier"
+LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 
 
@@ -79,7 +82,9 @@ class _LocalConfig(object):
         object.__setattr__(self, "_data", data or {})
 
     def __getattr__(self, name):
-        return self._data.get(name)
+        if name in self._data:
+            return self._data[name]
+        raise AttributeError(name)
 
     def __setattr__(self, name, value):
         if name.startswith("_"):
@@ -95,6 +100,52 @@ class _LocalConfig(object):
             json.dump(self._data, fp, indent=2)
 
 
+class _CombinedConfig(object):
+    def __init__(self, primary, primary_saver, fallback, fallback_saver):
+        object.__setattr__(self, "_primary", primary)
+        object.__setattr__(self, "_primary_saver", primary_saver)
+        object.__setattr__(self, "_fallback", fallback)
+        object.__setattr__(self, "_fallback_saver", fallback_saver)
+
+    def __getattr__(self, name):
+        for cfg in (self._primary, self._fallback):
+            if cfg is None:
+                continue
+            try:
+                return getattr(cfg, name)
+            except AttributeError:
+                continue
+            except Exception:
+                continue
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+        for cfg in (self._primary, self._fallback):
+            if cfg is None:
+                continue
+            try:
+                setattr(cfg, name, value)
+            except Exception:
+                continue
+
+    def save(self):
+        saved = False
+        errors = []
+        for saver in (self._primary_saver, self._fallback_saver):
+            if not callable(saver):
+                continue
+            try:
+                saver()
+                saved = True
+            except Exception as exc:
+                errors.append(exc)
+        if not saved and errors:
+            raise errors[0]
+
+
 def _local_config_path():
     appdata = os.environ.get("APPDATA")
     if not appdata:
@@ -102,25 +153,121 @@ def _local_config_path():
     return os.path.join(appdata, "pyRevit", "WWPTools", "Export2Ex.config.json")
 
 
+def _log_file_path():
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
+    return os.path.join(appdata, "pyRevit", "WWPTools", "Logs", LOG_FILE_NAME)
+
+
+def log_message(message):
+    try:
+        log_path = _log_file_path()
+        folder = os.path.dirname(log_path)
+        if folder and not os.path.isdir(folder):
+            os.makedirs(folder)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_path, "a") as fp:
+            fp.write("[{}] {}\n".format(timestamp, message))
+    except Exception:
+        pass
+
+
+def log_exception(context, exc):
+    try:
+        detail = traceback.format_exc()
+    except Exception:
+        detail = str(exc)
+    log_message("{}: {}\n{}".format(context, str(exc), detail))
+
+
+def describe_file_state(path):
+    try:
+        exists = os.path.exists(path)
+    except Exception:
+        exists = False
+    try:
+        is_file = os.path.isfile(path)
+    except Exception:
+        is_file = False
+    try:
+        size = os.path.getsize(path) if is_file else -1
+    except Exception:
+        size = -1
+    return "path='{}' exists={} is_file={} size={}".format(path, exists, is_file, size)
+
+
+def read_log_tail(max_chars=5000):
+    log_path = _log_file_path()
+    if not os.path.isfile(log_path):
+        return "Log file not found:\n{}".format(log_path)
+    try:
+        with open(log_path, "r") as fp:
+            text = fp.read()
+    except Exception as exc:
+        return "Failed to read log file '{}': {}".format(log_path, str(exc))
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def show_error_report(ex):
+    log_path = _log_file_path()
+    report = (
+        "Export2Ex failed.\n\n"
+        "Error\n{}\n\n"
+        "Log File\n{}\n\n"
+        "Recent Log\n{}"
+    ).format(str(ex), log_path, read_log_tail())
+    try:
+        ui = load_uiutils()
+        if hasattr(ui, "uiUtils_show_text_report"):
+            ui.uiUtils_show_text_report(
+                "Export2Ex Error Report",
+                report,
+                ok_text="Close",
+                cancel_text=None,
+                width=900,
+                height=620,
+            )
+            return
+        ui.uiUtils_alert(report, title="Export2Ex Error Report")
+    except Exception:
+        pass
+
+
+def _load_local_config():
+    cfg_path = _local_config_path()
+    data = {}
+    if os.path.isfile(cfg_path):
+        try:
+            with open(cfg_path, "r") as fp:
+                loaded = json.load(fp)
+            if isinstance(loaded, dict):
+                data = loaded
+        except Exception:
+            data = {}
+    return _LocalConfig(cfg_path, data)
+
+
 def get_config_and_saver():
-    """Use pyRevit config when available; fallback to local JSON on CPython 6.1 issues."""
+    """Persist to both pyRevit config and a local JSON file for reliability."""
+    local_cfg = _load_local_config()
     try:
         from pyrevit import script as pyrevit_script
-        cfg = pyrevit_script.get_config()
-        return cfg, pyrevit_script.save_config
-    except Exception:
-        cfg_path = _local_config_path()
-        data = {}
-        if os.path.isfile(cfg_path):
-            try:
-                with open(cfg_path, "r") as fp:
-                    loaded = json.load(fp)
-                if isinstance(loaded, dict):
-                    data = loaded
-            except Exception:
-                data = {}
-        cfg = _LocalConfig(cfg_path, data)
+        pyrevit_cfg = pyrevit_script.get_config()
+        cfg = _CombinedConfig(pyrevit_cfg, pyrevit_script.save_config, local_cfg, local_cfg.save)
         return cfg, cfg.save
+    except Exception:
+        return local_cfg, local_cfg.save
+
+
+def config_get(config, name, default=None):
+    try:
+        value = getattr(config, name)
+    except Exception:
+        return default
+    return default if value is None else value
 
 
 def get_default_dir(doc):
@@ -576,17 +723,35 @@ def _show_export_form(
 
 
 def read_csv_rows(path, delimiter=",", quotechar=""):
+    log_message(
+        "read_csv_rows start {} delimiter={!r} quotechar={!r}".format(
+            describe_file_state(path), delimiter, quotechar
+        )
+    )
     for encoding in ("utf-8-sig", "utf-16", "cp1252"):
-        try:
-            text = read_text_file(path, encoding=encoding)
-            handle = io.StringIO(text)
-            if quotechar in ("\"", "'"):
-                reader = csv.reader(handle, delimiter=delimiter, quotechar=quotechar)
-            else:
-                reader = csv.reader(handle, delimiter=delimiter)
-            return [row for row in reader]
-        except Exception:
-            continue
+        for attempt in range(1, 4):
+            try:
+                text = read_text_file(path, encoding=encoding)
+                handle = io.StringIO(text)
+                if quotechar in ("\"", "'"):
+                    reader = csv.reader(handle, delimiter=delimiter, quotechar=quotechar)
+                else:
+                    reader = csv.reader(handle, delimiter=delimiter)
+                rows = [row for row in reader]
+                log_message(
+                    "read_csv_rows success path='{}' encoding={} attempt={} rows={}".format(
+                        path, encoding, attempt, len(rows)
+                    )
+                )
+                return rows
+            except Exception as exc:
+                log_message(
+                    "read_csv_rows failed path='{}' encoding={} attempt={} {} error={}".format(
+                        path, encoding, attempt, describe_file_state(path), str(exc)
+                    )
+                )
+                if attempt < 3:
+                    time.sleep(0.2)
     return []
 
 
@@ -602,19 +767,52 @@ def get_text_encoding(name):
 
 
 def read_text_file(path, encoding="utf-8"):
+    log_message("read_text_file open {} encoding={}".format(describe_file_state(path), encoding))
     reader = StreamReader(path, get_text_encoding(encoding), True)
     try:
-        return reader.ReadToEnd()
+        text = reader.ReadToEnd()
+        log_message("read_text_file success path='{}' chars={}".format(path, len(text)))
+        return text
     finally:
         reader.Close()
 
 
 def write_text_file(path, text, encoding="utf-8"):
-    writer = StreamWriter(path, False, get_text_encoding(encoding))
-    try:
-        writer.Write(text)
-    finally:
-        writer.Close()
+    log_message(
+        "write_text_file start path='{}' encoding={} chars={} parent_exists={}".format(
+            path,
+            encoding,
+            len(text or ""),
+            os.path.isdir(os.path.dirname(path)) if os.path.dirname(path) else True,
+        )
+    )
+    for attempt in range(1, 4):
+        writer = None
+        try:
+            writer = StreamWriter(path, False, get_text_encoding(encoding))
+            writer.Write(text)
+            writer.Flush()
+            log_message(
+                "write_text_file success path='{}' attempt={} {}".format(
+                    path, attempt, describe_file_state(path)
+                )
+            )
+            return
+        except Exception as exc:
+            log_message(
+                "write_text_file failed path='{}' attempt={} {} error={}".format(
+                    path, attempt, describe_file_state(path), str(exc)
+                )
+            )
+            if attempt >= 3:
+                raise
+            time.sleep(0.2)
+        finally:
+            if writer is not None:
+                try:
+                    writer.Close()
+                except Exception:
+                    pass
 
 
 def normalize_table_data(data):
@@ -877,6 +1075,18 @@ def export_to_excel(
     text_qualifier="",
     delimiter=",",
 ):
+    log_message(
+        "export_to_excel start file_path='{}' schedules={} delimiter={!r} quotechar={!r} title={} col_headers={} group_headers={} grouped_col_headers={}".format(
+            file_path,
+            len(schedules),
+            delimiter,
+            text_qualifier,
+            bool(export_title),
+            bool(export_column_headers),
+            bool(export_group_headers),
+            bool(export_grouped_column_headers),
+        )
+    )
     add_lib_path()
     try:
         import openpyxl
@@ -909,6 +1119,7 @@ def export_to_excel(
     )
     try:
         for view in schedules:
+            log_message("export_to_excel schedule start name='{}' id={}".format(view.Name, element_id_value(view.Id)))
             key_schedule = is_key_schedule(view)
             base_name = sanitize_sheet_name(view.Name)
             if base_name in workbook.sheetnames and base_name not in used_names:
@@ -927,8 +1138,10 @@ def export_to_excel(
                 sheet = workbook.create_sheet(title=sheet_name)
 
             temp_name = "{}.csv".format(sanitize_file_name(view.Name))
+            log_message("export_to_excel view.Export temp_dir='{}' temp_name='{}'".format(temp_dir, temp_name))
             view.Export(temp_dir, temp_name, options)
             csv_path = os.path.join(temp_dir, temp_name)
+            log_message("export_to_excel exported temp csv {}".format(describe_file_state(csv_path)))
             data = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
             if not key_schedule:
                 data = inject_element_id_column(data, view, csv_text=False)
@@ -947,7 +1160,9 @@ def export_to_excel(
                 column_specs=column_specs,
                 doc=doc,
             )
+            log_message("export_to_excel schedule complete name='{}' rows={}".format(view.Name, len(data)))
     finally:
+        log_message("export_to_excel cleanup temp_dir='{}'".format(temp_dir))
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     if "Sheet" in workbook.sheetnames and len(workbook.sheetnames) > 1:
@@ -955,6 +1170,7 @@ def export_to_excel(
         workbook.remove(default_sheet)
 
     workbook.save(file_path)
+    log_message("export_to_excel saved workbook {}".format(describe_file_state(file_path)))
     return True
 
 
@@ -970,8 +1186,22 @@ def export_to_csv(
     export_grouped_column_headers=False,
     text_qualifier="",
 ):
+    log_message(
+        "export_to_csv start folder='{}' schedules={} delimiter={!r} quotechar={!r} quote_all={} title={} col_headers={} group_headers={} grouped_col_headers={}".format(
+            folder,
+            len(schedules),
+            delimiter,
+            text_qualifier,
+            bool(quote_all),
+            bool(export_title),
+            bool(export_column_headers),
+            bool(export_group_headers),
+            bool(export_grouped_column_headers),
+        )
+    )
     if not os.path.isdir(folder):
         os.makedirs(folder)
+        log_message("export_to_csv created folder='{}'".format(folder))
     options = DB.ViewScheduleExportOptions()
     apply_schedule_export_options(
         options,
@@ -983,32 +1213,50 @@ def export_to_csv(
         text_qualifier=text_qualifier,
     )
     used_names = set()
-    for view in schedules:
-        key_schedule = is_key_schedule(view)
-        base_name = sanitize_file_name(view.Name)
-        unique_name = make_unique_name(base_name, used_names)
-        file_name = "{}.csv".format(unique_name)
-        view.Export(folder, file_name, options)
-        csv_path = os.path.join(folder, file_name)
-        rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
-        if not key_schedule:
-            rows = inject_element_id_column(rows, view, csv_text=True)
-        buffer_handle = io.StringIO()
-        if text_qualifier in ("\"", "'"):
-            writer = csv.writer(
-                buffer_handle,
-                delimiter=delimiter,
-                quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
-                quotechar=text_qualifier,
+    temp_dir = tempfile.mkdtemp(prefix="wwp_schedules_csv_")
+    log_message("export_to_csv temp_dir='{}'".format(temp_dir))
+    try:
+        for view in schedules:
+            log_message("export_to_csv schedule start name='{}' id={}".format(view.Name, element_id_value(view.Id)))
+            key_schedule = is_key_schedule(view)
+            base_name = sanitize_file_name(view.Name)
+            unique_name = make_unique_name(base_name, used_names)
+            file_name = "{}.csv".format(unique_name)
+            temp_name = "tmp_{}_{}.csv".format(element_id_value(view.Id), unique_name)
+            temp_csv_path = os.path.join(temp_dir, temp_name)
+            final_csv_path = os.path.join(folder, file_name)
+            log_message("export_to_csv view.Export temp_dir='{}' temp_name='{}'".format(temp_dir, temp_name))
+            view.Export(temp_dir, temp_name, options)
+            log_message("export_to_csv exported temp csv {}".format(describe_file_state(temp_csv_path)))
+            rows = normalize_table_data(read_csv_rows(temp_csv_path, delimiter=delimiter, quotechar=text_qualifier))
+            if not key_schedule:
+                rows = inject_element_id_column(rows, view, csv_text=True)
+            buffer_handle = io.StringIO()
+            if text_qualifier in ("\"", "'"):
+                writer = csv.writer(
+                    buffer_handle,
+                    delimiter=delimiter,
+                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+                    quotechar=text_qualifier,
+                )
+            else:
+                writer = csv.writer(
+                    buffer_handle,
+                    delimiter=delimiter,
+                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+                )
+            writer.writerows(rows)
+            write_text_file(final_csv_path, buffer_handle.getvalue(), encoding="utf-8-sig")
+            log_message(
+                "export_to_csv schedule complete name='{}' temp={} output={}".format(
+                    view.Name,
+                    describe_file_state(temp_csv_path),
+                    describe_file_state(final_csv_path),
+                )
             )
-        else:
-            writer = csv.writer(
-                buffer_handle,
-                delimiter=delimiter,
-                quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
-            )
-        writer.writerows(rows)
-        write_text_file(csv_path, buffer_handle.getvalue(), encoding="utf-8-sig")
+    finally:
+        log_message("export_to_csv cleanup temp_dir='{}'".format(temp_dir))
+        shutil.rmtree(temp_dir, ignore_errors=True)
     return True
 
 
@@ -1067,6 +1315,7 @@ def select_csv_delimiter(ui, default_delimiter=","):
 
 
 def main():
+    log_message("main start log_path='{}'".format(_log_file_path()))
     doc = get_active_doc()
     if doc is None:
         ui = load_uiutils()
@@ -1081,7 +1330,8 @@ def main():
         return
 
     items = [ScheduleItem(v) for v in schedules]
-    last_ids = getattr(config, CONFIG_LAST_SCHEDULE_IDS, [])
+    log_message("main schedules loaded count={}".format(len(items)))
+    last_ids = config_get(config, CONFIG_LAST_SCHEDULE_IDS, [])
     try:
         prechecked_ids = set(int(x) for x in last_ids)
     except Exception:
@@ -1091,16 +1341,16 @@ def main():
         if element_id_value(item.view.Id) in prechecked_ids
     ]
     default_dir = get_default_dir(doc)
-    last_excel_path = getattr(config, CONFIG_LAST_EXCEL_PATH, "")
-    last_csv_dir = getattr(config, CONFIG_LAST_CSV_DIR, "")
-    last_csv_mode = getattr(config, CONFIG_LAST_CSV_MODE, 0)
-    last_csv_delim = getattr(config, CONFIG_LAST_CSV_DELIM, ",")
-    last_export_mode = getattr(config, CONFIG_LAST_EXPORT_MODE, 0)
-    last_export_title = getattr(config, CONFIG_LAST_CSV_EXPORT_TITLE, False)
-    last_column_headers = getattr(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True)
-    last_group_headers = getattr(config, CONFIG_LAST_CSV_GROUP_HEADERS, False)
-    last_grouped_column_headers = getattr(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False)
-    last_text_qualifier = getattr(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, "")
+    last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
+    last_csv_dir = config_get(config, CONFIG_LAST_CSV_DIR, "")
+    last_csv_mode = config_get(config, CONFIG_LAST_CSV_MODE, 0)
+    last_csv_delim = config_get(config, CONFIG_LAST_CSV_DELIM, ",")
+    last_export_mode = config_get(config, CONFIG_LAST_EXPORT_MODE, 0)
+    last_export_title = config_get(config, CONFIG_LAST_CSV_EXPORT_TITLE, False)
+    last_column_headers = config_get(config, CONFIG_LAST_CSV_COLUMN_HEADERS, True)
+    last_group_headers = config_get(config, CONFIG_LAST_CSV_GROUP_HEADERS, False)
+    last_grouped_column_headers = config_get(config, CONFIG_LAST_CSV_GROUPED_COLUMN_HEADERS, False)
+    last_text_qualifier = config_get(config, CONFIG_LAST_CSV_TEXT_QUALIFIER, "")
 
     init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
     init_csv_dir = ensure_existing_dir(last_csv_dir, default_dir)
@@ -1189,6 +1439,7 @@ def main():
         config.last_csv_column_headers = export_column_headers
         config.last_csv_group_headers = export_group_headers
         config.last_csv_grouped_column_headers = export_grouped_column_headers
+        log_message("main saving config after modern dialog")
         save_config()
         ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
         return
@@ -1262,9 +1513,15 @@ def main():
         config.last_csv_mode = csv_mode
         config.last_csv_delim = csv_delim
 
+    log_message("main saving config after legacy dialog")
     save_config()
     ui.uiUtils_alert("Export complete.", title="Multiple Schedules Exporter")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as ex:
+        log_exception("Unhandled exception in Export2Ex", ex)
+        show_error_report(ex)
+        raise
