@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import importlib
+import io
 import json
 import os
 import re
@@ -13,6 +14,8 @@ import tempfile
 import clr
 from System import String
 from System.Collections.Generic import List
+from System.IO import StreamReader, StreamWriter
+from System.Text import Encoding, UTF8Encoding
 
 from pyrevit import DB
 
@@ -575,15 +578,43 @@ def _show_export_form(
 def read_csv_rows(path, delimiter=",", quotechar=""):
     for encoding in ("utf-8-sig", "utf-16", "cp1252"):
         try:
-            with open(path, "r", encoding=encoding, newline="") as handle:
-                if quotechar in ("\"", "'"):
-                    reader = csv.reader(handle, delimiter=delimiter, quotechar=quotechar)
-                else:
-                    reader = csv.reader(handle, delimiter=delimiter)
-                return [row for row in reader]
+            text = read_text_file(path, encoding=encoding)
+            handle = io.StringIO(text)
+            if quotechar in ("\"", "'"):
+                reader = csv.reader(handle, delimiter=delimiter, quotechar=quotechar)
+            else:
+                reader = csv.reader(handle, delimiter=delimiter)
+            return [row for row in reader]
         except Exception:
             continue
     return []
+
+
+def get_text_encoding(name):
+    value = (name or "").strip().lower()
+    if value == "utf-8-sig":
+        return UTF8Encoding(True)
+    if value == "utf-8":
+        return UTF8Encoding(False)
+    if value == "utf-16":
+        return Encoding.Unicode
+    return Encoding.GetEncoding(name)
+
+
+def read_text_file(path, encoding="utf-8"):
+    reader = StreamReader(path, get_text_encoding(encoding), True)
+    try:
+        return reader.ReadToEnd()
+    finally:
+        reader.Close()
+
+
+def write_text_file(path, text, encoding="utf-8"):
+    writer = StreamWriter(path, False, get_text_encoding(encoding))
+    try:
+        writer.Write(text)
+    finally:
+        writer.Close()
 
 
 def normalize_table_data(data):
@@ -962,21 +993,22 @@ def export_to_csv(
         rows = normalize_table_data(read_csv_rows(csv_path, delimiter=delimiter, quotechar=text_qualifier))
         if not key_schedule:
             rows = inject_element_id_column(rows, view, csv_text=True)
-        with open(csv_path, "w", encoding="utf-8-sig", newline="") as handle:
-            if text_qualifier in ("\"", "'"):
-                writer = csv.writer(
-                    handle,
-                    delimiter=delimiter,
-                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
-                    quotechar=text_qualifier,
-                )
-            else:
-                writer = csv.writer(
-                    handle,
-                    delimiter=delimiter,
-                    quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
-                )
-            writer.writerows(rows)
+        buffer_handle = io.StringIO()
+        if text_qualifier in ("\"", "'"):
+            writer = csv.writer(
+                buffer_handle,
+                delimiter=delimiter,
+                quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+                quotechar=text_qualifier,
+            )
+        else:
+            writer = csv.writer(
+                buffer_handle,
+                delimiter=delimiter,
+                quoting=csv.QUOTE_ALL if quote_all else csv.QUOTE_MINIMAL,
+            )
+        writer.writerows(rows)
+        write_text_file(csv_path, buffer_handle.getvalue(), encoding="utf-8-sig")
     return True
 
 

@@ -4,7 +4,7 @@
 import os
 import sys
 import importlib
-from pyrevit import revit, DB, script
+from pyrevit import revit, script
 import WWP_uiUtils as ui
 from pyrevit.framework import EventHandler
 from System.IO import File
@@ -13,11 +13,14 @@ from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
 script_dir = os.path.dirname(__file__)
-lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
-if lib_path not in sys.path:
-    sys.path.append(lib_path)
+pulldown_dir = os.path.abspath(os.path.join(script_dir, ".."))
+lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
+for path in (pulldown_dir, lib_path):
+    if path not in sys.path:
+        sys.path.append(path)
 
 import WWP_colorSchemeUtils as csu
+import color_scheme_common as csc
 
 try:
     csu = importlib.reload(csu)
@@ -35,97 +38,12 @@ def _log(message):
         pass
 
 
-def _scheme_area_scheme_name(doc, scheme):
-    try:
-        area_scheme_id = getattr(scheme, "AreaSchemeId", None)
-        if area_scheme_id:
-            area_scheme = doc.GetElement(area_scheme_id)
-            if area_scheme:
-                return getattr(area_scheme, "Name", "") or ""
-    except Exception:
-        pass
-    try:
-        get_area_scheme_id = getattr(scheme, "GetAreaSchemeId", None)
-        if callable(get_area_scheme_id):
-            area_scheme_id = get_area_scheme_id()
-            if area_scheme_id:
-                area_scheme = doc.GetElement(area_scheme_id)
-                if area_scheme:
-                    return getattr(area_scheme, "Name", "") or ""
-    except Exception:
-        pass
-    return ""
-
-
-def _category_name(doc, category_id):
-    if category_id is None:
-        return "Unknown Category"
-    try:
-        cat = doc.GetElement(category_id)
-        cat_name = getattr(cat, "Name", "") if cat else ""
-        if cat_name:
-            return cat_name
-    except Exception:
-        pass
-    try:
-        return DB.LabelUtils.GetLabelFor(category_id)
-    except Exception:
-        pass
-    try:
-        import System
-        cat_int = int(category_id.IntegerValue)
-        bic = System.Enum.ToObject(DB.BuiltInCategory, cat_int)
-        label = DB.LabelUtils.GetLabelFor(bic)
-        if label:
-            return label
-        return "Category {}".format(cat_int)
-    except Exception:
-        return "Unknown Category"
-
-
 def _scheme_display_name(doc, scheme):
-    scheme_name = getattr(scheme, "Name", "") or "Color Scheme"
-    area_name = _scheme_area_scheme_name(doc, scheme)
-    if area_name:
-        return "Area({}):{}".format(area_name, scheme_name)
-    return "{}: {}".format(_category_name(doc, scheme.CategoryId), scheme_name)
-
-
-def _elem_id_int(elem_id):
-    try:
-        return int(elem_id.IntegerValue)
-    except Exception:
-        try:
-            return int(elem_id)
-        except Exception:
-            return None
-
-
-def _scheme_area_scheme_id(scheme):
-    try:
-        area_scheme_id = getattr(scheme, "AreaSchemeId", None)
-        if area_scheme_id and area_scheme_id != DB.ElementId.InvalidElementId:
-            return area_scheme_id
-    except Exception:
-        pass
-    try:
-        getter = getattr(scheme, "GetAreaSchemeId", None)
-        if callable(getter):
-            area_scheme_id = getter()
-            if area_scheme_id and area_scheme_id != DB.ElementId.InvalidElementId:
-                return area_scheme_id
-    except Exception:
-        pass
-    return None
+    return csc.scheme_display_name(doc, scheme)
 
 
 def _describe_scheme(scheme):
-    return "scheme='{}' id={} categoryId={} areaSchemeId={}".format(
-        getattr(scheme, "Name", "<unnamed>"),
-        _elem_id_int(getattr(scheme, "Id", None)),
-        _elem_id_int(getattr(scheme, "CategoryId", None)),
-        _elem_id_int(_scheme_area_scheme_id(scheme)),
-    )
+    return csc.describe_scheme(scheme)
 
 
 def _set_owner(window):
@@ -201,22 +119,6 @@ def _show_selection_dialog(display_names):
     return result if result.get("ok") else None
 
 
-def _unique_scheme_name_in_scope(doc, scope_seed_scheme, base_name):
-    base = (base_name or "Color Scheme").strip()
-    if not base:
-        base = "Color Scheme"
-    all_schemes = csu.collect_color_fill_schemes(doc)
-    if csu.find_scheme_in_scope_by_name(all_schemes, scope_seed_scheme, base) is None:
-        return base
-    idx = 1
-    while idx < 1000:
-        candidate = "{} ({})".format(base, idx)
-        if csu.find_scheme_in_scope_by_name(all_schemes, scope_seed_scheme, candidate) is None:
-            return candidate
-        idx += 1
-    return "{} ({})".format(base, "Copy")
-
-
 def main():
     doc = revit.doc
     schemes = csu.collect_color_fill_schemes(doc)
@@ -242,7 +144,7 @@ def main():
         target = selected_target
 
         if create_new:
-            new_name = _unique_scheme_name_in_scope(doc, selected_target, source_name)
+            new_name = csc.unique_scheme_name_in_scope(doc, selected_target, source_name)
             _log("Creating new target scheme '{}' from scope seed '{}'.".format(new_name, getattr(selected_target, "Name", "<unnamed>")))
             new_id = selected_target.Duplicate(new_name)
             created = doc.GetElement(new_id)
@@ -263,8 +165,6 @@ def main():
         ui.uiUtils_alert("Failed to update target Color Scheme.\n\n{}".format(error or "Unknown error"), title="Copy Color Scheme")
         return
 
-    # Commit-time Revit regeneration can still override visuals on schemes that are
-    # currently "In Use". Apply a follow-up pass in a separate transaction.
     try:
         with revit.Transaction("Finalize Copy Color Scheme"):
             _ok2, _err2 = csu.force_overwrite_scheme_visuals(source, target, log=_log)
