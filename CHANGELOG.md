@@ -5,6 +5,14 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-03-11
+- Sheet Scale Updater: merged sheet selection and target parameter selection into one dialog
+- Sheet Scale Updater: target parameter list now filters to non-Yes/No parameters containing `Scale`
+- Sheet Scale Updater: current sheet is surfaced first and labeled in the picker
+- Sheet Scale Updater: simplified reporting to show changed sheets and failed/skipped sheets only
+- Area Plan Duplicator: fixed level list scrolling and added footer logo
+- Schedule2Excel/CSV: added footer logo to the export dialog
+
 ## [1.2.0] - 2026-03-06
 - Installer refresh release so users on installer `1.1.9` can reinstall and pull the latest script set from `main`
 - Schedule2Excel/CSV: fixed Excel save path handling so `.xlsm` stays `.xlsm` (no forced `.xlsx` append)
