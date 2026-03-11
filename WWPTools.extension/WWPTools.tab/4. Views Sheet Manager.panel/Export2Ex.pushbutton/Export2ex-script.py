@@ -367,7 +367,9 @@ def _show_export_form(
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
     from System.IO import StringReader
+    from System import Uri
     from System.Windows.Markup import XamlReader
+    from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
     from System.Windows.Controls import SelectionMode
 
@@ -530,20 +532,29 @@ def _show_export_form(
                     </GroupBox>
                 </StackPanel>
             </Grid>
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                <Button Name="OkButton" Style="{StaticResource PrimaryButton}" Width="150" Margin="0,0,8,0">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Text="&#xE105;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                        <TextBlock Text="Export" FontSize="14"/>
-                    </StackPanel>
-                </Button>
-                <Button Name="CancelButton" Style="{StaticResource SecondaryButton}" Width="150">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                        <TextBlock Text="Cancel" FontSize="14"/>
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            <DockPanel Grid.Row="2" Margin="0,12,0,0">
+                <Image Name="LogoImage"
+                       DockPanel.Dock="Left"
+                       Width="56"
+                       Height="56"
+                       VerticalAlignment="Bottom"
+                       HorizontalAlignment="Left"
+                       IsHitTestVisible="False" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Name="OkButton" Style="{StaticResource PrimaryButton}" Width="150" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE105;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
+                            <TextBlock Text="Export" FontSize="14"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Name="CancelButton" Style="{StaticResource SecondaryButton}" Width="150">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
+                            <TextBlock Text="Cancel" FontSize="14"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
         </Grid>
     </Window>
     """
@@ -567,6 +578,7 @@ def _show_export_form(
     export_grouped_column_headers = window.FindName("ExportGroupedColumnHeaders")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
+    logo_image = window.FindName("LogoImage")
 
     schedule_list.ItemsSource = _to_net_list(items)
     delimiter_items = [
@@ -614,6 +626,20 @@ def _show_export_form(
         csv_mode.IsChecked = True
     else:
         excel_mode.IsChecked = True
+
+    try:
+        script_dir = os.path.dirname(__file__)
+        lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
+        if logo_image is not None and os.path.isfile(logo_path):
+            bitmap = BitmapImage()
+            bitmap.BeginInit()
+            bitmap.UriSource = Uri(logo_path)
+            bitmap.CacheOption = BitmapCacheOption.OnLoad
+            bitmap.EndInit()
+            logo_image.Source = bitmap
+    except Exception:
+        pass
 
     selected_names = set()
     if prechecked_indices:

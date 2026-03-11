@@ -1,0 +1,134 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sheet Scale Updater"
+        Width="980"
+        Height="680"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FontFamily="Arial Narrow"
+        FontSize="14"
+        Background="White">
+    <Window.Resources>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#0A66D1"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="18,6"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="18">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#0858B6" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#AAAAAA" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#8A8F98" />
+        </Style>
+    </Window.Resources>
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="PromptText"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,8" />
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="360" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="Target Parameter:"
+                       VerticalAlignment="Center" />
+
+            <ComboBox x:Name="ParameterCombo"
+                      Grid.Column="1"
+                      Margin="8,0,0,0"
+                      MinWidth="320"
+                      IsEditable="True"
+                      IsTextSearchEnabled="True"
+                      StaysOpenOnEdit="True" />
+
+            <TextBlock Grid.Column="3"
+                       Text="Sheet Search:"
+                       VerticalAlignment="Center" />
+
+            <TextBox x:Name="SearchBox"
+                     Grid.Column="4"
+                     Margin="8,0,0,0"
+                     MinWidth="260" />
+        </Grid>
+
+        <TextBlock Grid.Row="2"
+                   Text="Select sheets to update:"
+                   Margin="0,0,0,6" />
+
+        <ListBox x:Name="SheetsList"
+                 Grid.Row="3"
+                 SelectionMode="Extended"
+                 MinHeight="320"
+                 Margin="0,0,0,8" />
+
+        <TextBlock x:Name="ValidationText"
+                   Grid.Row="4"
+                   Foreground="#C62828"
+                   Visibility="Collapsed"
+                   Margin="0,0,0,4"
+                   TextWrapping="Wrap" />
+
+        <DockPanel Grid.Row="5"
+                   Margin="0,12,0,0">
+            <Image x:Name="LogoImage"
+                   DockPanel.Dock="Left"
+                   Width="56"
+                   Height="56"
+                   VerticalAlignment="Bottom"
+                   HorizontalAlignment="Left"
+                   IsHitTestVisible="False" />
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button x:Name="OkButton"
+                        Content="OK"
+                        MinWidth="96"
+                        Margin="0,0,8,0"
+                        IsDefault="True"
+                        Style="{StaticResource PrimaryButton}" />
+                <Button x:Name="CancelButton"
+                        Content="Cancel"
+                        MinWidth="96"
+                        IsCancel="True"
+                        Style="{StaticResource SecondaryButton}" />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>
