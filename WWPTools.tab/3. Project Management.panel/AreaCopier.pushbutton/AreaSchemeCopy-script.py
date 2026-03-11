@@ -6,10 +6,12 @@ import traceback
 from pyrevit import DB, revit
 from pyrevit.framework import EventHandler
 from System.IO import File, StringReader
+from System import Uri
 from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
+from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
 from System.Xml import XmlReader
 
 script_dir = os.path.dirname(__file__)
@@ -60,6 +62,7 @@ def _show_setup_dialog(scheme_names, level_names):
     validation = window.FindName("ValidationText")
     ok_btn = window.FindName("OkButton")
     cancel_btn = window.FindName("CancelButton")
+    logo_image = window.FindName("LogoImage")
 
     for name in scheme_names:
         source_combo.Items.Add(name)
@@ -76,6 +79,18 @@ def _show_setup_dialog(scheme_names, level_names):
         target_combo.SelectedIndex = 1
     elif target_combo.Items.Count > 0:
         target_combo.SelectedIndex = 0
+
+    try:
+        logo_path = os.path.join(lib_path, "WWPtools-logo.png")
+        if logo_image is not None and os.path.isfile(logo_path):
+            bitmap = BitmapImage()
+            bitmap.BeginInit()
+            bitmap.UriSource = Uri(logo_path)
+            bitmap.CacheOption = BitmapCacheOption.OnLoad
+            bitmap.EndInit()
+            logo_image.Source = bitmap
+    except Exception:
+        pass
 
     result = {"ok": False}
 
