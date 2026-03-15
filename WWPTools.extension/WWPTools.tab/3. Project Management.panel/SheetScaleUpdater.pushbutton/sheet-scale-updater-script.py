@@ -7,13 +7,23 @@ from Autodesk.Revit import DB, UI
 
 # pyRevit script tools
 from pyrevit import script
+from WWP_settings import get_tool_settings
 from WWP_uiUtils import uiUtils_alert
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
 
 output = script.get_output()
-config = script.get_config()
+legacy_sources = []
+try:
+    legacy_sources.append(script.get_config())
+except Exception:
+    pass
+config, save_config = get_tool_settings(
+    "SheetScaleUpdater",
+    doc=doc,
+    legacy_sources=legacy_sources,
+)
 
 def _print_md(text):
     try:
@@ -437,7 +447,7 @@ def main():
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.sheet_scale_param_name = target_param_name
     config.sheet_scale_param_scope = target_param_scope
-    script.save_config()
+    save_config()
 
     titleblocks_by_sheet = {}
     for tb in titleblocks:

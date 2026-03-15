@@ -5,6 +5,7 @@ import os
 import sys
 
 from pyrevit import DB, revit, script
+from WWP_settings import get_tool_settings
 
 
 TITLE = "Import Area Key Schedule"
@@ -12,13 +13,24 @@ SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
 TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
+_CONFIG_CACHE = None
 
 
 def _get_config():
+    global _CONFIG_CACHE
+    if _CONFIG_CACHE is not None:
+        return _CONFIG_CACHE
+    legacy_sources = []
     try:
-        return script.get_config()
+        legacy_sources.append(script.get_config())
     except Exception:
-        return None
+        pass
+    _CONFIG_CACHE, _ = get_tool_settings(
+        "ImportAreaKeySchedule",
+        doc=revit.doc,
+        legacy_sources=legacy_sources,
+    )
+    return _CONFIG_CACHE
 
 
 def _safe_config_get(config, key, default=None):
@@ -41,7 +53,9 @@ def _safe_config_set(config, key, value):
 
 def _save_config():
     try:
-        script.save_config()
+        config = _get_config()
+        if config is not None:
+            config.save()
     except Exception:
         pass
 

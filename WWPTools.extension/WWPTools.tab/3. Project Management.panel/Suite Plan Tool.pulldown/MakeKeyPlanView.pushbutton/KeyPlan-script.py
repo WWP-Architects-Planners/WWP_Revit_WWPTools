@@ -2,6 +2,7 @@
 import clr
 
 from pyrevit import revit, DB, script
+from WWP_settings import get_tool_settings
 import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
@@ -10,6 +11,16 @@ from System.Collections.Generic import List
 
 doc = revit.doc
 uidoc = revit.uidoc
+legacy_sources = []
+try:
+    legacy_sources.append(script.get_config())
+except Exception:
+    pass
+config, save_config = get_tool_settings(
+    "MakeKeyPlanView",
+    doc=doc,
+    legacy_sources=legacy_sources,
+)
 
 CONFIG_LAST_AREA_ID = "last_area_id"
 CONFIG_LAST_KEYPLAN_TEMPLATE_ID = "last_keyplan_template_id"
@@ -165,7 +176,6 @@ def main():
         uiutils.uiUtils_alert("No filled region types found.", title="Make Keyplans")
         return
 
-    config = script.get_config()
     state = {
         "areas": [],
         "area_label": None,
@@ -251,7 +261,7 @@ def main():
     config.last_fill_type_id = (
         element_id_value(keyplan_fill_type.Id) if keyplan_fill_type else None
     )
-    script.save_config()
+    save_config()
 
     results = []
     with revit.Transaction("Create Keyplan Views"):
