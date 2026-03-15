@@ -1,24 +1,27 @@
 #! python3
 from pyrevit import revit, DB, script
 from Autodesk.Revit import UI
+from WWP_settings import get_tool_settings
 import WWP_uiUtils as ui
 # Get the active document
 doc = revit.doc
 output = script.get_output()
+tool_config, save_tool_config = get_tool_settings("CopyParameter", doc=doc)
 
 
-def ask_for_inputs(param_names):
+def ask_for_inputs(param_names, defaults=None):
     """Single form for parameter mapping and text transforms."""
+    defaults = defaults or {}
     try:
         return ui.uiUtils_parameter_copy_inputs(
             param_names=param_names or [],
             title="Copy and Transform Parameter",
-            source_default="View Name",
-            target_default="Title on Sheet",
-            find_default="",
-            replace_default="",
-            prefix_default="",
-            suffix_default="",
+            source_default=defaults.get("source_param") or "View Name",
+            target_default=defaults.get("target_param") or "Title on Sheet",
+            find_default=defaults.get("find_text") or "",
+            replace_default=defaults.get("replace_text") or "",
+            prefix_default=defaults.get("prefix") or "",
+            suffix_default=defaults.get("suffix") or "",
             width=480,
             height=460,
         )
@@ -91,7 +94,7 @@ def set_parameter_value(element, param_name, value):
         print(f"Error setting parameter '{param_name}': {str(e)}")
         return False
 
-def show_input_dialog(elements):
+def show_input_dialog(elements, defaults=None):
     """
     Display user input dialog for parameter names and find/replace values.
     
@@ -103,7 +106,7 @@ def show_input_dialog(elements):
     if not param_names:
         UI.TaskDialog.Show("Copy Parameter", "No parameters found on selected elements.")
         return None
-    return ask_for_inputs(param_names)
+    return ask_for_inputs(param_names, defaults=defaults)
 
 def main():
     """Main execution function."""
@@ -115,7 +118,15 @@ def main():
         return
     
     # Get user input
-    config = show_input_dialog(elements)
+    defaults = {
+        "source_param": getattr(tool_config, "source_param", "") or "View Name",
+        "target_param": getattr(tool_config, "target_param", "") or "Title on Sheet",
+        "find_text": getattr(tool_config, "find_text", "") or "",
+        "replace_text": getattr(tool_config, "replace_text", "") or "",
+        "prefix": getattr(tool_config, "prefix", "") or "",
+        "suffix": getattr(tool_config, "suffix", "") or "",
+    }
+    config = show_input_dialog(elements, defaults=defaults)
     if not config:
         return
     
@@ -125,6 +136,13 @@ def main():
     replace_text = config["replace_text"] or ""
     prefix = config.get("prefix") or ""
     suffix = config.get("suffix") or ""
+    tool_config.source_param = source_param
+    tool_config.target_param = target_param
+    tool_config.find_text = find_text
+    tool_config.replace_text = replace_text
+    tool_config.prefix = prefix
+    tool_config.suffix = suffix
+    save_tool_config()
     
     # Process elements
     success_count = 0

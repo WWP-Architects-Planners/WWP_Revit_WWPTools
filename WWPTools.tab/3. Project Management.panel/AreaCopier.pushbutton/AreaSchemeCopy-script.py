@@ -19,6 +19,7 @@ lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.append(lib_path)
 import WWP_colorSchemeUtils as csu
+from WWP_settings import get_tool_settings
 
 def _load_uiutils():
     try:
@@ -44,7 +45,17 @@ def _set_owner(window):
         pass
 
 
-def _show_setup_dialog(scheme_names, level_names):
+def _index_by_value(values, target, default_index=0):
+    if not target:
+        return default_index
+    try:
+        return values.index(target)
+    except Exception:
+        return default_index
+
+
+def _show_setup_dialog(scheme_names, level_names, defaults=None):
+    defaults = defaults or {}
     xaml_path = os.path.join(script_dir, "AreaSchemeCopySetup.xaml")
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
@@ -73,12 +84,34 @@ def _show_setup_dialog(scheme_names, level_names):
         item.Tag = i
         levels_list.Items.Add(item)
 
+    source_default = defaults.get("source_scheme_name")
+    target_default = defaults.get("target_scheme_name")
+    selected_levels = set(defaults.get("selected_level_names") or [])
+
     if source_combo.Items.Count > 0:
-        source_combo.SelectedIndex = 0
+        source_combo.SelectedIndex = _index_by_value(scheme_names, source_default, 0)
     if target_combo.Items.Count > 1:
-        target_combo.SelectedIndex = 1
-    elif target_combo.Items.Count > 0:
-        target_combo.SelectedIndex = 0
+        fallback_index = 1
+    else:
+        fallback_index = 0
+    if target_combo.Items.Count > 0:
+        target_combo.SelectedIndex = _index_by_value(scheme_names, target_default, fallback_index)
+
+    for item in levels_list.Items:
+        try:
+            if item.Content in selected_levels:
+                item.IsSelected = True
+        except Exception:
+            pass
+
+    try:
+        tag_toggle.IsChecked = bool(defaults.get("copy_tags", True))
+    except Exception:
+        pass
+    try:
+        color_toggle.IsChecked = bool(defaults.get("copy_color_scheme", False))
+    except Exception:
+        pass
 
     try:
         logo_path = os.path.join(lib_path, "WWPtools-logo.png")
@@ -668,6 +701,8 @@ def main():
         ui.uiUtils_alert("No active document.", title="Copy Areas")
         return
 
+    tool_config, save_tool_config = get_tool_settings("AreaCopier", doc=doc)
+
     schemes = _get_area_schemes(doc)
     if not schemes:
         ui.uiUtils_alert("No area schemes found in this project.", title="Copy Areas")
@@ -681,6 +716,13 @@ def main():
     setup = _show_setup_dialog(
         [s.Name for s in schemes],
         [l.Name for l in levels],
+        defaults={
+            "source_scheme_name": getattr(tool_config, "source_scheme_name", None),
+            "target_scheme_name": getattr(tool_config, "target_scheme_name", None),
+            "selected_level_names": getattr(tool_config, "selected_level_names", None),
+            "copy_tags": getattr(tool_config, "copy_tags", True),
+            "copy_color_scheme": getattr(tool_config, "copy_color_scheme", False),
+        },
     )
     if not setup:
         return
@@ -694,6 +736,13 @@ def main():
     source_scheme = schemes[source_index]
     target_scheme = schemes[target_index]
     selected_levels = [levels[i] for i in level_indices if 0 <= i < len(levels)]
+
+    tool_config.source_scheme_name = source_scheme.Name
+    tool_config.target_scheme_name = target_scheme.Name
+    tool_config.selected_level_names = [level.Name for level in selected_levels]
+    tool_config.copy_tags = tag_untagged
+    tool_config.copy_color_scheme = copy_color_scheme
+    save_tool_config()
 
     source_plans = _get_area_plans_by_level(doc, source_scheme.Id)
     target_plans = _get_area_plans_by_level(doc, target_scheme.Id)

@@ -20,6 +20,7 @@ from System.IO import StreamReader, StreamWriter
 from System.Text import Encoding, UTF8Encoding
 
 from pyrevit import DB
+from WWP_settings import get_tool_settings
 
 
 
@@ -146,7 +147,7 @@ class _CombinedConfig(object):
             raise errors[0]
 
 
-def _local_config_path():
+def _legacy_local_config_path():
     appdata = os.environ.get("APPDATA")
     if not appdata:
         appdata = os.path.join(os.path.expanduser("~"), "AppData", "Roaming")
@@ -237,7 +238,7 @@ def show_error_report(ex):
 
 
 def _load_local_config():
-    cfg_path = _local_config_path()
+    cfg_path = _legacy_local_config_path()
     data = {}
     if os.path.isfile(cfg_path):
         try:
@@ -251,15 +252,21 @@ def _load_local_config():
 
 
 def get_config_and_saver():
-    """Persist to both pyRevit config and a local JSON file for reliability."""
-    local_cfg = _load_local_config()
+    """Persist to a project-aware JSON file and seed from legacy config when available."""
+    legacy_sources = []
     try:
         from pyrevit import script as pyrevit_script
-        pyrevit_cfg = pyrevit_script.get_config()
-        cfg = _CombinedConfig(pyrevit_cfg, pyrevit_script.save_config, local_cfg, local_cfg.save)
-        return cfg, cfg.save
+
+        legacy_sources.append(pyrevit_script.get_config())
     except Exception:
-        return local_cfg, local_cfg.save
+        pass
+    legacy_files = [_legacy_local_config_path()]
+    return get_tool_settings(
+        "Export2Ex",
+        doc=get_active_doc(),
+        legacy_sources=legacy_sources,
+        legacy_file_paths=legacy_files,
+    )
 
 
 def config_get(config, name, default=None):

@@ -4,6 +4,7 @@ import random
 
 import clr
 from pyrevit import revit, DB, script
+from WWP_settings import get_tool_settings
 import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
@@ -12,6 +13,16 @@ from System.Collections.Generic import List
 
 doc = revit.doc
 uidoc = revit.uidoc
+legacy_sources = []
+try:
+    legacy_sources.append(script.get_config())
+except Exception:
+    pass
+config, save_config = get_tool_settings(
+    "MakeMarketingViews",
+    doc=doc,
+    legacy_sources=legacy_sources,
+)
 
 CONFIG_LAST_AREA_ID = "last_area_id"
 CONFIG_LAST_DOOR_ID = "last_door_id"
@@ -573,7 +584,6 @@ def main():
         uiutils.uiUtils_alert("No titleblock types found.", title="Make Marketing View")
         return
 
-    config = script.get_config()
     state = {
         "area": None,
         "areas": [],
@@ -750,7 +760,7 @@ def main():
     config.last_sheet_number_param = sheet_number_param or ""
     config.last_sheet_name_param = sheet_name_param or ""
     config.last_overwrite_existing = bool(overwrite_existing)
-    script.save_config()
+    save_config()
 
     results = []
     with revit.Transaction("Make Marketing View"):
