@@ -31,12 +31,12 @@ namespace WWPTools.WpfUI.Views
         {
             InitializeComponent();
             DialogStyles.ApplyPrimaryButtonStyle(OkButton);
-            DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
+            DialogStyles.ApplySecondaryButtonStyle(CancelButton);
             DialogStyles.ApplyPrimaryButtonStyle(ApplyFilterButton);
-            DialogStyles.ApplyPrimaryButtonStyle(ClearFilterButton);
-            DialogStyles.ApplyPrimaryButtonStyle(SelectAllButton);
-            DialogStyles.ApplyPrimaryButtonStyle(SelectNoneButton);
-            DialogStyles.ApplyPrimaryButtonStyle(InvertSelectionButton);
+            DialogStyles.ApplySecondaryButtonStyle(ClearFilterButton);
+            DialogStyles.ApplySecondaryButtonStyle(SelectAllButton);
+            DialogStyles.ApplySecondaryButtonStyle(SelectNoneButton);
+            DialogStyles.ApplySecondaryButtonStyle(InvertSelectionButton);
             OkButton.Click += (_, __) => DialogResult = true;
             CancelButton.Click += (_, __) => DialogResult = false;
             ApplyFilterButton.Click += (_, __) => ApplyFilter();

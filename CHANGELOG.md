@@ -5,6 +5,13 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-03-16
+- Flat UI refresh across WPF-based tool dialogs, including new XAML-backed dialogs where needed
+- Export2Ex: moved to a flat XAML dialog, fixed dialog loading errors, and improved sizing with a resizable splitter layout
+- Export2Ex: converted option checkboxes to toggle-style controls for a more consistent export form
+- Sheet Scale Updater: added an `Ignore Drafting Views` toggle and warnings for sheets that contain only drafting views
+- Import Area Key Schedule: improved automatic column mapping with direct contains matching and stronger fuzzy matching for parameter names like `*WWP_Stats_GCA`
+
 ## [1.2.1] - 2026-03-11
 - Sheet Scale Updater: merged sheet selection and target parameter selection into one dialog
 - Sheet Scale Updater: target parameter list now filters to non-Yes/No parameters containing `Scale`

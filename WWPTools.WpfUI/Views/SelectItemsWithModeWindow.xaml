@@ -5,60 +5,71 @@
         Width="720"
         Height="620"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize"
-        FontFamily="Arial Narrow"
-        FontSize="14"
-        Background="White">
-    <Grid Margin="12">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+        ResizeMode="CanResize">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/WWPTools.WpfUI;component/Themes/FlatTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Grid Margin="16">
+        <Border Background="{StaticResource PanelBrush}"
+                BorderBrush="#D7DEE6"
+                BorderThickness="1"
+                Padding="20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-        <TextBlock x:Name="PromptText"
-                   TextWrapping="Wrap"
-                   Margin="0,0,0,8" />
+                <TextBlock x:Name="PromptText"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,10"
+                           Foreground="{StaticResource MutedBrush}" />
 
-        <ListBox x:Name="ItemsList"
-                 Grid.Row="1"
-                 SelectionMode="Extended"
-                 Margin="0,0,0,8"
-                 MinHeight="200" />
+                <ListBox x:Name="ItemsList"
+                         Grid.Row="1"
+                         SelectionMode="Extended"
+                         Margin="0,0,0,10"
+                         MinHeight="200" />
 
-        <StackPanel x:Name="ModePanel"
-                    Grid.Row="2"
-                    Orientation="Horizontal"
-                    Margin="0,8,0,8">
-            <CheckBox x:Name="ModeA"
-                      Margin="0,0,16,0" />
-            <CheckBox x:Name="ModeB" />
-        </StackPanel>
+                <StackPanel x:Name="ModePanel"
+                            Grid.Row="2"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,10">
+                    <CheckBox x:Name="ModeA"
+                              Margin="0,0,16,0" />
+                    <CheckBox x:Name="ModeB" />
+                </StackPanel>
 
-        <DockPanel Grid.Row="3">
-            <Image x:Name="LogoImage"
-                   DockPanel.Dock="Left"
-                   Width="56"
-                   Height="56"
-                   Margin="0,0,0,0"
-                   VerticalAlignment="Bottom"
-                   HorizontalAlignment="Left"
-                   IsHitTestVisible="False" />
-            <StackPanel DockPanel.Dock="Right"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        Margin="0,12,0,0">
-                <Button x:Name="OkButton"
-                        Content="OK"
-                        MinWidth="80"
-                        Margin="0,0,8,0"
-                        IsDefault="True" />
-                <Button x:Name="CancelButton"
-                        Content="Cancel"
-                        MinWidth="80"
-                        IsCancel="True" />
-            </StackPanel>
-        </DockPanel>
+                <DockPanel Grid.Row="3">
+                    <Image x:Name="LogoImage"
+                           DockPanel.Dock="Left"
+                           Width="56"
+                           Height="56"
+                           VerticalAlignment="Bottom"
+                           HorizontalAlignment="Left"
+                           IsHitTestVisible="False" />
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Margin="0,12,0,0">
+                        <Button x:Name="OkButton"
+                                Content="OK"
+                                MinWidth="80"
+                                Margin="0,0,8,0"
+                                IsDefault="True" />
+                        <Button x:Name="CancelButton"
+                                Content="Cancel"
+                                MinWidth="80"
+                                IsCancel="True" />
+                    </StackPanel>
+                </DockPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

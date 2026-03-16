@@ -21,8 +21,8 @@ namespace WWPTools.WpfUI.Views
             InitializeComponent();
             DataContext = this;
             DialogStyles.ApplyPrimaryButtonStyle(OkButton);
-            DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
-            DialogStyles.ApplyPrimaryButtonStyle(BrowseButton);
+            DialogStyles.ApplySecondaryButtonStyle(CancelButton);
+            DialogStyles.ApplySecondaryButtonStyle(BrowseButton);
             DialogStyles.ApplyPrimaryButtonStyle(LoadButton);
 
             OkButton.Click += (_, __) =>

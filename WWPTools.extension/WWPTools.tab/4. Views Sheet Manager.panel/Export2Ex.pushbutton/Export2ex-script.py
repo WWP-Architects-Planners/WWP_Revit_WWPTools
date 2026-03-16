@@ -16,7 +16,7 @@ import traceback
 import clr
 from System import String
 from System.Collections.Generic import List
-from System.IO import StreamReader, StreamWriter
+from System.IO import File, StreamReader, StreamWriter
 from System.Text import Encoding, UTF8Encoding
 
 from pyrevit import DB
@@ -386,186 +386,12 @@ def _show_export_form(
             net_list.Add("" if value is None else str(value))
         return net_list
 
-    xaml = """
-    <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-            Title="Export Schedules" Height="720" Width="880"
-            WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
-        <Window.Resources>
-            <Style x:Key="PrimaryButton" TargetType="Button">
-                <Setter Property="Background" Value="#1976D2"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="Padding" Value="14,6"/>
-                <Setter Property="Height" Value="40"/>
-                <Setter Property="BorderThickness" Value="0"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border Background="{TemplateBinding Background}"
-                                    CornerRadius="18">
-                                <ContentPresenter HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"/>
-                            </Border>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-            <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-                <Setter Property="Background" Value="#E0E0E0"/>
-                <Setter Property="Foreground" Value="#424242"/>
-            </Style>
-            <Style x:Key="BlueToggle" TargetType="ToggleButton">
-                <Setter Property="Width" Value="42"/>
-                <Setter Property="Height" Value="21"/>
-                <Setter Property="FontWeight" Value="Bold"/>
-                <Setter Property="FontSize" Value="9"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="ToggleButton">
-                            <Grid>
-                                <Border x:Name="SwitchTrack"
-                                        CornerRadius="10.5"
-                                        Background="#BDBDBD"
-                                        BorderBrush="#9E9E9E"
-                                        BorderThickness="1"/>
-                                <Grid>
-                                    <TextBlock x:Name="OnText"
-                                               Text="ON"
-                                               Foreground="White"
-                                               FontWeight="Bold"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Left"
-                                               Margin="4,0,0,0"
-                                               Visibility="Collapsed"/>
-                                    <TextBlock x:Name="OffText"
-                                               Text="OFF"
-                                               Foreground="White"
-                                               FontWeight="Bold"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Right"
-                                               Margin="0,0,5,0"
-                                               Visibility="Visible"/>
-                                </Grid>
-                                <Ellipse x:Name="Thumb"
-                                         Width="14"
-                                         Height="14"
-                                         Fill="White"
-                                         Stroke="#9E9E9E"
-                                         StrokeThickness="1"
-                                         HorizontalAlignment="Left"
-                                         Margin="3,3,0,3"/>
-                            </Grid>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="SwitchTrack" Property="Background" Value="#1976D2"/>
-                                    <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#0F5BA8"/>
-                                    <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
-                                    <Setter TargetName="Thumb" Property="Margin" Value="0,3,3,3"/>
-                                    <Setter TargetName="OnText" Property="Visibility" Value="Visible"/>
-                                    <Setter TargetName="OffText" Property="Visibility" Value="Collapsed"/>
-                                </Trigger>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.95"/>
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.5"/>
-                                    <Setter TargetName="Thumb" Property="Opacity" Value="0.6"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-        </Window.Resources>
-        <Grid Margin="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0">
-                <TextBlock Text="Search schedules:"/>
-                <TextBox Name="SearchBox" Margin="0,4,0,8"/>
-            </StackPanel>
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="320"/>
-                </Grid.ColumnDefinitions>
-                <ListBox Name="ScheduleList" Grid.Column="0" SelectionMode="Extended"/>
-                <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                    <TextBlock Text="Export mode:"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
-                        <RadioButton Name="ExcelMode" Content="Excel" GroupName="ModeGroup" Margin="0,0,12,0"/>
-                        <RadioButton Name="CsvMode" Content="CSV" GroupName="ModeGroup"/>
-                    </StackPanel>
-
-                    <GroupBox Header="Schedule appearance" Margin="0,4,0,8">
-                        <StackPanel Margin="8,6,8,8">
-                            <CheckBox Name="ExportTitle" Content="Export title"/>
-                            <CheckBox Name="ExportColumnHeaders" Content="Export column headers" IsChecked="True"/>
-                            <CheckBox Name="ExportGroupedColumnHeaders" Content="Include grouped column headers" Margin="18,0,0,0"/>
-                            <CheckBox Name="ExportGroupHeaders" Content="Export group headers, footers, and blank lines"/>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <TextBlock Text="Excel file path:"/>
-                    <DockPanel Margin="0,4,0,8">
-                        <TextBox Name="ExcelPath" DockPanel.Dock="Left" Width="220" Margin="0,0,6,0"/>
-                        <Button Name="BrowseExcel" Content="Browse" Width="70"/>
-                    </DockPanel>
-
-                    <GroupBox Header="Output options" Margin="0,4,0,8">
-                        <StackPanel Margin="8,6,8,8">
-                            <TextBlock Text="CSV folder:"/>
-                            <DockPanel Margin="0,4,0,8">
-                                <TextBox Name="CsvFolder" DockPanel.Dock="Left" Width="220" Margin="0,0,6,0"/>
-                                <Button Name="BrowseCsv" Content="Browse" Width="70"/>
-                            </DockPanel>
-
-                            <TextBlock Text="CSV delimiter:"/>
-                            <ComboBox Name="CsvDelimiter" Margin="0,4,0,8"/>
-
-                            <TextBlock Text="Text qualifier:"/>
-                            <ComboBox Name="TextQualifier" Margin="0,4,0,8"/>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="Quote all fields" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ToggleButton Name="QuoteAll" Style="{StaticResource BlueToggle}" />
-                            </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
-                </StackPanel>
-            </Grid>
-            <DockPanel Grid.Row="2" Margin="0,12,0,0">
-                <Image Name="LogoImage"
-                       DockPanel.Dock="Left"
-                       Width="56"
-                       Height="56"
-                       VerticalAlignment="Bottom"
-                       HorizontalAlignment="Left"
-                       IsHitTestVisible="False" />
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Name="OkButton" Style="{StaticResource PrimaryButton}" Width="150" Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <TextBlock Text="&#xE105;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                            <TextBlock Text="Export" FontSize="14"/>
-                        </StackPanel>
-                    </Button>
-                    <Button Name="CancelButton" Style="{StaticResource SecondaryButton}" Width="150">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                            <TextBlock Text="Cancel" FontSize="14"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </DockPanel>
-        </Grid>
-    </Window>
-    """
-    reader = XmlReader.Create(StringReader(xaml))
+    dialog_script_dir = os.path.dirname(__file__)
+    xaml_path = os.path.join(dialog_script_dir, "ExportSchedulesDialog.xaml")
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing dialog XAML: {}".format(xaml_path))
+    xaml_text = File.ReadAllText(xaml_path)
+    reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
 
     search_box = window.FindName("SearchBox")
@@ -635,8 +461,7 @@ def _show_export_form(
         excel_mode.IsChecked = True
 
     try:
-        script_dir = os.path.dirname(__file__)
-        lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+        lib_path = os.path.abspath(os.path.join(dialog_script_dir, "..", "..", "..", "lib"))
         logo_path = os.path.join(lib_path, "WWPtools-logo.png")
         if logo_image is not None and os.path.isfile(logo_path):
             bitmap = BitmapImage()

@@ -396,7 +396,6 @@ def main():
     last_sheet_ids = getattr(config, "sheet_ids", []) or []
     last_param_name = getattr(config, "sheet_scale_param_name", "") or ""
     last_param_scope = getattr(config, "sheet_scale_param_scope", "") or ""
-    last_ignore_drafting_views = bool(getattr(config, "sheet_scale_ignore_drafting_views", False))
     prechecked_indices = []
     if last_sheet_ids:
         for i, s in enumerate(sheet_by_index):
@@ -436,7 +435,7 @@ def main():
             prompt="Select sheets to update and choose the target parameter:",
             prechecked_indices=prechecked_indices,
             default_label=default_label,
-            ignore_drafting_views_default=last_ignore_drafting_views,
+            ignore_drafting_views_default=False,
         )
     except Exception as ex:
         UI.TaskDialog.Show("Sheet Scale Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -465,7 +464,6 @@ def main():
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.sheet_scale_param_name = target_param_name
     config.sheet_scale_param_scope = target_param_scope
-    config.sheet_scale_ignore_drafting_views = ignore_drafting_views
     save_config()
 
     titleblocks_by_sheet = {}

@@ -1444,7 +1444,7 @@ namespace WWPTools.WpfUI
                     MinWidth = 140,
                     MinHeight = 38
                 };
-                DialogStyles.ApplyPrimaryButtonStyle(cancelButton);
+                DialogStyles.ApplySecondaryButtonStyle(cancelButton);
                 panel.Children.Add(cancelButton);
             }
 
@@ -1706,6 +1706,7 @@ namespace WWPTools.WpfUI
     internal static class DialogStyles
     {
         private static Style _primaryButtonStyle;
+        private static Style _secondaryButtonStyle;
         private static Style _toggleCheckBoxStyle;
 
         public static void ApplyPrimaryButtonStyle(Button button)
@@ -1713,6 +1714,13 @@ namespace WWPTools.WpfUI
             if (button == null)
                 return;
             button.Style = _primaryButtonStyle ?? (_primaryButtonStyle = CreatePrimaryButtonStyle());
+        }
+
+        public static void ApplySecondaryButtonStyle(Button button)
+        {
+            if (button == null)
+                return;
+            button.Style = _secondaryButtonStyle ?? (_secondaryButtonStyle = CreateSecondaryButtonStyle());
         }
 
         public static void ApplyToggleStyle(CheckBox checkbox)
@@ -1725,37 +1733,35 @@ namespace WWPTools.WpfUI
         private static Style CreatePrimaryButtonStyle()
         {
             var style = new Style(typeof(Button));
-            style.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(10, 102, 209))));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(63, 154, 217))));
             style.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
-            style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
-            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
-            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(18, 6, 18, 6)));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(63, 154, 217))));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 26.5));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(18, 0, 18, 0)));
             style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+            style.Setters.Add(new Setter(Control.TemplateProperty, CreateButtonTemplate(
+                Color.FromRgb(46, 135, 197),
+                Color.FromRgb(46, 135, 197),
+                true)));
+            return style;
+        }
 
-            var template = new ControlTemplate(typeof(Button));
-            var border = new FrameworkElementFactory(typeof(Border));
-            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
-            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
-            border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
-            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(18));
-
-            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
-            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            border.AppendChild(presenter);
-
-            template.VisualTree = border;
-
-            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-            hoverTrigger.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(8, 88, 182))));
-            template.Triggers.Add(hoverTrigger);
-
-            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
-            disabledTrigger.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromRgb(170, 170, 170))));
-            disabledTrigger.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
-            template.Triggers.Add(disabledTrigger);
-
-            style.Setters.Add(new Setter(Control.TemplateProperty, template));
+        private static Style CreateSecondaryButtonStyle()
+        {
+            var style = CreatePrimaryButtonStyle();
+            style.Setters.Clear();
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, new SolidColorBrush(Color.FromRgb(31, 41, 55))));
+            style.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(203, 213, 225))));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 26.5));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(18, 0, 18, 0)));
+            style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+            style.Setters.Add(new Setter(Control.TemplateProperty, CreateButtonTemplate(
+                Color.FromRgb(239, 243, 248),
+                Color.FromRgb(203, 213, 225),
+                true)));
             return style;
         }
 
@@ -1770,21 +1776,25 @@ namespace WWPTools.WpfUI
 
             var toggleGrid = new FrameworkElementFactory(typeof(Grid));
             toggleGrid.SetValue(DockPanel.DockProperty, Dock.Right);
-            toggleGrid.SetValue(FrameworkElement.WidthProperty, 44.0);
-            toggleGrid.SetValue(FrameworkElement.HeightProperty, 22.0);
+            toggleGrid.SetValue(FrameworkElement.WidthProperty, 38.0);
+            toggleGrid.SetValue(FrameworkElement.HeightProperty, 19.0);
 
             var track = new FrameworkElementFactory(typeof(Border));
             track.Name = "ToggleTrack";
-            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(229, 232, 237)));
-            track.SetValue(Border.CornerRadiusProperty, new CornerRadius(11));
+            track.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(184, 193, 204)));
+            track.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(174, 184, 196)));
+            track.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            track.SetValue(Border.CornerRadiusProperty, new CornerRadius(9.5));
             toggleGrid.AppendChild(track);
 
             var thumb = new FrameworkElementFactory(typeof(Ellipse));
             thumb.Name = "ToggleThumb";
-            thumb.SetValue(FrameworkElement.WidthProperty, 18.0);
-            thumb.SetValue(FrameworkElement.HeightProperty, 18.0);
+            thumb.SetValue(FrameworkElement.WidthProperty, 15.0);
+            thumb.SetValue(FrameworkElement.HeightProperty, 15.0);
             thumb.SetValue(Shape.FillProperty, Brushes.White);
-            thumb.SetValue(FrameworkElement.MarginProperty, new Thickness(2));
+            thumb.SetValue(Shape.StrokeProperty, new SolidColorBrush(Color.FromRgb(174, 184, 196)));
+            thumb.SetValue(Shape.StrokeThicknessProperty, 1.0);
+            thumb.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 2, 21, 2));
             thumb.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
             thumb.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             toggleGrid.AppendChild(thumb);
@@ -1798,8 +1808,10 @@ namespace WWPTools.WpfUI
             template.VisualTree = root;
 
             var checkedTrigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
-            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0, 120, 215)), "ToggleTrack"));
-            checkedTrigger.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right, "ToggleThumb"));
+            checkedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(63, 154, 217)), "ToggleTrack"));
+            checkedTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(63, 154, 217)), "ToggleTrack"));
+            checkedTrigger.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(21, 2, 2, 2), "ToggleThumb"));
+            checkedTrigger.Setters.Add(new Setter(Shape.StrokeProperty, new SolidColorBrush(Color.FromRgb(63, 154, 217)), "ToggleThumb"));
             template.Triggers.Add(checkedTrigger);
 
             var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
@@ -1808,6 +1820,42 @@ namespace WWPTools.WpfUI
 
             style.Setters.Add(new Setter(Control.TemplateProperty, template));
             return style;
+        }
+
+        private static ControlTemplate CreateButtonTemplate(Color hoverBackgroundColor, Color hoverBorderColor, bool adjustOpacity)
+        {
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.Name = "ButtonBorder";
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+            border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.AppendChild(presenter);
+
+            template.VisualTree = border;
+
+            var hoverTrigger = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(hoverBackgroundColor), "ButtonBorder"));
+            hoverTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(hoverBorderColor), "ButtonBorder"));
+            template.Triggers.Add(hoverTrigger);
+
+            if (adjustOpacity)
+            {
+                var pressedTrigger = new Trigger { Property = ButtonBase.IsPressedProperty, Value = true };
+                pressedTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.9, "ButtonBorder"));
+                template.Triggers.Add(pressedTrigger);
+            }
+
+            var disabledTrigger = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+            disabledTrigger.Setters.Add(new Setter(UIElement.OpacityProperty, 0.55, "ButtonBorder"));
+            template.Triggers.Add(disabledTrigger);
+
+            return template;
         }
     }
 

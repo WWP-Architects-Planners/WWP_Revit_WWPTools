@@ -14,7 +14,7 @@ namespace WWPTools.WpfUI.Views
         {
             InitializeComponent();
             DialogStyles.ApplyPrimaryButtonStyle(OkButton);
-            DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
+            DialogStyles.ApplySecondaryButtonStyle(CancelButton);
             DialogStyles.ApplyToggleStyle(ModeA);
             DialogStyles.ApplyToggleStyle(ModeB);
             OkButton.Click += (_, __) => DialogResult = true;

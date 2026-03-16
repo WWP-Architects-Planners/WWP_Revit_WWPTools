@@ -14,9 +14,11 @@ namespace WWPTools.WpfUI.Views
         {
             InitializeComponent();
             DialogStyles.ApplyPrimaryButtonStyle(OkButton);
-            DialogStyles.ApplyPrimaryButtonStyle(CancelButton);
+            DialogStyles.ApplySecondaryButtonStyle(CancelButton);
             DialogStyles.ApplyToggleStyle(ModeExcel);
             DialogStyles.ApplyToggleStyle(ModeCsv);
+            DialogStyles.ApplySecondaryButtonStyle(BrowseExcelButton);
+            DialogStyles.ApplySecondaryButtonStyle(BrowseCsvButton);
             OkButton.Click += (_, __) => DialogResult = true;
             CancelButton.Click += (_, __) => DialogResult = false;
             ModeExcel.Checked += (_, __) => SetMode(true);
