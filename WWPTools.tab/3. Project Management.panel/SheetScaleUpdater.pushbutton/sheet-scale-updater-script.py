@@ -168,7 +168,15 @@ def _print_text(text=""):
     except Exception:
         pass
 
-def _show_sheet_scale_dialog(sheet_items, param_labels, title, prompt, prechecked_indices=None, default_label=None):
+def _show_sheet_scale_dialog(
+    sheet_items,
+    param_labels,
+    title,
+    prompt,
+    prechecked_indices=None,
+    default_label=None,
+    ignore_drafting_views_default=False,
+):
     if not sheet_items:
         return None
 
@@ -205,6 +213,7 @@ def _show_sheet_scale_dialog(sheet_items, param_labels, title, prompt, prechecke
     parameter_combo = window.FindName("ParameterCombo")
     search_box = window.FindName("SearchBox")
     sheets_list = window.FindName("SheetsList")
+    ignore_drafting_views_checkbox = window.FindName("IgnoreDraftingViewsCheckBox")
     validation_text = window.FindName("ValidationText")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
@@ -220,6 +229,8 @@ def _show_sheet_scale_dialog(sheet_items, param_labels, title, prompt, prechecke
         parameter_combo.Text = default_label
     elif parameter_combo.Items.Count > 0:
         parameter_combo.SelectedIndex = 0
+    if ignore_drafting_views_checkbox is not None:
+        ignore_drafting_views_checkbox.IsChecked = bool(ignore_drafting_views_default)
 
     try:
         lib_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib"))
@@ -320,6 +331,9 @@ def _show_sheet_scale_dialog(sheet_items, param_labels, title, prompt, prechecke
     selected_param = str(parameter_combo.Text or "").strip()
     return {
         "selected_indices": sorted(selected_indices),
+        "ignore_drafting_views": bool(
+            ignore_drafting_views_checkbox is not None and ignore_drafting_views_checkbox.IsChecked
+        ),
         "selected_parameter": selected_param,
     }
 
@@ -351,6 +365,7 @@ def main():
     updated_count = 0
     updated_sheets = []
     failed_sheets = []
+    warning_sheets = []
 
     active_view = doc.ActiveView
     current_sheet_id_val = None
@@ -381,6 +396,7 @@ def main():
     last_sheet_ids = getattr(config, "sheet_ids", []) or []
     last_param_name = getattr(config, "sheet_scale_param_name", "") or ""
     last_param_scope = getattr(config, "sheet_scale_param_scope", "") or ""
+    last_ignore_drafting_views = bool(getattr(config, "sheet_scale_ignore_drafting_views", False))
     prechecked_indices = []
     if last_sheet_ids:
         for i, s in enumerate(sheet_by_index):
@@ -420,6 +436,7 @@ def main():
             prompt="Select sheets to update and choose the target parameter:",
             prechecked_indices=prechecked_indices,
             default_label=default_label,
+            ignore_drafting_views_default=last_ignore_drafting_views,
         )
     except Exception as ex:
         UI.TaskDialog.Show("Sheet Scale Updater", "WPF UI error:\n{}".format(str(ex)))
@@ -443,10 +460,12 @@ def main():
     entry = param_entries.get(target_label)
     target_param_name = entry["name"] if entry else target_label
     target_param_scope = entry["scope"] if entry else "instance"
+    ignore_drafting_views = bool(dialog_result.get("ignore_drafting_views", False))
 
     config.sheet_ids = [v for v in (_element_id_int(s.Id) for s in selected_sheets) if v is not None]
     config.sheet_scale_param_name = target_param_name
     config.sheet_scale_param_scope = target_param_scope
+    config.sheet_scale_ignore_drafting_views = ignore_drafting_views
     save_config()
 
     titleblocks_by_sheet = {}
@@ -483,6 +502,9 @@ def main():
             scales = set()
             scale_details = []
             legend_views_skipped = 0
+            drafting_views_skipped = 0
+            non_legend_view_count = 0
+            non_legend_drafting_count = 0
             for vp_id in viewport_ids:
                 viewport = doc.GetElement(vp_id)
                 if not viewport:
@@ -491,14 +513,23 @@ def main():
                 if view_id in view_scale_cache:
                     sval = view_scale_cache[view_id]
                     is_legend = view_scale_cache.get(("legend", view_id), False)
+                    is_drafting = view_scale_cache.get(("drafting", view_id), False)
                 else:
                     view = doc.GetElement(view_id)
                     is_legend = bool(view and hasattr(view, "ViewType") and view.ViewType == DB.ViewType.Legend)
+                    is_drafting = bool(view and hasattr(view, "ViewType") and view.ViewType == DB.ViewType.DraftingView)
                     sval = view.Scale if view and hasattr(view, 'Scale') else None
                     view_scale_cache[view_id] = sval
                     view_scale_cache[("legend", view_id)] = is_legend
+                    view_scale_cache[("drafting", view_id)] = is_drafting
                 if is_legend:
                     legend_views_skipped += 1
+                    continue
+                non_legend_view_count += 1
+                if is_drafting:
+                    non_legend_drafting_count += 1
+                if ignore_drafting_views and is_drafting:
+                    drafting_views_skipped += 1
                     continue
                 if sval is not None:
                     scale_details.append(sval)
@@ -509,10 +540,22 @@ def main():
             sheet_debug["all_viewport_scales"] = scale_details
             if legend_views_skipped:
                 sheet_debug["legend_views_skipped"] = legend_views_skipped
+            if drafting_views_skipped:
+                sheet_debug["drafting_views_skipped"] = drafting_views_skipped
+            if non_legend_view_count and non_legend_view_count == non_legend_drafting_count:
+                warning_message = sheet_label + " - Only drafting views found on sheet"
+                if ignore_drafting_views:
+                    warning_message += " (ignored for scale calculation)"
+                warning_sheets.append(warning_message)
+                sheet_debug["warning"] = warning_message
 
             if not scales:
-                sheet_debug["error"] = "No valid scales found"
-                failed_sheets.append(sheet_label + " - No valid scales found")
+                if non_legend_view_count and non_legend_view_count == non_legend_drafting_count and ignore_drafting_views:
+                    sheet_debug["error"] = "Only drafting views found and ignored"
+                    failed_sheets.append(sheet_label + " - Only drafting views found and ignored")
+                else:
+                    sheet_debug["error"] = "No valid scales found"
+                    failed_sheets.append(sheet_label + " - No valid scales found")
                 continue
 
             if len(scales) == 1:
@@ -586,6 +629,8 @@ def main():
         return
 
     msg = "Successfully updated {} sheet(s).".format(updated_count)
+    if warning_sheets:
+        msg += "\nWarnings: {}".format(len(warning_sheets))
     if failed_sheets:
         msg += "\n\nFailed/Skipped: {}".format(len(failed_sheets))
     UI.TaskDialog.Show("Sheet Scale Updater", msg)
@@ -594,8 +639,10 @@ def main():
     _print_text("Sheet Scale Updater Report")
     _print_text("Developed by: Jason Tian")
     _print_text("Updated: {} sheets".format(updated_count))
+    _print_text("Warnings: {} sheets".format(len(warning_sheets)))
     _print_text("Failed/Skipped: {} sheets".format(len(failed_sheets)))
     _print_text("Target Parameter: {} ({})".format(target_param_name, target_param_scope or "instance"))
+    _print_text("Ignore Drafting Views: {}".format("Yes" if ignore_drafting_views else "No"))
     if updated_sheets:
         _print_text("")
         _print_text("Changed Sheets:")
@@ -611,5 +658,11 @@ def main():
         _print_text("Failed/Skipped Sheets:")
         for failure in failed_sheets:
             _print_text(" - {}".format(failure))
+
+    if warning_sheets:
+        _print_text("")
+        _print_text("Warnings:")
+        for warning in warning_sheets:
+            _print_text(" - {}".format(warning))
 
 main()
