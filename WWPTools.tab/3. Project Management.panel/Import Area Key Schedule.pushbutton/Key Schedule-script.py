@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
+from difflib import SequenceMatcher
 
 from pyrevit import DB, revit, script
 from WWP_settings import get_tool_settings
@@ -287,6 +289,225 @@ def build_preview_lines(headers, rows, max_rows=8):
     return lines
 
 
+def _base_parameter_name(name):
+    raw = (name or "").strip()
+    if raw.endswith(")") and " (id " in _normalize_name(raw):
+        return raw.rsplit(" (", 1)[0].strip()
+    return raw
+
+
+def _strip_excel_column_prefix(value):
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    match = re.match(r"^[A-Za-z]{1,3}\s*-\s*(.+)$", raw)
+    if match:
+        return match.group(1).strip()
+    return raw
+
+
+def _match_text_variants(value):
+    source_values = []
+    raw = (value or "").strip()
+    stripped = _strip_excel_column_prefix(raw)
+    for source in (raw, stripped):
+        normalized = _normalize_name(source)
+        if normalized and normalized not in source_values:
+            source_values.append(normalized)
+
+    results = []
+    seen = set()
+    for source in source_values:
+        text = source.replace("&", " and ")
+        text = re.sub(r"[_\-/]+", " ", text)
+        text = re.sub(r"[^a-z0-9\s]+", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        compact = text.replace(" ", "")
+        tokens = [token for token in text.split(" ") if token]
+        singular_tokens = []
+        for token in tokens:
+            if len(token) > 3 and token.endswith("s"):
+                singular_tokens.append(token[:-1])
+            else:
+                singular_tokens.append(token)
+        singular_text = " ".join(singular_tokens)
+        singular_compact = singular_text.replace(" ", "")
+        variants = [text, compact, singular_text, singular_compact]
+        for variant in variants:
+            if variant and variant not in seen:
+                seen.add(variant)
+                results.append(variant)
+    return results
+
+
+def _build_parameter_candidates(param_display_names):
+    candidates = []
+    for name in param_display_names or []:
+        raw = (name or "").strip()
+        if not raw:
+            continue
+        base = _base_parameter_name(raw)
+        variants = []
+        variants.extend(_match_text_variants(raw))
+        if base != raw:
+            variants.extend(_match_text_variants(base))
+        seen = set()
+        unique_variants = []
+        for variant in variants:
+            if variant and variant not in seen:
+                seen.add(variant)
+                unique_variants.append(variant)
+        token_set = set()
+        compact_variants = set()
+        for variant in unique_variants:
+            compact_variant = variant.replace(" ", "")
+            if compact_variant:
+                compact_variants.add(compact_variant)
+            for token in variant.split(" "):
+                token = token.strip()
+                if token:
+                    token_set.add(token)
+        candidates.append(
+            {
+                "display": name,
+                "variants": unique_variants,
+                "tokens": token_set,
+                "compact_variants": compact_variants,
+            }
+        )
+    return candidates
+
+
+def _contains_parameter_match(header, param_display_names):
+    header_variants = _match_text_variants(header)
+    if not header_variants:
+        return None
+
+    candidates = _build_parameter_candidates(param_display_names)
+    if not candidates:
+        return None
+
+    ranked = []
+    for candidate in candidates:
+        best_rank = None
+        best_length = None
+        for header_variant in header_variants:
+            header_compact = header_variant.replace(" ", "")
+            if len(header_compact) < 3:
+                continue
+
+            header_tokens = [token for token in header_variant.split(" ") if token and len(token) >= 3]
+            candidate_tokens = candidate.get("tokens", set())
+            candidate_compacts = candidate.get("compact_variants", set())
+
+            for token in header_tokens:
+                if token in candidate_tokens:
+                    length = min(abs(len(compact) - len(token)) for compact in candidate_compacts) if candidate_compacts else 0
+                    rank = (0, length, len(candidate.get("display", "")), candidate.get("display", ""))
+                    if best_rank is None or rank < best_rank:
+                        best_rank = rank
+
+            for compact in candidate_compacts:
+                if compact == header_compact:
+                    rank = (0, 0, len(candidate.get("display", "")), candidate.get("display", ""))
+                elif compact.endswith(header_compact) or compact.startswith(header_compact):
+                    rank = (1, abs(len(compact) - len(header_compact)), len(candidate.get("display", "")), candidate.get("display", ""))
+                elif header_compact in compact:
+                    rank = (2, abs(len(compact) - len(header_compact)), len(candidate.get("display", "")), candidate.get("display", ""))
+                else:
+                    continue
+                if best_rank is None or rank < best_rank:
+                    best_rank = rank
+            if best_rank is not None:
+                best_length = best_rank
+        if best_length is not None:
+            ranked.append((best_length, candidate.get("display")))
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda item: item[0])
+    return ranked[0][1]
+
+
+def _score_parameter_match(header, candidate):
+    header_variants = _match_text_variants(header)
+    if not header_variants:
+        return 0.0
+
+    best_score = 0.0
+    for header_variant in header_variants:
+        header_compact = header_variant.replace(" ", "")
+        header_tokens = set(token for token in header_variant.split(" ") if token)
+        for candidate_variant in candidate.get("variants", []):
+            candidate_compact = candidate_variant.replace(" ", "")
+            candidate_tokens = set(token for token in candidate_variant.split(" ") if token)
+            if not candidate_compact:
+                continue
+            if header_variant == candidate_variant or header_compact == candidate_compact:
+                return 1.0
+
+            # Strong auto-match when the header is a whole token in the parameter
+            # name, e.g. GCA -> *_WWP_Stats_GCA.
+            if len(header_tokens) == 1:
+                header_token = next(iter(header_tokens))
+                if len(header_token) >= 3 and header_token in candidate_tokens:
+                    return 0.97
+
+            # Strong auto-match when the normalized header text is clearly contained
+            # in the parameter name.
+            if len(header_compact) >= 3 and header_compact in candidate_compact:
+                if candidate_compact.endswith(header_compact) or candidate_compact.startswith(header_compact):
+                    best_score = max(best_score, 0.94)
+                else:
+                    best_score = max(best_score, 0.88)
+
+            sequence_score = SequenceMatcher(None, header_compact, candidate_compact).ratio()
+            overlap = 0.0
+            if header_tokens and candidate_tokens:
+                overlap = (2.0 * len(header_tokens & candidate_tokens)) / (len(header_tokens) + len(candidate_tokens))
+
+            contains_bonus = 0.0
+            shorter_len = min(len(header_compact), len(candidate_compact))
+            if shorter_len >= 4 and (
+                header_compact in candidate_compact or candidate_compact in header_compact
+            ):
+                contains_bonus = 0.08
+
+            score = max(sequence_score, overlap) + contains_bonus
+            if header_tokens and candidate_tokens and header_tokens <= candidate_tokens:
+                score += 0.10
+            if score > best_score:
+                best_score = score
+    return min(best_score, 1.0)
+
+
+def _fuzzy_match_parameter(header, param_display_names):
+    candidates = _build_parameter_candidates(param_display_names)
+    if not candidates:
+        return None
+
+    scored = []
+    for candidate in candidates:
+        score = _score_parameter_match(header, candidate)
+        if score > 0:
+            scored.append((score, candidate["display"]))
+    if not scored:
+        return None
+
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    best_score, best_name = scored[0]
+    second_score = scored[1][0] if len(scored) > 1 else 0.0
+
+    if best_score >= 0.96:
+        return best_name
+    if best_score >= 0.82 and (best_score - second_score) >= 0.03:
+        return best_name
+    if best_score >= 0.72 and (best_score - second_score) >= 0.08:
+        return best_name
+    return None
+
+
 def build_default_selections(headers, param_display_names):
     defaults = []
     name_lookup = {}
@@ -315,6 +536,14 @@ def build_default_selections(headers, param_display_names):
             continue
         if header_lower in name_lookup:
             defaults.append(name_lookup[header_lower])
+            continue
+        contains_match = _contains_parameter_match(header_text, param_display_names)
+        if contains_match:
+            defaults.append(contains_match)
+            continue
+        fuzzy_match = _fuzzy_match_parameter(header_text, param_display_names)
+        if fuzzy_match:
+            defaults.append(fuzzy_match)
             continue
         defaults.append(SKIP_OPTION)
     return defaults

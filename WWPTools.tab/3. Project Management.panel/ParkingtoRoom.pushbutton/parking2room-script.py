@@ -6,6 +6,7 @@ import traceback
 import clr
 from System import String
 from System.Collections.Generic import List
+from System.IO import File
 
 from pyrevit import DB, revit
 
@@ -383,40 +384,11 @@ def _show_inputs_form(
             net_list.Add("" if item is None else str(item))
         return net_list
 
-    xaml = """
-    <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-            Title="Parking Count in Room" Height="620" Width="720"
-            WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip">
-        <Grid Margin="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0">
-                <TextBlock Text="Select rooms that have parking:" Margin="0,0,0,6"/>
-            </StackPanel>
-            <ListBox Name="RoomsList" Grid.Row="1" SelectionMode="Extended" />
-            <StackPanel Grid.Row="2" Margin="0,10,0,0">
-                <TextBlock Text="Parking type source:" />
-                <ComboBox Name="TypeSourceCombo" Margin="0,4,0,8"/>
-                <TextBlock Text="Room parameter to write:" />
-                <ComboBox Name="RoomParamCombo" Margin="0,4,0,8"/>
-                <TextBlock Text="Parking count source parameter:" />
-                <ComboBox Name="CountParamCombo" Margin="0,4,0,12"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Name="OkButton" Content="Run" Width="90" Margin="0,0,8,0"/>
-                    <Button Name="CancelButton" Content="Cancel" Width="90"/>
-                </StackPanel>
-            </StackPanel>
-            <Image Name="LogoImage" Width="64" Height="64"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                   Grid.Row="2" Margin="0,0,0,0" />
-        </Grid>
-    </Window>
-    """
-    reader = XmlReader.Create(StringReader(xaml))
+    xaml_path = os.path.join(script_dir, "ParkingCountDialog.xaml")
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing dialog XAML: {}".format(xaml_path))
+    xaml_text = File.ReadAllText(xaml_path)
+    reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
 
     rooms_list = window.FindName("RoomsList")
