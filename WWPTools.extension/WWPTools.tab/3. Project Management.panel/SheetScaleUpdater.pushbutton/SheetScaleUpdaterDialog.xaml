@@ -49,6 +49,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -88,24 +89,29 @@
                      MinWidth="260" />
         </Grid>
 
-        <TextBlock Grid.Row="2"
+        <CheckBox x:Name="IgnoreDraftingViewsCheckBox"
+                  Grid.Row="2"
+                  Content="Ignore Drafting Views when calculating sheet scale"
+                  Margin="0,0,0,8" />
+
+        <TextBlock Grid.Row="3"
                    Text="Select sheets to update:"
                    Margin="0,0,0,6" />
 
         <ListBox x:Name="SheetsList"
-                 Grid.Row="3"
+                 Grid.Row="4"
                  SelectionMode="Extended"
                  MinHeight="320"
                  Margin="0,0,0,8" />
 
         <TextBlock x:Name="ValidationText"
-                   Grid.Row="4"
+                   Grid.Row="5"
                    Foreground="#C62828"
                    Visibility="Collapsed"
                    Margin="0,0,0,4"
                    TextWrapping="Wrap" />
 
-        <DockPanel Grid.Row="5"
+        <DockPanel Grid.Row="6"
                    Margin="0,12,0,0">
             <Image x:Name="LogoImage"
                    DockPanel.Dock="Left"
