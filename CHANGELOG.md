@@ -5,12 +5,14 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.3] - 2026-03-17
 
 ### Added
 - Web Context Builder: new pyRevit/XAML context import tool with embedded Leaflet/OpenStreetMap map, click-to-set location, cached web data, layer toggles, and square-radius extent import
+- UK Context Builder: new UK-only pyRevit/XAML context import tool using Environment Agency terrain services and DSM-minus-DTM fallback heights for buildings missing OSM height data
 - Web Context Builder: optional HRDEM terrain import with Toposolid generation, dense-area sampling control, terrain-aware building placement, and Toposolid subdivisions for roads, tracks, parcels, parks, and water
 - DirectShape To Mass: new conversion tool for turning imported DirectShape buildings into conceptual mass families
+- Copy Parameter: split into `Copy Parameter From Selected` and `Copy Parameter By Category` tools under a new pulldown
 
 ### Changed
 - Building Importer: replaced the old Dynamo-based workflow with a Python OSM importer and archived the legacy Dynamo graph
@@ -22,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Building Importer: fixed the material picker cancel path so it no longer throws `ElementId.op_Equality` errors
 - Web Context Builder: fixed flat-floor type duplication/materialization so duplicated floor types no longer silently fall back to the original base type
 - Web Context Builder: restored visible DirectShape edges by removing same-color line overrides on imported buildings
+- Area Plan Duplicator: fixed area boundary recreation when copying between area schemes and report actual created/failed boundary counts
 
 ## [1.2.2] - 2026-03-16
 - Flat UI refresh across WPF-based tool dialogs, including new XAML-backed dialogs where needed

@@ -27,12 +27,12 @@ from Autodesk.Revit import DB, UI
 from pyrevit.framework import EventHandler
 
 
-TITLE = "Web Context Builder"
-APP_ID = "WWPTools.WebContextBuilder"
+TITLE = "UK Context Builder"
+APP_ID = "WWPTools.UKContextBuilder"
 DEFAULT_RADIUS_M = 500.0
 MIN_RADIUS_M = 50.0
 MAX_RADIUS_M = 2000.0
-USER_AGENT = "WWPTools.WebContextBuilder/1.0"
+USER_AGENT = "WWPTools.UKContextBuilder/1.0"
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
@@ -52,8 +52,10 @@ PEDESTRIAN_HIGHWAYS = (
 )
 MAX_FAILURES_IN_REPORT = 30
 MAP_CLICK_SCHEME = "pyrevit-map://click"
-HRDEM_WMS_ENDPOINT = "https://datacube.services.geo.ca/ows/elevation"
-HRDEM_WMS_LAYER = "dtm"
+UK_TERRAIN_DTM_WMS_ENDPOINT = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wms"
+UK_TERRAIN_DTM_WMS_LAYER = "Lidar_Composite_Elevation_DTM_1m"
+UK_TERRAIN_DSM_WMS_ENDPOINT = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-last-return-dsm-1m/wms"
+UK_TERRAIN_DSM_WMS_LAYER = "Lidar_Composite_Elevation_LZ_DSM_1m"
 TERRAIN_MIN_GRID_SPACING_M = 60.0
 TERRAIN_DENSE_SQUARE_SIZE_M = 100.0
 TERRAIN_DENSE_GRID_SPACING_M = 10.0
@@ -63,6 +65,14 @@ BASE_TOTAL_TERRAIN_SAMPLE_POINTS = 260
 MAX_TOTAL_TERRAIN_SAMPLE_POINTS = 1600
 MAX_DENSE_GRID_SAMPLE_POINTS = 1521
 MIN_DENSE_AREA_M = 20.0
+DSM_DTM_MIN_BUILDING_HEIGHT_M = 3.0
+DSM_DTM_MAX_BUILDING_HEIGHT_M = 120.0
+DSM_DTM_SAMPLE_POINT_LIMIT = 9
+DSM_DTM_DRYRUN_LIMIT = 12
+FAST_TERRAIN_MIN_GRID_SPACING_M = 120.0
+FAST_MAX_TERRAIN_SAMPLE_POINTS = 49
+FAST_BASE_TOTAL_TERRAIN_SAMPLE_POINTS = 81
+FAST_MAX_TOTAL_TERRAIN_SAMPLE_POINTS = 121
 MAX_BUILDING_SOLIDS_PER_MASS_FAMILY = 1
 BUILDING_OUTPUT_DIRECTSHAPE = "directshape"
 BUILDING_OUTPUT_INPLACE_MASS = "inplacemass"
@@ -83,7 +93,7 @@ CACHE_ROOT = os.path.join(
     os.getenv("APPDATA") or os.path.expanduser("~"),
     "pyRevit",
     "WWPTools",
-    "WebContextBuilderCache",
+    "UKContextBuilderCache",
     CACHE_VERSION,
 )
 SETTINGS_ROOT = os.path.join(
@@ -91,7 +101,7 @@ SETTINGS_ROOT = os.path.join(
     "pyRevit",
     "WWPTools",
 )
-SETTINGS_FILE_PATH = os.path.join(SETTINGS_ROOT, "WebContextBuilderSettings.json")
+SETTINGS_FILE_PATH = os.path.join(SETTINGS_ROOT, "UKContextBuilderSettings.json")
 
 
 script_dir = os.path.dirname(__file__)
@@ -406,56 +416,83 @@ def _meters_per_degree(center_lat):
     return meters_per_degree_lat, meters_per_degree_lon
 
 
-def _sample_hrdem_elevation(lat, lon, sample_window_m=TERRAIN_SAMPLE_WINDOW_M):
+def _sample_uk_terrain_elevation(lat, lon, endpoint, layer_name, sample_window_m=TERRAIN_SAMPLE_WINDOW_M):
+    point_cache_key = _cache_key(
+        "uk_terrain_point",
+        endpoint,
+        layer_name,
+        round(float(lat), 8),
+        round(float(lon), 8),
+        round(float(sample_window_m), 3),
+    )
+    cached_value = _read_cache_json("terrain_point", point_cache_key)
+    if cached_value and "elevation_m" in cached_value:
+        return cached_value.get("elevation_m")
+
     meters_per_degree_lat, meters_per_degree_lon = _meters_per_degree(lat)
     delta_lat = sample_window_m / meters_per_degree_lat
     delta_lon = sample_window_m / meters_per_degree_lon
     query = urllib.parse.urlencode(
         {
             "service": "WMS",
-            "version": "1.3.0",
+            "version": "1.1.1",
             "request": "GetFeatureInfo",
-            "layers": HRDEM_WMS_LAYER,
-            "query_layers": HRDEM_WMS_LAYER,
+            "layers": layer_name,
+            "query_layers": layer_name,
             "styles": "",
-            "crs": "EPSG:4326",
-            "bbox": "{:.8f},{:.8f},{:.8f},{:.8f}".format(lat - delta_lat, lon - delta_lon, lat + delta_lat, lon + delta_lon),
-            "width": 101,
-            "height": 101,
-            "i": 50,
-            "j": 50,
+            "srs": "EPSG:4326",
+            "bbox": "{:.8f},{:.8f},{:.8f},{:.8f}".format(lon - delta_lon, lat - delta_lat, lon + delta_lon, lat + delta_lat),
+            "width": 3,
+            "height": 3,
+            "x": 1,
+            "y": 1,
             "format": "image/png",
             "info_format": "text/plain",
         }
     )
-    text = _http_get_text("{}?{}".format(HRDEM_WMS_ENDPOINT, query), timeout_sec=30)
+    text = _http_get_text("{}?{}".format(endpoint, query), timeout_sec=30)
     try:
         root = ET.fromstring(text)
         for element in root.iter():
             if element.tag.endswith("band-0-pixel-value") and element.text:
-                return float(element.text.strip())
+                value = float(element.text.strip())
+                _write_cache_json("terrain_point", point_cache_key, {"elevation_m": value})
+                return value
     except Exception:
         pass
 
-    match = re.search(r"<band-0-pixel-value>([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)</band-0-pixel-value>", text or "")
+    match = re.search(r"Elevation\s*=\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)", text or "")
     if match:
-        return float(match.group(1))
+        value = float(match.group(1))
+        _write_cache_json("terrain_point", point_cache_key, {"elevation_m": value})
+        return value
     return None
 
 
-def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m):
+def _sample_uk_dtm_elevation(lat, lon, sample_window_m=TERRAIN_SAMPLE_WINDOW_M):
+    return _sample_uk_terrain_elevation(lat, lon, UK_TERRAIN_DTM_WMS_ENDPOINT, UK_TERRAIN_DTM_WMS_LAYER, sample_window_m)
+
+
+def _sample_uk_dsm_elevation(lat, lon, sample_window_m=TERRAIN_SAMPLE_WINDOW_M):
+    return _sample_uk_terrain_elevation(lat, lon, UK_TERRAIN_DSM_WMS_ENDPOINT, UK_TERRAIN_DSM_WMS_LAYER, sample_window_m)
+
+
+def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m, fast_mode=False):
     dense_square_size_m = _normalize_dense_area_m(dense_square_size_m)
+    if fast_mode:
+        dense_square_size_m = 0.0
     grid_cache_key = _cache_key(
         "terrain_grid",
         round(float(center_lat), 8),
         round(float(center_lon), 8),
         round(float(radius_m), 3),
         round(float(dense_square_size_m), 3),
-        TERRAIN_MIN_GRID_SPACING_M,
+        bool(fast_mode),
+        FAST_TERRAIN_MIN_GRID_SPACING_M if fast_mode else TERRAIN_MIN_GRID_SPACING_M,
         TERRAIN_DENSE_GRID_SPACING_M,
-        MAX_TERRAIN_SAMPLE_POINTS,
-        BASE_TOTAL_TERRAIN_SAMPLE_POINTS,
-        MAX_TOTAL_TERRAIN_SAMPLE_POINTS,
+        FAST_MAX_TERRAIN_SAMPLE_POINTS if fast_mode else MAX_TERRAIN_SAMPLE_POINTS,
+        FAST_BASE_TOTAL_TERRAIN_SAMPLE_POINTS if fast_mode else BASE_TOTAL_TERRAIN_SAMPLE_POINTS,
+        FAST_MAX_TOTAL_TERRAIN_SAMPLE_POINTS if fast_mode else MAX_TOTAL_TERRAIN_SAMPLE_POINTS,
         MAX_DENSE_GRID_SAMPLE_POINTS,
     )
     cached_grid = _read_cache_json("terrain_grid", grid_cache_key)
@@ -478,7 +515,7 @@ def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m):
             row_values = []
             for col_index in range(per_side_local):
                 lon = center_lon + ((col_index - steps) * step_lon_local)
-                elevation = _sample_hrdem_elevation(lat, lon)
+                elevation = _sample_uk_dtm_elevation(lat, lon)
                 row_values.append(elevation)
                 if elevation is not None:
                     points_local.append(
@@ -525,9 +562,13 @@ def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m):
 
         return reduced[:target_count]
 
-    spacing_m = max(TERRAIN_MIN_GRID_SPACING_M, radius_m / 4.0)
+    max_terrain_sample_points = FAST_MAX_TERRAIN_SAMPLE_POINTS if fast_mode else MAX_TERRAIN_SAMPLE_POINTS
+    base_total_terrain_sample_points = FAST_BASE_TOTAL_TERRAIN_SAMPLE_POINTS if fast_mode else BASE_TOTAL_TERRAIN_SAMPLE_POINTS
+    max_total_terrain_sample_points = FAST_MAX_TOTAL_TERRAIN_SAMPLE_POINTS if fast_mode else MAX_TOTAL_TERRAIN_SAMPLE_POINTS
+
+    spacing_m = max(FAST_TERRAIN_MIN_GRID_SPACING_M, radius_m / 3.0) if fast_mode else max(TERRAIN_MIN_GRID_SPACING_M, radius_m / 4.0)
     coarse_steps = max(2, int(math.ceil(radius_m / spacing_m)))
-    while ((coarse_steps * 2) + 1) ** 2 > MAX_TERRAIN_SAMPLE_POINTS and coarse_steps > 2:
+    while ((coarse_steps * 2) + 1) ** 2 > max_terrain_sample_points and coarse_steps > 2:
         coarse_steps -= 1
     coarse_spacing_m = radius_m / float(coarse_steps)
     coarse_grid = _sample_regular_grid(radius_m, coarse_spacing_m)
@@ -550,10 +591,10 @@ def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m):
         if point_key not in seen_keys:
             dense_points.append(point)
 
-    target_total_points = max(BASE_TOTAL_TERRAIN_SAMPLE_POINTS, len(coarse_points))
+    target_total_points = max(base_total_terrain_sample_points, len(coarse_points))
     if dense_points:
         target_total_points = min(
-            MAX_TOTAL_TERRAIN_SAMPLE_POINTS,
+            max_total_terrain_sample_points,
             max(target_total_points, len(coarse_points) + len(dense_points)),
         )
     remaining_slots = max(0, target_total_points - len(coarse_points))
@@ -568,7 +609,7 @@ def _build_terrain_grid(center_lat, center_lon, radius_m, dense_square_size_m):
         max_elevation = elevation if max_elevation is None else max(max_elevation, elevation)
 
     if len(merged_points) < 9 or min_elevation is None or max_elevation is None:
-        raise Exception("HRDEM terrain sampling returned too few valid elevation points.")
+        raise Exception("UK DTM terrain sampling returned too few valid elevation points.")
 
     terrain_grid = {
         "rows": coarse_grid["rows"],
@@ -679,7 +720,7 @@ def _latlon_ring_centroid(ring):
 
 
 def _show_dialog(doc):
-    xaml_path = os.path.join(script_dir, "WebContextBuilderDialog.xaml")
+    xaml_path = os.path.join(script_dir, "UKContextBuilderDialog.xaml")
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
@@ -691,6 +732,7 @@ def _show_dialog(doc):
     address_text = window.FindName("AddressTextBox")
     radius_text = window.FindName("RadiusTextBox")
     validation_text = window.FindName("ValidationText")
+    dryrun_button = window.FindName("DryRunButton")
     run_button = window.FindName("RunButton")
     cancel_button = window.FindName("CancelButton")
     locate_button = window.FindName("LocateButton")
@@ -699,6 +741,7 @@ def _show_dialog(doc):
     map_hint_text = window.FindName("MapHintText")
     dense_area_text = window.FindName("DenseAreaTextBox")
     use_dense_area_checkbox = window.FindName("UseDenseAreaCheckBox")
+    fast_mode_checkbox = window.FindName("FastModeCheckBox")
     buildings_checkbox = window.FindName("BuildingsCheckBox")
     roads_checkbox = window.FindName("RoadsCheckBox")
     tracks_checkbox = window.FindName("TracksCheckBox")
@@ -720,6 +763,8 @@ def _show_dialog(doc):
         dense_area_text.Text = str(int(saved_settings.get("dense_area_m") or TERRAIN_DENSE_SQUARE_SIZE_M))
     if use_dense_area_checkbox is not None and "use_dense_area" in saved_settings:
         use_dense_area_checkbox.IsChecked = bool(saved_settings.get("use_dense_area"))
+    if fast_mode_checkbox is not None and "fast_mode" in saved_settings:
+        fast_mode_checkbox.IsChecked = bool(saved_settings.get("fast_mode"))
     if buildings_checkbox is not None and "buildings" in saved_settings:
         buildings_checkbox.IsChecked = bool(saved_settings.get("buildings"))
     if roads_checkbox is not None and "roads" in saved_settings:
@@ -756,7 +801,11 @@ def _show_dialog(doc):
         return parsed_radius
 
     def _update_dense_area_state(*args):
-        enabled = bool(use_dense_area_checkbox.IsChecked) if use_dense_area_checkbox is not None else True
+        fast_mode_enabled = bool(fast_mode_checkbox.IsChecked) if fast_mode_checkbox is not None else False
+        if use_dense_area_checkbox is not None:
+            use_dense_area_checkbox.IsEnabled = not fast_mode_enabled
+            use_dense_area_checkbox.Opacity = 1.0 if not fast_mode_enabled else 0.55
+        enabled = (bool(use_dense_area_checkbox.IsChecked) if use_dense_area_checkbox is not None else True) and not fast_mode_enabled
         if dense_area_text is not None:
             dense_area_text.IsEnabled = enabled
             dense_area_text.Opacity = 1.0 if enabled else 0.55
@@ -822,11 +871,15 @@ def _show_dialog(doc):
             _set_validation("Unable to locate address: {}".format(str(ex)))
 
     def _on_run(sender, args):
+        _commit_dialog_result("run")
+
+    def _commit_dialog_result(mode):
         address = (address_text.Text or "").strip()
         radius = _parse_radius(radius_text.Text)
+        fast_mode = bool(fast_mode_checkbox.IsChecked) if fast_mode_checkbox is not None else False
         use_dense_area = bool(use_dense_area_checkbox.IsChecked) if use_dense_area_checkbox is not None else True
         dense_area_m = 0.0
-        if use_dense_area:
+        if use_dense_area and not fast_mode:
             dense_area_m = _parse_dense_area(dense_area_text.Text if dense_area_text is not None else "")
         layers = {
             "buildings": bool(buildings_checkbox.IsChecked) if buildings_checkbox is not None else True,
@@ -840,7 +893,7 @@ def _show_dialog(doc):
         if radius is None:
             _set_validation("Radius must be between {} and {} meters.".format(int(MIN_RADIUS_M), int(MAX_RADIUS_M)))
             return
-        if use_dense_area and dense_area_m is None:
+        if use_dense_area and (not fast_mode) and dense_area_m is None:
             _set_validation("Dense area must be at least {} meters.".format(int(MIN_DENSE_AREA_M)))
             return
         if not any(layers.values()):
@@ -850,9 +903,11 @@ def _show_dialog(doc):
             _set_validation("Enter an address or set the project site location in Revit.")
             return
         result["ok"] = True
+        result["mode"] = mode
         result["address"] = address
         result["radius_m"] = radius
         result["dense_area_m"] = dense_area_m
+        result["fast_mode"] = fast_mode
         result["layers"] = layers
         result["location"] = map_state.get("location")
         result["location_label"] = map_state.get("label") or ""
@@ -861,6 +916,7 @@ def _show_dialog(doc):
                 "address": address,
                 "radius_m": radius,
                 "dense_area_m": dense_area_m,
+                "fast_mode": fast_mode,
                 "use_dense_area": use_dense_area,
                 "buildings": layers.get("buildings"),
                 "roads": layers.get("roads"),
@@ -874,10 +930,15 @@ def _show_dialog(doc):
         window.DialogResult = True
         window.Close()
 
+    def _on_dryrun(sender, args):
+        _commit_dialog_result("dryrun")
+
     def _on_cancel(sender, args):
         window.DialogResult = False
         window.Close()
 
+    if dryrun_button is not None:
+        dryrun_button.Click += EventHandler(_on_dryrun)
     run_button.Click += EventHandler(_on_run)
     cancel_button.Click += EventHandler(_on_cancel)
     if locate_button is not None:
@@ -885,6 +946,9 @@ def _show_dialog(doc):
     if use_dense_area_checkbox is not None:
         use_dense_area_checkbox.Checked += EventHandler(_update_dense_area_state)
         use_dense_area_checkbox.Unchecked += EventHandler(_update_dense_area_state)
+    if fast_mode_checkbox is not None:
+        fast_mode_checkbox.Checked += EventHandler(_update_dense_area_state)
+        fast_mode_checkbox.Unchecked += EventHandler(_update_dense_area_state)
     if map_browser is not None:
         map_browser.Navigating += _on_map_navigating
 
@@ -943,7 +1007,7 @@ def _geocode_address(address):
         return float(cached["lat"]), float(cached["lon"])
 
     query = urllib.parse.quote(address)
-    url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q={}".format(query)
+    url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q={}".format(query)
     data = _http_get_json(url, timeout_sec=20)
     if not data:
         raise Exception("Address not found.")
@@ -1363,6 +1427,142 @@ def _get_building_height_m(tags):
         return ((levels - 1.0) * 2.95) + 3.25, "levels"
 
     return 12.0, "default"
+
+
+def _collect_building_height_sample_points(feature):
+    samples = []
+    sample_keys = set()
+
+    def _add_sample(point):
+        if point is None or len(point) < 2:
+            return
+        key = (round(float(point[0]), 7), round(float(point[1]), 7))
+        if key in sample_keys:
+            return
+        sample_keys.add(key)
+        samples.append((float(point[0]), float(point[1])))
+
+    outer_ring = feature.get("outer") or []
+    centroid = _latlon_ring_centroid(outer_ring)
+    _add_sample(centroid)
+
+    outer_points = outer_ring[:-1] if len(outer_ring) > 1 and _point_key(outer_ring[0]) == _point_key(outer_ring[-1]) else list(outer_ring)
+    if outer_points:
+        step = max(1, int(math.floor(len(outer_points) / float(max(1, DSM_DTM_SAMPLE_POINT_LIMIT - 1)))))
+        for index in range(0, len(outer_points), step):
+            _add_sample(outer_points[index])
+            if len(samples) >= DSM_DTM_SAMPLE_POINT_LIMIT:
+                break
+
+    return samples[:DSM_DTM_SAMPLE_POINT_LIMIT]
+
+
+def _get_building_height_from_dsm_dtm(feature):
+    sample_points = _collect_building_height_sample_points(feature)
+    if not sample_points:
+        return None, None
+
+    dtm_samples = []
+    dsm_samples = []
+    for lat, lon in sample_points:
+        try:
+            dtm_value = _sample_uk_dtm_elevation(lat, lon)
+        except Exception:
+            dtm_value = None
+        try:
+            dsm_value = _sample_uk_dsm_elevation(lat, lon)
+        except Exception:
+            dsm_value = None
+        if dtm_value is not None:
+            dtm_samples.append(float(dtm_value))
+        if dsm_value is not None:
+            dsm_samples.append(float(dsm_value))
+
+    if not dtm_samples or not dsm_samples:
+        return None, None
+
+    dtm_samples.sort()
+    dsm_samples.sort()
+    ground_elevation = dtm_samples[len(dtm_samples) // 2]
+    roof_elevation = dsm_samples[-1]
+    height_m = roof_elevation - ground_elevation
+    if height_m <= 0:
+        return None, None
+
+    height_m = max(DSM_DTM_MIN_BUILDING_HEIGHT_M, min(DSM_DTM_MAX_BUILDING_HEIGHT_M, height_m))
+    return height_m, "dsm-dtm"
+
+
+def _build_dsm_dtm_dryrun_lines(building_features, fast_mode):
+    if not building_features:
+        return []
+
+    explicit_count = 0
+    levels_count = 0
+    default_features = []
+    for feature in building_features:
+        _, source = _get_building_height_m(feature.get("tags") or {})
+        if source == "height":
+            explicit_count += 1
+        elif source == "levels":
+            levels_count += 1
+        else:
+            default_features.append(feature)
+
+    lines = [
+        "DSM-DTM dry run:",
+        "  OSM explicit height: {}".format(explicit_count),
+        "  OSM levels fallback: {}".format(levels_count),
+        "  Buildings missing OSM height: {}".format(len(default_features)),
+    ]
+
+    if fast_mode:
+        lines.append("  Skipped because Fast Mode is enabled.")
+        return lines
+
+    preview_features = list(default_features[:DSM_DTM_DRYRUN_LIMIT])
+    lines.append("  Preview sample size: {}{}".format(
+        len(preview_features),
+        " of {}".format(len(default_features)) if len(default_features) > len(preview_features) else "",
+    ))
+
+    if not preview_features:
+        lines.append("  No DSM-DTM fallback buildings to preview.")
+        return lines
+
+    successes = []
+    failures = []
+    for feature in preview_features:
+        feature_id = feature.get("id") or "building"
+        try:
+            height_m, _ = _get_building_height_from_dsm_dtm(feature)
+        except Exception:
+            height_m = None
+        if height_m is None:
+            failures.append(feature_id)
+        else:
+            successes.append((feature_id, float(height_m)))
+
+    lines.append("  DSM-DTM resolved: {}".format(len(successes)))
+    lines.append("  DSM-DTM unresolved: {}".format(len(failures)))
+
+    if successes:
+        resolved_heights = [item[1] for item in successes]
+        lines.append(
+            "  Resolved height range: {:.2f} m to {:.2f} m (avg {:.2f} m)".format(
+                min(resolved_heights),
+                max(resolved_heights),
+                sum(resolved_heights) / float(len(resolved_heights)),
+            )
+        )
+        for feature_id, height_m in successes[:5]:
+            lines.append("    {} -> {:.2f} m".format(feature_id, height_m))
+
+    if failures:
+        for feature_id in failures[:5]:
+            lines.append("    {} -> unresolved".format(feature_id))
+
+    return lines
 
 
 def _road_width_m(tags):
@@ -2097,8 +2297,13 @@ def _create_directshape_building(doc, solid, feature_id, comment_text, palette_e
     raise Exception("; ".join(errors))
 
 
-def _prepare_building_mass_geometry(feature, origin_lat, origin_lon, base_elevation, building_output_mode=BUILDING_OUTPUT_DIRECTSHAPE, palette_entry=None):
+def _prepare_building_mass_geometry(feature, origin_lat, origin_lon, base_elevation, building_output_mode=BUILDING_OUTPUT_DIRECTSHAPE, palette_entry=None, fast_mode=False):
     height_m, height_source = _get_building_height_m(feature.get("tags") or {})
+    if (not fast_mode) and height_source == "default":
+        terrain_height_m, terrain_height_source = _get_building_height_from_dsm_dtm(feature)
+        if terrain_height_m is not None:
+            height_m = terrain_height_m
+            height_source = terrain_height_source
     if height_m <= 0:
         raise Exception("Building height resolved to a non-positive value.")
 
@@ -2111,7 +2316,7 @@ def _prepare_building_mass_geometry(feature, origin_lat, origin_lon, base_elevat
         material_id = palette_entry.get("material_id")
     solid = _create_solid(curve_loops, height_m, material_id)
     feature_id = feature.get("id") or "building"
-    comment_text = "Web Context Builder | {} | {:.2f} m | {}".format(feature_id, height_m, height_source)
+    comment_text = "UK Context Builder | {} | {:.2f} m | {}".format(feature_id, height_m, height_source)
     return {
         "solid": solid,
         "curve_loops": curve_loops,
@@ -2184,7 +2389,7 @@ def _create_mass_family_chunk(doc, building_items, palette_entry=None, batch_ind
     family_transaction = None
 
     try:
-        family_transaction = DB.Transaction(family_doc, "Create Web Context Builder Mass")
+        family_transaction = DB.Transaction(family_doc, "Create UK Context Builder Mass")
         family_transaction.Start()
 
         owner_family = getattr(family_doc, "OwnerFamily", None)
@@ -2263,7 +2468,7 @@ def _create_mass_family_chunk(doc, building_items, palette_entry=None, batch_ind
         try:
             instance = attempt()
             if instance is not None:
-                _set_comment(instance, "Web Context Builder | Batched mass family | {} buildings".format(len(building_items)))
+                _set_comment(instance, "UK Context Builder | Batched mass family | {} buildings".format(len(building_items)))
                 _apply_palette(doc, instance, palette_entry)
                 return instance
         except Exception as ex:
@@ -2300,8 +2505,8 @@ def _create_mass_family_buildings(doc, building_items, palette_entry=None):
     return instances
 
 
-def _create_building_mass(doc, feature, origin_lat, origin_lon, base_elevation, palette_entry=None, building_output_mode=BUILDING_OUTPUT_DIRECTSHAPE):
-    building_item = _prepare_building_mass_geometry(feature, origin_lat, origin_lon, base_elevation, building_output_mode, palette_entry)
+def _create_building_mass(doc, feature, origin_lat, origin_lon, base_elevation, palette_entry=None, building_output_mode=BUILDING_OUTPUT_DIRECTSHAPE, fast_mode=False):
+    building_item = _prepare_building_mass_geometry(feature, origin_lat, origin_lon, base_elevation, building_output_mode, palette_entry, fast_mode)
     return _create_directshape_building(
         doc,
         building_item["solid"],
@@ -2541,7 +2746,7 @@ def _get_materialized_floor_type(doc, base_floor_type, palette_entry, type_name)
     return floor_type
 
 
-def _summarize_data(address_label, radius_m, dense_area_m, endpoint, selected_layers, building_features, roads, tracks, parcel_features, park_features, water_features, waterways):
+def _summarize_data(address_label, radius_m, dense_area_m, fast_mode, endpoint, selected_layers, building_features, roads, tracks, parcel_features, park_features, water_features, waterways, dsm_dtm_dryrun_lines=None):
     selected_layer_names = []
     if (selected_layers or {}).get("buildings"):
         selected_layer_names.append("Buildings")
@@ -2563,6 +2768,7 @@ def _summarize_data(address_label, radius_m, dense_area_m, endpoint, selected_la
         "Radius: {} m".format(int(round(radius_m))),
         "Overpass endpoint: {}".format(endpoint or "<unknown>"),
         "Building output: DirectShape",
+        "Import mode: {}".format("Fast" if fast_mode else "Accurate"),
         "Selected layers: {}".format(", ".join(selected_layer_names) if selected_layer_names else "<none>"),
         "",
         "Buildings: {}".format(len(building_features or [])),
@@ -2573,14 +2779,18 @@ def _summarize_data(address_label, radius_m, dense_area_m, endpoint, selected_la
         "Water areas: {}".format(len(water_features or [])),
         "Waterways: {}".format(len(waterways or [])),
         "",
-        "Terrain uses a denser central HRDEM sample block of {} m x {} m.".format(
+        "Terrain uses a denser central UK EA DTM sample block of {} m x {} m.".format(
             int(round(dense_area_m)),
             int(round(dense_area_m)),
-        ) if dense_area_m and dense_area_m > 0 else "Terrain uses the faster coarse-only HRDEM sampling mode.",
+        ) if (dense_area_m and dense_area_m > 0 and not fast_mode) else "Terrain uses the faster coarse-only UK EA DTM sampling mode.",
+        "Missing building heights will use UK EA DSM minus DTM when available." if not fast_mode else "Missing building heights will use the default fallback height in Fast Mode.",
         "Buildings will be created as DirectShape in the Mass category when possible.",
         "Roads, tracks, parcels, parks, and water will be created as Toposolid subdivisions when Terrain is enabled.",
         "Roads, tracks, parcels, parks, and water will be created as Floors when Terrain is disabled.",
     ]
+    if dsm_dtm_dryrun_lines:
+        lines.append("")
+        lines.extend(dsm_dtm_dryrun_lines)
     return "\n".join(lines)
 
 
@@ -2643,6 +2853,8 @@ def main():
     dense_area_m = user_inputs.get("dense_area_m")
     if dense_area_m is None:
         dense_area_m = TERRAIN_DENSE_SQUARE_SIZE_M
+    fast_mode = bool(user_inputs.get("fast_mode"))
+    run_mode = (user_inputs.get("mode") or "run").strip().lower()
     selected_layers = user_inputs.get("layers") or {}
     selected_location = user_inputs.get("location")
     selected_location_label = user_inputs.get("location_label") or ""
@@ -2678,11 +2890,13 @@ def main():
     roads = roads if selected_layers.get("roads") else []
     tracks = tracks if selected_layers.get("tracks") else []
     waterways = waterways if selected_layers.get("water") else []
+    dsm_dtm_dryrun_lines = _build_dsm_dtm_dryrun_lines(building_features, fast_mode) if selected_layers.get("buildings") else []
 
     preview_text = _summarize_data(
         address_label,
         radius_m,
         dense_area_m,
+        fast_mode,
         overpass_data.get("_endpoint"),
         selected_layers,
         building_features,
@@ -2692,7 +2906,19 @@ def main():
         park_features,
         water_features,
         waterways,
+        dsm_dtm_dryrun_lines,
     )
+    if run_mode == "dryrun":
+        ui.uiUtils_show_text_report(
+            "{} - Dry Run".format(TITLE),
+            preview_text,
+            ok_text="Close",
+            cancel_text=None,
+            width=760,
+            height=560,
+        )
+        return
+
     if not ui.uiUtils_show_text_report(
         "{} - Preview".format(TITLE),
         preview_text,
@@ -2724,9 +2950,9 @@ def main():
     terrain_grid = None
     if terrain_enabled:
         try:
-            terrain_grid = _build_terrain_grid(center_lat, center_lon, radius_m, dense_area_m)
+            terrain_grid = _build_terrain_grid(center_lat, center_lon, radius_m, dense_area_m, fast_mode=fast_mode)
         except Exception as ex:
-            UI.TaskDialog.Show(TITLE, "HRDEM terrain sampling failed:\n{}".format(str(ex)))
+            UI.TaskDialog.Show(TITLE, "UK terrain sampling failed:\n{}".format(str(ex)))
             return
 
     created_counts = {"terrain": 0, "buildings": 0, "roads": 0, "tracks": 0, "parcels": 0, "parks": 0, "water": 0}
@@ -2762,7 +2988,7 @@ def main():
             )
             _set_comment(
                 terrain_toposolid,
-                "Web Context Builder | HRDEM terrain | range {:.2f}m to {:.2f}m".format(
+                "UK Context Builder | UK EA terrain | range {:.2f}m to {:.2f}m".format(
                     terrain_grid["min_elevation_m"],
                     terrain_grid["max_elevation_m"],
                 ),
@@ -2796,6 +3022,7 @@ def main():
                     feature_base_elevation,
                     palette.get("buildings"),
                     BUILDING_OUTPUT_DIRECTSHAPE,
+                    fast_mode=fast_mode,
                 )
                 created_counts["buildings"] += 1
             except Exception as ex:
@@ -2821,7 +3048,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Road subdivision | {}".format(way_id),
+                        "UK Context Builder | Road subdivision | {}".format(way_id),
                     )
                     _apply_subdivision_offset_2026(doc, road_subdivision)
                     _apply_palette(doc, road_subdivision, palette.get("roads"))
@@ -2831,7 +3058,7 @@ def main():
                         curve_loops,
                         road_floor_type,
                         base_level,
-                        "Web Context Builder | Road | {}".format(way_id),
+                        "UK Context Builder | Road | {}".format(way_id),
                     )
                     _apply_palette(doc, road_floor, palette.get("roads"), apply_view_override=False)
                 created_counts["roads"] += 1
@@ -2858,7 +3085,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Track subdivision | {}".format(way_id),
+                        "UK Context Builder | Track subdivision | {}".format(way_id),
                     )
                     _apply_subdivision_offset_2026(doc, track_subdivision)
                     _apply_palette(doc, track_subdivision, palette.get("tracks"))
@@ -2868,7 +3095,7 @@ def main():
                         curve_loops,
                         track_floor_type,
                         base_level,
-                        "Web Context Builder | Track | {}".format(way_id),
+                        "UK Context Builder | Track | {}".format(way_id),
                     )
                     _apply_palette(doc, track_floor, palette.get("tracks"), apply_view_override=False)
                 created_counts["tracks"] += 1
@@ -2883,7 +3110,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Parcel subdivision | {}".format(feature.get("id")),
+                        "UK Context Builder | Parcel subdivision | {}".format(feature.get("id")),
                     )
                     _apply_subdivision_offset_2026(doc, parcel_subdivision)
                     _apply_palette(doc, parcel_subdivision, palette.get("parcels"))
@@ -2893,7 +3120,7 @@ def main():
                         curve_loops,
                         parcel_floor_type,
                         base_level,
-                        "Web Context Builder | Parcel | {}".format(feature.get("id")),
+                        "UK Context Builder | Parcel | {}".format(feature.get("id")),
                     )
                     _apply_palette(doc, parcel_floor, palette.get("parcels"), apply_view_override=False)
                 created_counts["parcels"] += 1
@@ -2908,7 +3135,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Park subdivision | {}".format(feature.get("id")),
+                        "UK Context Builder | Park subdivision | {}".format(feature.get("id")),
                     )
                     _apply_subdivision_offset_2026(doc, park_subdivision)
                     _apply_palette(doc, park_subdivision, palette.get("parks"))
@@ -2924,7 +3151,7 @@ def main():
                         ),
                         park_floor_type,
                         base_level,
-                        "Web Context Builder | Park | {}".format(feature.get("id")),
+                        "UK Context Builder | Park | {}".format(feature.get("id")),
                     )
                     _apply_palette(doc, park_floor, palette.get("parks"), apply_view_override=False)
                 created_counts["parks"] += 1
@@ -2939,7 +3166,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Water subdivision | {}".format(feature.get("id")),
+                        "UK Context Builder | Water subdivision | {}".format(feature.get("id")),
                     )
                     _apply_subdivision_offset_2026(doc, water_subdivision)
                     _apply_palette(doc, water_subdivision, palette.get("water"))
@@ -2949,7 +3176,7 @@ def main():
                         curve_loops,
                         water_floor_type,
                         base_level,
-                        "Web Context Builder | Water Area | {}".format(feature.get("id")),
+                        "UK Context Builder | Water Area | {}".format(feature.get("id")),
                     )
                     _apply_palette(doc, water_floor, palette.get("water"), apply_view_override=False)
                 created_counts["water"] += 1
@@ -2970,7 +3197,7 @@ def main():
                         doc,
                         terrain_toposolid,
                         curve_loops,
-                        "Web Context Builder | Waterway subdivision | {}".format(way_id),
+                        "UK Context Builder | Waterway subdivision | {}".format(way_id),
                     )
                     _apply_subdivision_offset_2026(doc, waterway_subdivision)
                     _apply_palette(doc, waterway_subdivision, palette.get("water"))
@@ -2980,7 +3207,7 @@ def main():
                         curve_loops,
                         water_floor_type,
                         base_level,
-                        "Web Context Builder | Waterway | {}".format(way_id),
+                        "UK Context Builder | Waterway | {}".format(way_id),
                     )
                     _apply_palette(doc, waterway_floor, palette.get("water"), apply_view_override=False)
                 created_counts["water"] += 1
