@@ -282,19 +282,48 @@ def _get_boundary_curves(doc, view):
     return curves
 
 
-def _ensure_sketch_plane(doc, view):
+def _ensure_sketch_plane(doc, view, fallback_elevation=None):
     try:
         if view.SketchPlane:
             return view.SketchPlane
     except Exception:
         pass
-    try:
-        level = view.GenLevel
-    except Exception:
-        level = None
-    elevation = level.Elevation if level else 0
+    if fallback_elevation is None:
+        try:
+            level = view.GenLevel
+        except Exception:
+            level = None
+        elevation = level.Elevation if level else 0
+    else:
+        elevation = fallback_elevation
     plane = DB.Plane.CreateByNormalAndOrigin(DB.XYZ.BasisZ, DB.XYZ(0, 0, elevation))
     return DB.SketchPlane.Create(doc, plane)
+
+
+def _get_plane_elevation(sketch_plane, fallback=0.0):
+    if sketch_plane is None:
+        return fallback
+    try:
+        return float(sketch_plane.GetPlane().Origin.Z)
+    except Exception:
+        return fallback
+
+
+def _move_curve_to_elevation(curve, target_elevation):
+    if curve is None:
+        return None
+    try:
+        source_elevation = float(curve.GetEndPoint(0).Z)
+    except Exception:
+        source_elevation = float(target_elevation)
+    dz = float(target_elevation) - source_elevation
+    if abs(dz) <= 1e-9:
+        return curve
+    try:
+        xf = DB.Transform.CreateTranslation(DB.XYZ(0, 0, dz))
+        return curve.CreateTransformed(xf)
+    except Exception:
+        return curve
 
 
 def _get_area_location_uv(area, view):
@@ -786,14 +815,29 @@ def main():
                     color_scheme_note = " | color scheme: {}".format(scheme_msg)
 
             boundary_curves = _get_boundary_curves(doc, source_view)
+            created_boundaries = 0
+            failed_boundaries = 0
             if boundary_curves:
-                sketch_plane = _ensure_sketch_plane(doc, target_view)
+                source_plane = None
+                try:
+                    source_plane = source_view.SketchPlane
+                except Exception:
+                    source_plane = None
+                source_elevation = _get_plane_elevation(
+                    source_plane,
+                    fallback=getattr(boundary_curves[0].GetEndPoint(0), "Z", 0.0),
+                )
+                sketch_plane = _ensure_sketch_plane(doc, target_view, fallback_elevation=source_elevation)
+                target_elevation = _get_plane_elevation(sketch_plane)
                 for curve in boundary_curves:
                     try:
-                        doc.Create.NewAreaBoundaryLine(sketch_plane, curve, target_view)
-                        total_boundaries += 1
+                        target_curve = _move_curve_to_elevation(curve, target_elevation)
+                        doc.Create.NewAreaBoundaryLine(sketch_plane, target_curve, target_view)
+                        created_boundaries += 1
                     except Exception:
-                        total_failed += 1
+                        failed_boundaries += 1
+            total_boundaries += created_boundaries
+            total_failed += failed_boundaries
 
             areas = _collect_areas_by_scheme_level(doc, source_scheme.Id, level_id)
 
@@ -827,18 +871,26 @@ def main():
                 created_tags, failed_tags = _tag_untagged_areas(doc, target_view, target_areas)
                 total_tags += created_tags
                 total_failed += failed_tags
-                report_lines.append("{}: areas {} | boundaries {} | tagged {}{}".format(
+                boundary_note = ""
+                if failed_boundaries:
+                    boundary_note = " ({} failed)".format(failed_boundaries)
+                report_lines.append("{}: areas {} | boundaries {}{} | tagged {}{}".format(
                     level.Name,
                     len(areas),
-                    len(boundary_curves),
+                    created_boundaries,
+                    boundary_note,
                     created_tags,
                     color_scheme_note,
                 ))
             else:
-                report_lines.append("{}: areas {} | boundaries {}{}".format(
+                boundary_note = ""
+                if failed_boundaries:
+                    boundary_note = " ({} failed)".format(failed_boundaries)
+                report_lines.append("{}: areas {} | boundaries {}{}{}".format(
                     level.Name,
                     len(areas),
-                    len(boundary_curves),
+                    created_boundaries,
+                    boundary_note,
                     color_scheme_note,
                 ))
 
