@@ -5,6 +5,24 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Web Context Builder: new pyRevit/XAML context import tool with embedded Leaflet/OpenStreetMap map, click-to-set location, cached web data, layer toggles, and square-radius extent import
+- Web Context Builder: optional HRDEM terrain import with Toposolid generation, dense-area sampling control, terrain-aware building placement, and Toposolid subdivisions for roads, tracks, parcels, parks, and water
+- DirectShape To Mass: new conversion tool for turning imported DirectShape buildings into conceptual mass families
+
+### Changed
+- Building Importer: replaced the old Dynamo-based workflow with a Python OSM importer and archived the legacy Dynamo graph
+- Web Context Builder: buildings now import as DirectShape in the Mass category by default for faster runs and simpler visibility control
+- Web Context Builder: roads, tracks, parcels, parks, and water now create or repair dedicated `WWP CONTEXT - ...` floor types with fixed 10 mm thickness and assigned materials on the flat-floor workflow
+- Web Context Builder: context floor types are repaired on each run so existing legacy `WWP` floor types are updated to the current naming, thickness, and material rules
+
+### Fixed
+- Building Importer: fixed the material picker cancel path so it no longer throws `ElementId.op_Equality` errors
+- Web Context Builder: fixed flat-floor type duplication/materialization so duplicated floor types no longer silently fall back to the original base type
+- Web Context Builder: restored visible DirectShape edges by removing same-color line overrides on imported buildings
+
 ## [1.2.2] - 2026-03-16
 - Flat UI refresh across WPF-based tool dialogs, including new XAML-backed dialogs where needed
 - Export2Ex: moved to a flat XAML dialog, fixed dialog loading errors, and improved sizing with a resizable splitter layout
