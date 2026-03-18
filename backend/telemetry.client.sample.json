@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "endpoint_url": "https://your-server.example.com/api/usage",
+  "api_key": "replace-me",
+  "timeout_sec": 2,
+  "batch_size": 25
+}
