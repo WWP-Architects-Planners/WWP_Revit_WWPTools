@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Collections;
+using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Windows.Interop;
@@ -21,6 +22,7 @@ namespace WWPTools.WpfUI
     {
         private const string DefaultFont = "Arial Narrow";
         private const double DefaultFontSize = 14;
+        private static string _installedVersion;
 
         public static int[] SelectIndices(
             IEnumerable items,
@@ -50,7 +52,7 @@ namespace WWPTools.WpfUI
             EnsureApplication();
             var dialog = new OpenFileDialog
             {
-                Title = title ?? "Open File",
+                Title = FormatWindowTitle(title ?? "Open File"),
                 Filter = string.IsNullOrWhiteSpace(filter) ? "All files (*.*)|*.*" : filter,
                 Multiselect = multiselect,
                 InitialDirectory = string.IsNullOrWhiteSpace(initialDirectory) ? null : initialDirectory
@@ -68,7 +70,7 @@ namespace WWPTools.WpfUI
             EnsureApplication();
             var dialog = new SaveFileDialog
             {
-                Title = title ?? "Save File",
+                Title = FormatWindowTitle(title ?? "Save File"),
                 Filter = string.IsNullOrWhiteSpace(filter) ? "All files (*.*)|*.*" : filter,
                 DefaultExt = string.IsNullOrWhiteSpace(defaultExtension) ? null : defaultExtension,
                 InitialDirectory = string.IsNullOrWhiteSpace(initialDirectory) ? null : initialDirectory,
@@ -244,7 +246,7 @@ namespace WWPTools.WpfUI
             var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
             var window = new Views.SelectItemsWithModeWindow
             {
-                Title = title ?? "Select Items",
+                Title = FormatWindowTitle(title ?? "Select Items"),
                 Width = width > 0 ? width : 720,
                 Height = height > 0 ? height : 620
             };
@@ -317,7 +319,7 @@ namespace WWPTools.WpfUI
             var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
             var window = new Views.ExportSchedulesWindow
             {
-                Title = title ?? "Export Schedules",
+                Title = FormatWindowTitle(title ?? "Export Schedules"),
                 Width = width > 0 ? width : 860,
                 Height = height > 0 ? height : 720
             };
@@ -395,7 +397,7 @@ namespace WWPTools.WpfUI
             var prechecked = new HashSet<int>(precheckedIndices ?? Array.Empty<int>());
             var window = new Views.SelectItemsWithFilterWindow
             {
-                Title = title ?? "Select Items",
+                Title = FormatWindowTitle(title ?? "Select Items"),
                 Width = width > 0 ? width : 980,
                 Height = height > 0 ? height : 720
             };
@@ -1168,7 +1170,7 @@ namespace WWPTools.WpfUI
             EnsureApplication();
             var window = new Views.AreaKeyplanImportWindow
             {
-                Title = title ?? "Import Area Key Schedule",
+                Title = FormatWindowTitle(title ?? "Import Area Key Schedule"),
                 Width = width > 0 ? width : 980,
                 Height = height > 0 ? height : 720
             };
@@ -1341,7 +1343,7 @@ namespace WWPTools.WpfUI
             EnsureApplication();
             var window = new Window
             {
-                Title = title ?? "Dialog",
+                Title = FormatWindowTitle(title ?? "Dialog"),
                 Width = width > 0 ? width : 520,
                 Height = height > 0 ? height : 320,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -1355,6 +1357,51 @@ namespace WWPTools.WpfUI
             if (owner != IntPtr.Zero)
                 new WindowInteropHelper(window) { Owner = owner };
             return window;
+        }
+
+        private static string FormatWindowTitle(string title)
+        {
+            var baseTitle = string.IsNullOrWhiteSpace(title) ? "Dialog" : title.Trim();
+            var version = GetInstalledVersion();
+            if (string.IsNullOrWhiteSpace(version))
+                return baseTitle;
+
+            var suffix = " v" + version;
+            if (baseTitle.IndexOf(suffix, StringComparison.OrdinalIgnoreCase) >= 0)
+                return baseTitle;
+
+            return baseTitle + suffix;
+        }
+
+        private static string GetInstalledVersion()
+        {
+            if (_installedVersion != null)
+                return _installedVersion;
+
+            try
+            {
+                var assemblyPath = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (!string.IsNullOrWhiteSpace(assemblyPath))
+                {
+                    var versionPath = System.IO.Path.Combine(assemblyPath, "WWPTools.version.json");
+                    if (File.Exists(versionPath))
+                    {
+                        var content = File.ReadAllText(versionPath);
+                        var match = Regex.Match(content, "\"version\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.IgnoreCase);
+                        if (match.Success)
+                        {
+                            _installedVersion = match.Groups[1].Value.Trim();
+                            return _installedVersion;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            _installedVersion = string.Empty;
+            return _installedVersion;
         }
 
         private static TextBlock CreatePrompt(string prompt)
@@ -1536,7 +1583,7 @@ namespace WWPTools.WpfUI
                 dialog.SetOptions(options);
 
                 if (!string.IsNullOrWhiteSpace(title))
-                    dialog.SetTitle(title);
+                    dialog.SetTitle(FormatWindowTitle(title));
 
                 if (!string.IsNullOrWhiteSpace(initialFolder))
                 {

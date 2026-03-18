@@ -9,6 +9,7 @@ from Autodesk.Revit import DB, UI
 from pyrevit import script
 from WWP_settings import get_tool_settings
 from WWP_uiUtils import uiUtils_alert
+from WWP_versioning import apply_window_title
 
 doc = __revit__.ActiveUIDocument.Document
 uidoc = __revit__.ActiveUIDocument
@@ -202,7 +203,9 @@ def _show_sheet_scale_dialog(
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)
     if title:
-        window.Title = title
+        apply_window_title(window, title)
+    else:
+        apply_window_title(window, "Sheet Scale Updater")
     try:
         helper = WindowInteropHelper(window)
         helper.Owner = uidoc.Application.MainWindowHandle

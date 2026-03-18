@@ -25,6 +25,7 @@ clr.AddReference("RevitAPIUI")
 
 from Autodesk.Revit import DB, UI
 from pyrevit.framework import EventHandler
+from WWP_versioning import apply_window_title
 
 
 TITLE = "Web Context Builder"
@@ -686,6 +687,7 @@ def _show_dialog(doc):
     xaml_text = File.ReadAllText(xaml_path)
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)
+    apply_window_title(window, TITLE)
     _set_owner(window)
 
     address_text = window.FindName("AddressTextBox")

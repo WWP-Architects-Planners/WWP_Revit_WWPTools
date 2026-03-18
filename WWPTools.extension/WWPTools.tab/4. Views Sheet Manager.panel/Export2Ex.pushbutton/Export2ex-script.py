@@ -21,6 +21,7 @@ from System.Text import Encoding, UTF8Encoding
 
 from pyrevit import DB
 from WWP_settings import get_tool_settings
+from WWP_versioning import apply_window_title
 
 
 
@@ -393,6 +394,7 @@ def _show_export_form(
     xaml_text = File.ReadAllText(xaml_path)
     reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
+    apply_window_title(window, "Multiple Schedules Exporter")
 
     search_box = window.FindName("SearchBox")
     schedule_list = window.FindName("ScheduleList")
