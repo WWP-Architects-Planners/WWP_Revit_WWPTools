@@ -21,6 +21,7 @@ for path in (pulldown_dir, lib_path):
 
 import WWP_colorSchemeUtils as csu
 import color_scheme_common as csc
+from WWP_versioning import apply_window_title
 
 try:
     csu = importlib.reload(csu)
@@ -61,6 +62,7 @@ def _show_selection_dialog(display_names):
 
     xaml_text = File.ReadAllText(xaml_path)
     window = XamlReader.Parse(xaml_text)
+    apply_window_title(window, "Copy Color Scheme")
     _set_owner(window)
 
     source_combo = window.FindName("SourceSchemeCombo")

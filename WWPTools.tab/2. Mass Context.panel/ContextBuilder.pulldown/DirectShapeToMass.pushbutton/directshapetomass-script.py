@@ -423,6 +423,57 @@ def _place_family_instance(doc, family, comment_text):
         raise
 
 
+def _add_material_instance_param(family_doc, freeform_elements):
+    """Add a 'Material' instance parameter to the family and associate it with the primary freeform geometry."""
+    if not freeform_elements:
+        return
+
+    family_manager = family_doc.FamilyManager
+    mat_family_param = None
+
+    # Revit 2022+ API uses ForgeTypeId-based overload
+    try:
+        mat_family_param = family_manager.AddParameter(
+            "Material",
+            DB.GroupTypeId.Materials,
+            DB.SpecTypeId.Reference.Material,
+            True,  # instance parameter
+        )
+    except Exception:
+        pass
+
+    # Fallback for pre-2022 Revit (ParameterType enum)
+    if mat_family_param is None:
+        try:
+            mat_family_param = family_manager.AddParameter(
+                "Material",
+                DB.BuiltInParameterGroup.PG_MATERIALS,
+                DB.ParameterType.Material,
+                True,  # instance parameter
+            )
+        except Exception:
+            pass
+
+    if mat_family_param is None:
+        _log_debug("Could not add Material family instance parameter - skipping association.")
+        return
+
+    # Associate the largest solid's freeform element material parameter to the family parameter
+    freeform = freeform_elements[0]
+    mat_elem_param = freeform.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+    if mat_elem_param is None:
+        mat_elem_param = freeform.LookupParameter("Material")
+
+    if mat_elem_param is not None:
+        try:
+            family_manager.AssociateElementParameterToFamilyParameter(mat_elem_param, mat_family_param)
+            _log_debug("Associated freeform material parameter to family instance parameter 'Material'.")
+        except Exception as ex:
+            _log_debug("Could not associate material parameter: {}".format(ex))
+    else:
+        _log_debug("No material parameter found on freeform element - association skipped.")
+
+
 def _convert_element_to_mass_family(doc, element, solids):
     _log_debug("Converting DirectShape element id={} app_id='{}' app_data='{}' solids={}".format(
         element.Id.IntegerValue,
@@ -473,11 +524,15 @@ def _convert_element_to_mass_family(doc, element, solids):
             raise Exception("This Revit version does not support FreeFormElement creation.")
 
         source_comment = _get_comment(element)
+        created_freeforms = []
         for solid in solids:
             freeform = freeform_cls.Create(family_doc, solid)
             if freeform is None:
                 raise Exception("Revit did not create a freeform element in the mass family.")
             _set_comment(freeform, source_comment)
+            created_freeforms.append(freeform)
+
+        _add_material_instance_param(family_doc, created_freeforms)
 
         transaction.Commit()
         transaction = None

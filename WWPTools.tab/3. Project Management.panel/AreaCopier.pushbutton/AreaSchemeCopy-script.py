@@ -20,6 +20,7 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 import WWP_colorSchemeUtils as csu
 from WWP_settings import get_tool_settings
+from WWP_versioning import apply_window_title
 
 def _load_uiutils():
     try:
@@ -63,6 +64,7 @@ def _show_setup_dialog(scheme_names, level_names, defaults=None):
     xaml_text = File.ReadAllText(xaml_path)
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)
+    apply_window_title(window, "Copy Areas - Setup")
     _set_owner(window)
 
     source_combo = window.FindName("SourceSchemeCombo")

@@ -14,6 +14,12 @@ except Exception:
 		_urlrequest = None
 from datetime import datetime
 
+try:
+	import WWP_telemetry
+	WWP_telemetry.track_app_init()
+except Exception:
+	pass
+
 # check if notifications are disabled
 if msgUtils_muted():
 	script.exit()

@@ -15,6 +15,7 @@ script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.append(lib_path)
+from WWP_versioning import apply_window_title
 
 
 def _load_uiutils():
@@ -390,6 +391,7 @@ def _show_inputs_form(
     xaml_text = File.ReadAllText(xaml_path)
     reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(reader)
+    apply_window_title(window, "Parking Count in Room")
 
     rooms_list = window.FindName("RoomsList")
     type_combo = window.FindName("TypeSourceCombo")
