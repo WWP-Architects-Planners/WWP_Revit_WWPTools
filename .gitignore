@@ -11,3 +11,5 @@ installer/*.wixpdb
 **/ARCHIVE/
 **/archived/
 **/ARCHIVED/
+**/__pycache__/
+*.pyc
