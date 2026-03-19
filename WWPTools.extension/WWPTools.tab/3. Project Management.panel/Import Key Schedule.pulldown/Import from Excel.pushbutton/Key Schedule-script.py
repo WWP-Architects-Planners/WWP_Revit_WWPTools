@@ -66,6 +66,37 @@ def _header_signature(headers):
     return "|".join([_normalize_name(h) for h in headers or []])
 
 
+def _mapping_signature_key(category_key):
+    return "area_key_import_headers_signature_{}".format(category_key)
+
+
+def _mapping_selection_key(category_key):
+    return "area_key_import_selected_options_{}".format(category_key)
+
+
+def _target_category_key(selected_target_type):
+    target = resolve_schedule_target(selected_target_type)
+    return _normalize_name(target.get("label"))
+
+
+def _load_saved_mapping(config, category_key, signature, column_count, parameter_options):
+    saved_signature = _safe_config_get(config, _mapping_signature_key(category_key), "") or ""
+    saved_selections = _safe_config_get(config, _mapping_selection_key(category_key), None)
+    defaults = None
+    if saved_signature == signature:
+        defaults = _sanitize_selections(saved_selections, column_count, parameter_options)
+    if defaults is not None:
+        return defaults
+
+    legacy_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
+    legacy_target = _safe_config_get(config, "area_key_import_target", "") or ""
+    legacy_target_key = _target_category_key(legacy_target) if legacy_target else ""
+    legacy_selections = _safe_config_get(config, "area_key_import_selected_options", None)
+    if legacy_signature == signature and legacy_target_key == category_key:
+        return _sanitize_selections(legacy_selections, column_count, parameter_options)
+    return None
+
+
 def _sanitize_selections(selections, column_count, parameter_options):
     if not selections or len(selections) != column_count:
         return None
@@ -954,12 +985,13 @@ def main():
             headers, column_labels, rows = extract_excel_data(workbook)
             if column_labels:
                 signature = _header_signature(headers)
-                saved_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
-                saved_target = _safe_config_get(config, "area_key_import_target", "") or ""
-                saved_selections = _safe_config_get(config, "area_key_import_selected_options", None)
-                defaults = None
-                if _normalize_name(saved_target) == category_key and saved_signature == signature:
-                    defaults = _sanitize_selections(saved_selections, len(column_labels), parameter_options)
+                defaults = _load_saved_mapping(
+                    config,
+                    category_key,
+                    signature,
+                    len(column_labels),
+                    parameter_options,
+                )
                 if defaults is None:
                     defaults = build_default_selections(headers, param_names)
                 state.update(
@@ -1035,12 +1067,13 @@ def main():
                 ui.uiUtils_alert("No data found in the Excel file.", title=TITLE)
                 continue
             signature = _header_signature(headers)
-            saved_signature = _safe_config_get(config, "area_key_import_headers_signature", "") or ""
-            saved_target = _safe_config_get(config, "area_key_import_target", "") or ""
-            saved_selections = _safe_config_get(config, "area_key_import_selected_options", None)
-            defaults = None
-            if _normalize_name(saved_target) == category_key and saved_signature == signature:
-                defaults = _sanitize_selections(saved_selections, len(column_labels), parameter_options)
+            defaults = _load_saved_mapping(
+                config,
+                category_key,
+                signature,
+                len(column_labels),
+                parameter_options,
+            )
             if defaults is None:
                 defaults = build_default_selections(headers, param_names)
             state.update(
@@ -1237,6 +1270,8 @@ def main():
         _safe_config_set(config, "area_key_import_file_path", state.get("file_path", ""))
         _safe_config_set(config, "area_key_import_headers_signature", _header_signature(state.get("headers", [])))
         _safe_config_set(config, "area_key_import_selected_options", selections)
+        _safe_config_set(config, _mapping_signature_key(category_key), _header_signature(state.get("headers", [])))
+        _safe_config_set(config, _mapping_selection_key(category_key), selections)
         _safe_config_set(config, "area_key_import_schedule_name_{}".format(category_key), schedule_name)
         _save_config()
 
