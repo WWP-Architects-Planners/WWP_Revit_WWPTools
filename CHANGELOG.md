@@ -5,6 +5,15 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-03-19
+
+### Added
+- Views Sheet Manager: new `Lay Views on Sheet` tool with a CPython/XAML window, titleblock picker, draggable sheet preview, and automatic viewport array layout
+- Views Sheet Manager: searchable in-window view selector for the `Lay Views on Sheet` tool with filter-based batch selection
+
+### Fixed
+- Import Key Schedule: Excel-to-parameter mapping selections now persist and reload correctly per target type and header signature
+
 ## [1.2.4] - 2026-03-19
 
 ### Added
