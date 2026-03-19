@@ -5,6 +5,21 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-03-19
+
+### Added
+- Import Key Schedule: converted the tool into a pulldown with `Import from Excel` and a new `Map by Name` action
+- Import Key Schedule: new `Map by Name` tool for existing Rooms and Areas that matches host `Name` to key schedule `Name` and assigns the host key parameter automatically
+
+### Changed
+- Import Key Schedule: duplicate key schedule name matches now prefer the `Program = Residential` version by default when multiple rows share the same `Name`
+- Manual Revisions: moved to a CPython/XAML workflow with selectable target titleblock swapping and multi-sheet processing
+- Manual Revisions: added automatic multiline wrapping, current-sheet-first selection, optional single-column ignore behavior, and resizable split-pane UI
+
+### Fixed
+- Manual Revisions: removed per-sheet titleblock lookups from dialog startup to reduce load time
+- Manual Revisions: improved wrapped text layout and overflow handling for left/right revision columns
+
 ## [1.2.3] - 2026-03-17
 
 ### Added
@@ -178,3 +193,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.1.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.1.0
 [1.0.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.0.0
 [1.2.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.2.0
+[1.2.4]: https://github.com/jason-svn/WWPTools/releases/tag/V1.2.4

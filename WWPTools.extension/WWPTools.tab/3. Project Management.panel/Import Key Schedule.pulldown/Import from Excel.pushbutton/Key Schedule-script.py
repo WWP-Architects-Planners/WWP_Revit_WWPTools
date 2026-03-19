@@ -10,7 +10,7 @@ from pyrevit import DB, revit, script
 from WWP_settings import get_tool_settings
 
 
-TITLE = "Import Area Key Schedule"
+TITLE = "Import Key Schedule from Excel"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
 TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
