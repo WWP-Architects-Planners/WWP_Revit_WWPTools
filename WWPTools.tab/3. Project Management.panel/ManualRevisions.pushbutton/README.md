@@ -1,48 +1,65 @@
 # WWP Manual Revisions — PyRevit Tool
 
 ## What it does
-Toggles between Revit's native revision schedule and a manual 4-parameter
-revision block on one or more sheets. Provides a WPF dialog to fill in
-revision content directly.
+Swaps selected sheets from their current titleblock to a target titleblock that
+uses fake revision parameters. The tool automatically builds the four
+multiline text parameters from each sheet's actual Revit revisions.
+
+Line count rule:
+- Each revision counts as 1 line by default
+- Revision descriptions wrap to the next line at about 25 characters without breaking words
+- Each wrapped line counts toward the 11-line limit
+- Up to 10 wrapped lines are filled on the left side before overflowing to the
+  right side
+- You can optionally ignore sheets whose real revision table still fits within
+  10 wrapped lines, so they stay on the current titleblock
 
 ---
 
-## Required Shared Parameters (on ViewSheet)
+## Parameter Mapping
 
 | Parameter Name                  | Type    | Notes                          |
 |---------------------------------|---------|--------------------------------|
-| WWP_ShowManualRevisions_YesNo   | Yes/No  | Drives visibility formulas     |
-| WWP_Rev_Left_Dates              | Text    | One date per line, left column |
-| WWP_Rev_Left_Descs              | Text    | One desc per line, left column |
-| WWP_Rev_Right_Dates             | Text    | One date per line, right col   |
-| WWP_Rev_Right_Descs             | Text    | One desc per line, right col   |
+| ! S_TB_RevisonDate_Left         | Text    | Default left date parameter on the sheet |
+| ! S_TB_RevisonDetail_Left       | Text    | Default left description parameter on the sheet |
+| ! S_TB_RevisonDate_Right        | Text    | Default right date parameter on the sheet |
+| ! S_TB_RevisonDetail_Right      | Text    | Default right description parameter on the sheet |
 
-All five must be added to your Shared Parameter file and bound to sheets
-before running the tool.
+The tool exposes dropdowns for the four sheet text parameters. The selected
+mapping is saved per project and reused on the next run. The names above are
+the default selections. When you run the tool, the four text parameters are
+populated automatically from the revisions placed on each sheet.
 
 ---
 
 ## Titleblock Setup
 
-1. In the titleblock family, add all 5 parameters as **instance** parameters.
-2. Place **Label** elements for each of the 4 text parameters inside the
+1. Keep your current titleblock with the real Revit revision schedule and create
+   a target titleblock with the manual revision labels.
+2. In the target titleblock family, add the parameters you want to drive as **instance** parameters.
+3. Place **Label** elements for the four manual revision parameters inside the
    manual revision table box.
-3. Set the **visibility** of the manual table group:
-   - Visible when: `WWP_ShowManualRevisions_YesNo == Yes`
-4. Set the **visibility** of the native Revit revision schedule:
-   - Visible when: `NOT(WWP_ShowManualRevisions_YesNo)`
+4. The target titleblock should show the fake revision labels by default.
+5. The source titleblock should keep the real Revit revision schedule.
 
 ---
 
 ## Usage
 
-- Open a sheet (or select multiple sheets in the Project Browser)
 - Run the tool from the WWP tab
-- Check/uncheck the toggle and fill in the four text fields
-- One entry per line — date lines and description lines must match in count
-- Click **Apply to Sheet**
+- Confirm or change the four parameter dropdown mappings at the top
+- Choose the target titleblock
+- Optionally enable the ignore rule for sheets that do not need two columns
+- Select one or more sheets inside the dialog
+- The current sheet is shown at the top of the list
+- Review the titleblock swap summary for the selected sheets
+- Click **Update Sheets**
 
-For multiple sheets: all selected sheets get the same values written.
+For multiple sheets: each sheet gets its own generated revision dates and
+descriptions. Any current titleblock on those sheets is swapped to the selected
+target titleblock before the fake revision parameters are written. If the
+ignore option is enabled, sheets whose real revision table still fits within
+10 wrapped lines are skipped and reported as ignored.
 
 ---
 
