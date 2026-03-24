@@ -1,7 +1,6 @@
 layout:
-  - 1. Project Setup
-  - 2. Mass Context
-  - 3. Project Management
-  - 4. Views Sheet Manager
-  - 5. Revit Cleanup
-  - 6. Links
+  - 1. Setup
+  - 2. Context
+  - 3. Manage
+  - 4. Sheets
+  - 5. Cleanup
