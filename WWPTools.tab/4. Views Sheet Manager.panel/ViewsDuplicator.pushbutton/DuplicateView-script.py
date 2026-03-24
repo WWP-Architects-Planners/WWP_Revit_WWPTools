@@ -6,7 +6,7 @@ from Autodesk.Revit import DB
 import WWP_uiUtils as ui
 
 
-TITLE = "Duplicate Views"
+TITLE = "Views Duplicator"
 DESCRIPTION = "Replace String"
 PARAM_VIEW_SUBCATEGORY = "View Subcategory"
 
