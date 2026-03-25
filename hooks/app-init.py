@@ -72,7 +72,7 @@ def _get_local_version():
 def _get_latest_release_version():
 	try:
 		req = Request(
-			"https://api.github.com/repos/jason-svn/WWPTools/releases/latest",
+			"https://api.github.com/repos/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest",
 			headers={"User-Agent": "WWPTools"},
 		)
 		with urlopen(req, timeout=2) as resp:
@@ -117,7 +117,7 @@ try:
 					title="WWPTools Update",
 					appid="WWP Architects + Planners",
 					icon=icon_path if os.path.exists(icon_path) else None,
-					click="https://github.com/jason-svn/WWPTools/releases/latest",
+					click="https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest",
 					actions=None,
 				)
 			else:
