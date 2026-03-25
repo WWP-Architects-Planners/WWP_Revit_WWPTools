@@ -2,6 +2,23 @@
 
 WWPTools is a pyRevit toolbar extension distributed via GitHub Releases for easy installs and updates.
 
+## pyRevit Extension Manager
+pyRevit installs a Git extension by cloning the repository root directly into `%APPDATA%\pyRevit\Extensions\WWPTools.extension`.
+
+That means `WWPTools.extension` can not live as a nested folder inside the same branch that users install from. If the repo root contains `backend`, `installer`, `WWPTools.WpfUI`, and other development folders, pyRevit clones all of them into the installed extension folder and the toolbar only works when the actual tab/panel bundles are also at that root.
+
+This repo now supports a two-branch model:
+
+1. `main` stays the development branch and keeps source projects such as `WWPTools.WpfUI`, `backend`, `installer`, and solution files.
+2. `pyrevit` is auto-published from the `WWPTools.extension` subtree, so its branch root is the extension payload itself.
+
+### Required GitHub setup
+1. Push `main` as usual.
+2. Let the `Publish pyRevit Branch` workflow create/update the `pyrevit` branch.
+3. Set the repository default branch to `pyrevit` if you want pyRevit Extension Manager installs to pull the clean extension-only layout.
+
+If you do not want to change the default branch, use a separate distribution repo that mirrors the `pyrevit` branch.
+
 ## For admins (publish updates)
 1) Create a GitHub repo named `WWPTools` (public).
 2) Publish updates by pushing to `main` (the installer pulls the repo zip from GitHub).

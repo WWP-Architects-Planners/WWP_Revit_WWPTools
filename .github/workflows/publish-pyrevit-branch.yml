@@ -1,0 +1,29 @@
+name: Publish pyRevit Branch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "WWPTools.extension/**"
+      - ".github/workflows/publish-pyrevit-branch.yml"
+      - "installer/Publish-PyRevitBranch.ps1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Publish WWPTools.extension subtree to pyrevit branch
+        shell: pwsh
+        run: |
+          ./installer/Publish-PyRevitBranch.ps1 -SourceRef HEAD -TargetBranch pyrevit -ExtensionPath WWPTools.extension -Remote origin
