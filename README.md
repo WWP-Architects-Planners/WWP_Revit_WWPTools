@@ -12,6 +12,8 @@ This repo now supports a two-branch model:
 1. `main` stays the development branch and keeps source projects such as `WWPTools.WpfUI`, `backend`, `installer`, and solution files.
 2. `pyrevit` is auto-published from the `WWPTools.extension` subtree, so its branch root is the extension payload itself.
 
+The publish workflow also validates WPF UI sync. If files under `WWPTools.WpfUI` changed, the workflow requires both shipped DLLs under `WWPTools.extension/lib` to be updated in the same push.
+
 ### Required GitHub setup
 1. Push `main` as usual.
 2. Let the `Publish pyRevit Branch` workflow create/update the `pyrevit` branch.

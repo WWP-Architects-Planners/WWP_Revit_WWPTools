@@ -6,8 +6,10 @@ on:
       - main
     paths:
       - "WWPTools.extension/**"
+      - "WWPTools.WpfUI/**"
       - ".github/workflows/publish-pyrevit-branch.yml"
       - "installer/Publish-PyRevitBranch.ps1"
+      - "installer/Test-PyRevitPublishInputs.ps1"
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Validate publish inputs
+        shell: pwsh
+        env:
+          BASE_REF: ${{ github.event.before }}
+          HEAD_REF: ${{ github.sha }}
+        run: |
+          ./installer/Test-PyRevitPublishInputs.ps1 -BaseRef $env:BASE_REF -HeadRef $env:HEAD_REF
 
       - name: Publish WWPTools.extension subtree to pyrevit branch
         shell: pwsh
