@@ -1,4 +1,3 @@
-#! python3
 import clr
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
@@ -8,6 +7,7 @@ import os
 import datetime
 import traceback
 import WWP_uiUtils as ui
+from WWP_compat import io_open
 
 doc = __revit__.ActiveUIDocument.Document
 app = doc.Application
@@ -69,18 +69,18 @@ def _read_shared_parameters(file_path):
     groups = {}  # Store group ID -> group name mapping
     
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with io_open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         print("Read file with utf-8 encoding, {} lines".format(len(lines)))
     except Exception as e1:
         print("utf-8 failed: {}".format(str(e1)))
         try:
-            with open(file_path, 'r', encoding='utf-16') as f:
+            with io_open(file_path, 'r', encoding='utf-16') as f:
                 lines = f.readlines()
             print("Read file with utf-16 encoding, {} lines".format(len(lines)))
         except Exception as e2:
             print("utf-16 failed: {}".format(str(e2)))
-            with open(file_path, 'r') as f:
+            with io_open(file_path, 'r') as f:
                 lines = f.readlines()
             print("Read file with default encoding, {} lines".format(len(lines)))
     

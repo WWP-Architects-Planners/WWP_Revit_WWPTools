@@ -1,10 +1,9 @@
-#!python3
 import os
 import clr
 clr.AddReference('RevitAPI')
 import subprocess
 import ctypes
-import configparser
+from WWP_compat import configparser, io_open, read_config_file
 
 app = __revit__.Application
 doc = __revit__.ActiveUIDocument.Document
@@ -18,6 +17,7 @@ confirm_response = ctypes.windll.user32.MessageBoxW(
 
 if confirm_response == 1:
     revit_version = str(app.VersionNumber)
+    revit_cloud_local_path = ""
     path = os.path.join(os.environ.get('LOCALAPPDATA'), "Autodesk", "Revit", "Autodesk Revit " + revit_version)
     temp_path = os.path.join(os.environ.get('LOCALAPPDATA'), 'TEMP')
     collab_cache_path = os.path.join(path, 'CollaborationCache')
@@ -27,15 +27,15 @@ if confirm_response == 1:
         config = configparser.ConfigParser()
         config.optionxform = str
         try:
-            with open(revit_ini_path, 'r', encoding='utf-16') as ini_file:
-                config.read_file(ini_file)
+            with io_open(revit_ini_path, 'r', encoding='utf-16') as ini_file:
+                read_config_file(config, ini_file)
         except Exception:
             try:
-                with open(revit_ini_path, 'r', encoding='utf-8-sig', errors='ignore') as ini_file:
-                    config.read_file(ini_file)
+                with io_open(revit_ini_path, 'r', encoding='utf-8-sig', errors='ignore') as ini_file:
+                    read_config_file(config, ini_file)
             except Exception:
-                with open(revit_ini_path, 'r', encoding='cp1252', errors='ignore') as ini_file:
-                    config.read_file(ini_file)
+                with io_open(revit_ini_path, 'r', encoding='cp1252', errors='ignore') as ini_file:
+                    read_config_file(config, ini_file)
         if config.has_option("CloudModelCache", "CacheLocation"):
             revit_cloud_local_path = config.get("CloudModelCache", "CacheLocation")
 

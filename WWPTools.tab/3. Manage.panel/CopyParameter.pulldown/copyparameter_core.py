@@ -1,4 +1,3 @@
-#! python3
 from pyrevit import revit, DB
 from Autodesk.Revit import UI
 import WWP_uiUtils as ui

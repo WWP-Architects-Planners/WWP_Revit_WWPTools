@@ -1,4 +1,3 @@
-#!python3
 import clr
 import os
 import sys

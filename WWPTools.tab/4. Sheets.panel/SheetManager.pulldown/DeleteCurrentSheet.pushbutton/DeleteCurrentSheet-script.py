@@ -1,4 +1,3 @@
-#! python3
 import importlib
 import os
 import sys

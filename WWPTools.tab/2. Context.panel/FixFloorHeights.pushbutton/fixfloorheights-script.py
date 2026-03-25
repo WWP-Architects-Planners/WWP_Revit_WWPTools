@@ -1,4 +1,3 @@
-#! python3
 import csv
 import math
 import os
@@ -30,6 +29,7 @@ if LIB_PATH not in sys.path:
 
 import WWP_uiUtils as ui
 from System.Collections.Generic import List
+from WWP_compat import io_open
 
 
 HEADER_ALIASES = {
@@ -319,7 +319,7 @@ def _infer_column_indexes(rows):
 
 
 def _read_csv_points(csv_path, unit_name):
-    with open(csv_path, "r", encoding="utf-8-sig", newline="") as csv_file:
+    with io_open(csv_path, "r", encoding="utf-8-sig", newline="") as csv_file:
         sample = csv_file.read(4096)
         csv_file.seek(0)
         reader = csv.reader(csv_file, _sniff_dialect(sample))

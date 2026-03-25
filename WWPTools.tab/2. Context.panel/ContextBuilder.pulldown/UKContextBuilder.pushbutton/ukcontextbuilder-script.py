@@ -7,8 +7,6 @@ import os
 import re
 import sys
 import traceback
-import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 
 from System import Uri
@@ -111,6 +109,7 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 
 import WWP_uiUtils as ui
+from WWP_compat import Request, decode_to_text, urllib_parse, urlopen
 
 
 def _get_doc():
@@ -403,10 +402,10 @@ def _render_map(browser, center_lat=None, center_lon=None, radius_m=0.0, label="
 
 
 def _http_get_text(url, timeout_sec=20):
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    response = urllib.request.urlopen(request, timeout=timeout_sec)
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    response = urlopen(request, timeout=timeout_sec)
     try:
-        return response.read().decode("utf-8")
+        return decode_to_text(response.read(), "utf-8")
     finally:
         response.close()
 
@@ -433,7 +432,7 @@ def _sample_uk_terrain_elevation(lat, lon, endpoint, layer_name, sample_window_m
     meters_per_degree_lat, meters_per_degree_lon = _meters_per_degree(lat)
     delta_lat = sample_window_m / meters_per_degree_lat
     delta_lon = sample_window_m / meters_per_degree_lon
-    query = urllib.parse.urlencode(
+    query = urllib_parse.urlencode(
         {
             "service": "WMS",
             "version": "1.1.1",
@@ -851,8 +850,8 @@ def _show_dialog(doc):
                 return
 
             args.Cancel = True
-            parsed = urllib.parse.urlparse(absolute_uri)
-            query = urllib.parse.parse_qs(parsed.query)
+            parsed = urllib_parse.urlparse(absolute_uri)
+            query = urllib_parse.parse_qs(parsed.query)
             lat = float((query.get("lat") or [None])[0])
             lon = float((query.get("lon") or [None])[0])
             label = _reverse_geocode(lat, lon)
@@ -979,24 +978,24 @@ def _show_dialog(doc):
 
 
 def _http_get_json(url, timeout_sec=20):
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    response = urllib.request.urlopen(request, timeout=timeout_sec)
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    response = urlopen(request, timeout=timeout_sec)
     try:
-        return json.loads(response.read().decode("utf-8"))
+        return json.loads(decode_to_text(response.read(), "utf-8"))
     finally:
         response.close()
 
 
 def _http_post_text(url, body_text, timeout_sec=20):
-    payload = urllib.parse.urlencode({"data": body_text}).encode("utf-8")
-    request = urllib.request.Request(
+    payload = urllib_parse.urlencode({"data": body_text}).encode("utf-8")
+    request = Request(
         url,
         data=payload,
         headers={"User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
     )
-    response = urllib.request.urlopen(request, timeout=timeout_sec)
+    response = urlopen(request, timeout=timeout_sec)
     try:
-        return response.read().decode("utf-8")
+        return decode_to_text(response.read(), "utf-8")
     finally:
         response.close()
 
@@ -1008,7 +1007,7 @@ def _geocode_address(address):
     if cached and ("lat" in cached) and ("lon" in cached):
         return float(cached["lat"]), float(cached["lon"])
 
-    query = urllib.parse.quote(address)
+    query = urllib_parse.quote(address)
     url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q={}".format(query)
     data = _http_get_json(url, timeout_sec=20)
     if not data:
