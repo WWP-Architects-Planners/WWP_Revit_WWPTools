@@ -1,4 +1,3 @@
-#! python3
 import collections
 from collections import defaultdict
 import os

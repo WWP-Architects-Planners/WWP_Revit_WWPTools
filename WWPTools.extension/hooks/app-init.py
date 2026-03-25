@@ -5,14 +5,8 @@ from pyrevit import forms, script
 from WWP_msgUtils import *
 import json
 import re
-try:
-	import urllib.request as _urlrequest
-except Exception:
-	try:
-		import urllib2 as _urlrequest
-	except Exception:
-		_urlrequest = None
 from datetime import datetime
+from WWP_compat import Request, decode_to_text, urlopen
 
 try:
 	import WWP_telemetry
@@ -77,14 +71,12 @@ def _get_local_version():
 
 def _get_latest_release_version():
 	try:
-		if _urlrequest is None:
-			return None
-		req = _urlrequest.Request(
+		req = Request(
 			"https://api.github.com/repos/jason-svn/WWPTools/releases/latest",
 			headers={"User-Agent": "WWPTools"},
 		)
-		with _urlrequest.urlopen(req, timeout=2) as resp:
-			data = json.loads(resp.read().decode("utf-8"))
+		with urlopen(req, timeout=2) as resp:
+			data = json.loads(decode_to_text(resp.read(), "utf-8"))
 		tag = data.get("tag_name") or data.get("name")
 		return _parse_semver(tag)
 	except Exception:

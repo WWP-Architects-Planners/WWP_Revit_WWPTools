@@ -1,4 +1,3 @@
-#!python3
 import clr
 
 from pyrevit import revit, DB, script
