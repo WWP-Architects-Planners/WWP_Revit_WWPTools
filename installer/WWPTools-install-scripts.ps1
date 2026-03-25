@@ -44,8 +44,8 @@ function Download-File {
 
 Write-Log "=== WWPTools install start ==="
 try {
-    $repoOwner = 'jason-svn'
-    $repoName = 'WWPTools'
+    $repoOwner = 'WWP-Architects-Planners'
+    $repoName = 'WWP_Revit_WWPTools'
     $branch = 'main'
     $targetExtension = Join-Path $env:APPDATA 'pyRevit\Extensions\WWPTools.extension'
     $extensionsRoot = Split-Path -Parent $targetExtension

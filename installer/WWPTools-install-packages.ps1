@@ -44,8 +44,8 @@ function Download-File {
 
 Write-Log "=== WWPTools packages install start ==="
 try {
-    $repoOwner = 'jason-svn'
-    $repoName = 'WWPTools'
+    $repoOwner = 'WWP-Architects-Planners'
+    $repoName = 'WWP_Revit_WWPTools'
     $branch = 'main'
     $targetPackages = 'C:\dynpackages'
     $manifestPath = Join-Path $targetPackages 'WWPTools-packages-manifest.txt'

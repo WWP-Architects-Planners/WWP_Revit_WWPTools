@@ -208,7 +208,7 @@ function Build-WwpToolsMsi {
         Move-Item -LiteralPath $tempVersionPath -Destination $versionPath -Force
         Write-Host ("Updated extension version file: {0}" -f $versionPath)
 
-        $aboutBundle = Join-Path $repoRoot "WWPTools.extension\\WWPTools.tab\\6. Links.panel\\About us.urlbutton\\bundle.yaml"
+        $aboutBundle = Join-Path $repoRoot "WWPTools.extension\\WWPTools.tab\\5. Cleanup.panel\\About us.urlbutton\\bundle.yaml"
         if (Test-Path -LiteralPath $aboutBundle) {
             $bundleLines = Get-Content -LiteralPath $aboutBundle
             $tooltipLine = ('tooltip: "Installed version: {0}"' -f $version)

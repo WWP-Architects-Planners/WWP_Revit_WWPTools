@@ -46,9 +46,15 @@ CONFIG_LAST_PRINTER = "last_printer"
 CONFIG_LAST_SOURCE_DIR = "last_source_dir"
 
 PREVIEW_OUTPUT_NAME = "Combined Drawing Set.pdf"
-WAIT_TIMEOUT_SECONDS = 180.0
-WAIT_STABLE_POLLS = 4
+WAIT_TIMEOUT_SECONDS = 75.0
+WAIT_STABLE_POLLS = 3
+WAIT_FILE_APPEAR_SECONDS = 20.0
+WAIT_ZERO_BYTE_ABORT_SECONDS = 15.0
+WAIT_NO_GROWTH_SECONDS = 20.0
 _WPFUI_THEME_READY = False
+UNSUPPORTED_SILENT_PDF_PRINTERS = (
+    "microsoft print to pdf",
+)
 
 
 def _read_bundle_title():
@@ -311,6 +317,18 @@ def _is_pdf_printer(printer_name):
     return "pdf" in str(printer_name or "").lower()
 
 
+def _requires_interactive_save_dialog(printer_name):
+    return str(printer_name or "").strip().lower() in UNSUPPORTED_SILENT_PDF_PRINTERS
+
+
+def _unsupported_printer_message(printer_name):
+    return (
+        "The selected printer '{}' is not supported by Combined Print Set because it can ignore the configured "
+        "output path and wait on a hidden Save dialog, which leaves Revit hanging and produces 0 KB PDFs.\n\n"
+        "Use a PDF printer that supports unattended PrintToFile output."
+    ).format(printer_name)
+
+
 def _collect_printers():
     names = []
     try:
@@ -326,29 +344,75 @@ def _collect_printers():
             continue
         seen.add(key)
         unique_names.append(name)
-    unique_names.sort(key=lambda item: (0 if _is_pdf_printer(item) else 1, item.lower()))
+    unique_names.sort(
+        key=lambda item: (
+            0 if _is_pdf_printer(item) and not _requires_interactive_save_dialog(item) else
+            1 if _is_pdf_printer(item) else
+            2,
+            item.lower(),
+        )
+    )
     return unique_names
 
 
+def _is_valid_pdf_file(path_value):
+    try:
+        if not os.path.isfile(path_value):
+            return False
+        if os.path.getsize(path_value) <= 4:
+            return False
+        with open(path_value, "rb") as pdf_stream:
+            return pdf_stream.read(5) == b"%PDF-"
+    except Exception:
+        return False
+
+
 def _wait_for_pdf(path_value, timeout_seconds=WAIT_TIMEOUT_SECONDS):
+    start_time = time.time()
     deadline = time.time() + float(timeout_seconds)
+    last_seen_time = None
+    last_growth_time = None
     last_size = -1
     stable_polls = 0
     while time.time() <= deadline:
+        now = time.time()
         if os.path.isfile(path_value):
             try:
                 current_size = os.path.getsize(path_value)
             except Exception:
                 current_size = -1
-            if current_size > 0 and current_size == last_size:
-                stable_polls += 1
-                if stable_polls >= WAIT_STABLE_POLLS:
-                    return True
+            if last_seen_time is None:
+                last_seen_time = now
+            if current_size > 0:
+                if current_size == last_size:
+                    stable_polls += 1
+                    if stable_polls >= WAIT_STABLE_POLLS:
+                        if _is_valid_pdf_file(path_value):
+                            return True
+                        raise Exception("The PDF printer created a file, but it is not a valid PDF: {}".format(path_value))
+                else:
+                    last_size = current_size
+                    last_growth_time = now
+                    stable_polls = 0
             else:
-                last_size = current_size
-                stable_polls = 0
+                if last_seen_time is not None and (now - last_seen_time) >= WAIT_ZERO_BYTE_ABORT_SECONDS:
+                    raise Exception(
+                        "The PDF printer created a 0 KB file and never wrote PDF data.\n"
+                        "This usually means the printer is waiting on a hidden Save dialog or does not support silent PrintToFile output.\n"
+                        "File: {}".format(path_value)
+                    )
+            if last_growth_time is not None and current_size > 0 and (now - last_growth_time) >= WAIT_NO_GROWTH_SECONDS:
+                if _is_valid_pdf_file(path_value):
+                    return True
+                raise Exception("The PDF file stopped growing before a valid PDF was produced: {}".format(path_value))
+        elif (now - start_time) >= WAIT_FILE_APPEAR_SECONDS:
+            raise Exception(
+                "The PDF printer did not create the output file within {} seconds.\n"
+                "This usually means the printer ignored PrintToFile or is waiting on an interactive prompt.\n"
+                "Expected file: {}".format(int(WAIT_FILE_APPEAR_SECONDS), path_value)
+            )
         time.sleep(0.5)
-    return False
+    raise Exception("Timed out waiting for the PDF printer to finish writing:\n{}".format(path_value))
 
 
 def _merge_pdf_files(input_paths, output_path):
@@ -376,6 +440,8 @@ def _merge_pdf_files(input_paths, output_path):
 
 
 def _configure_print_manager(print_manager, printer_name, output_path):
+    if _requires_interactive_save_dialog(printer_name):
+        raise Exception(_unsupported_printer_message(printer_name))
     print_manager.SelectNewPrintDriver(printer_name)
     print_manager.PrintToFile = True
     try:
@@ -398,18 +464,24 @@ def _print_sheet_to_pdf(current_doc, sheet, printer_name, output_path):
             pass
 
     last_error = None
-    for _ in range(3):
+    for _ in range(2):
         try:
             _configure_print_manager(current_doc.PrintManager, printer_name, output_path)
             success = current_doc.PrintManager.SubmitPrint(sheet)
             if not success:
                 raise Exception("The printer reported an unsuccessful print submission.")
-            if not _wait_for_pdf(output_path):
-                raise Exception("The PDF printer did not create the expected output file.")
+            _wait_for_pdf(output_path)
+            if not _is_valid_pdf_file(output_path):
+                raise Exception("The printer finished, but the output is not a valid PDF:\n{}".format(output_path))
             return
         except Exception as exc:
             last_error = exc
-            time.sleep(1.5)
+            try:
+                if os.path.isfile(output_path):
+                    os.remove(output_path)
+            except Exception:
+                pass
+            time.sleep(1.0)
     raise Exception("Failed to print '{}': {}".format(_sheet_display(sheet.SheetNumber, sheet.Name), last_error))
 
 
@@ -858,6 +930,9 @@ class CombinedPrintSetDialog(object):
         printer_name = self._selected_printer_name()
         if not printer_name:
             self._txt_warning.Text = "Select a PDF printer."
+            return
+        if _requires_interactive_save_dialog(printer_name):
+            self._txt_warning.Text = _unsupported_printer_message(printer_name)
             return
         output_path = _normalize_text(self._txt_output_path.Text)
         if not output_path:

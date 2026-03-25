@@ -5,6 +5,21 @@ All notable changes to WWPTools will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-03-25
+
+### Added
+- pyRevit compatibility: added a shared runtime compatibility layer for pyRevit 5.3.1 and 6.1 file, config, and HTTP handling
+
+### Changed
+- Installer and update checker: switched GitHub release and zip-download URLs to the current `WWP-Architects-Planners/WWP_Revit_WWPTools` repository
+- pyRevit compatibility: removed unnecessary `python3` engine headers from version-neutral tools so they can run under older pyRevit installs without forcing CPython
+
+### Fixed
+- Combined Print Set: fail fast when a PDF printer leaves a hidden save dialog, never creates output, or stalls at `0 KB`, instead of hanging Revit for minutes per sheet
+- Web Context Builder and UK Context Builder: replaced Python-3-only urllib imports with cross-runtime compatibility helpers
+- Local File Cleaner, Create Template, and Fix Floor Heights: replaced Python-3-only config/file handling with cross-runtime compatibility helpers
+- Export2Ex, Import Key Schedule, and Type Layers: removed postponed-annotation syntax that made the CPython-backed workflows more brittle across pyRevit versions
+
 ## [1.2.5] - 2026-03-19
 
 ### Added
