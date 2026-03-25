@@ -9,6 +9,11 @@
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net48'">
     <NoWarn>$(NoWarn);NU1903</NoWarn>
+    <RevitInstallDir>C:\Program Files\Autodesk\Revit 2024</RevitInstallDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
+    <RevitInstallDir>C:\Program Files\Autodesk\Revit 2026</RevitInstallDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +25,17 @@
     <Page Remove="bin\**\*.xaml" />
     <Page Remove="obj.*\**\*.xaml" />
     <Page Remove="bin.*\**\*.xaml" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(RevitInstallDir)\\RevitAPI.dll') and Exists('$(RevitInstallDir)\\RevitAPIUI.dll')">
+    <Reference Include="RevitAPI">
+      <HintPath>$(RevitInstallDir)\RevitAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>$(RevitInstallDir)\RevitAPIUI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="CopyToLib" AfterTargets="Build">
