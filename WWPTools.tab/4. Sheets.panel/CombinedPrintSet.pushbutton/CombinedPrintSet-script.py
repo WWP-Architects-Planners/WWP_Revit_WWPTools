@@ -17,7 +17,6 @@ clr.AddReference("WindowsBase")
 clr.AddReference("System.Drawing")
 
 from Autodesk.Revit import DB
-from pyrevit import revit
 from pyrevit.framework import EventHandler
 from System.Drawing.Printing import PrinterSettings
 from System.IO import File
@@ -36,8 +35,8 @@ import WWP_uiUtils as ui
 from WWP_versioning import apply_window_title
 
 
-uidoc = revit.uidoc
-doc = revit.doc
+uidoc = getattr(__revit__, "ActiveUIDocument", None)
+doc = uidoc.Document if uidoc else None
 app = __revit__.Application
 config, save_config = get_tool_settings("CombinedPrintSet", doc=doc)
 
