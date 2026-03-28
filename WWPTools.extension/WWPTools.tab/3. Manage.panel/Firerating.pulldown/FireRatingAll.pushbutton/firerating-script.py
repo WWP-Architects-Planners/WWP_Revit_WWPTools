@@ -1,5 +1,15 @@
 #!python3
 # -*- coding: utf-8 -*-
+"""Create Fire Rating Lines for ALL Walls in Current View.
+
+Reads the FRR Walls instance parameter from each wall visible in the
+current view and draws a detail line along the wall centerline with
+the matching WWP - FRR - xH line style.
+
+Supported rating values: 0HR, .75HR (3/4HR), 1HR, 1.5HR, 2HR, 3HR
+Matching line style name convention: 'WWP - FRR - 0H', 'WWP - FRR - 3/4H',
+  'WWP - FRR - 1H', 'WWP - FRR - 1.5H', 'WWP - FRR - 2H', 'WWP - FRR - 3H'
+"""
 import os
 import sys
 import traceback
@@ -27,16 +37,8 @@ uidoc = getattr(__revit__, "ActiveUIDocument", None)
 doc = uidoc.Document if uidoc else None
 WINDOW_TITLE = "Create Fire Rating Lines — All Walls"
 
-# Maps FRR rating substrings to line style name substrings
-FRR_STYLE_MAP = [
-    ("0HR", "0HR"),
-    ("3/4HR", "3-4HR"),
-    ("1HR", "1HR"),
-    ("1.5HR", "1-5HR"),
-    ("2HR", "2HR"),
-    ("3HR", "3HR"),
-    ("4HR", "4HR"),
-]
+# FRR value substrings to check in the parameter (order matters — most specific first)
+FRR_RATINGS = ["1.5HR", ".75HR", "0HR", "1HR", "2HR", "3HR"]
 
 
 def _set_owner(window):
@@ -51,19 +53,27 @@ def get_all_line_styles():
 
 
 def find_style_for_frr(frr_value, all_styles):
-    """Find best matching line style for a given FRR value."""
+    """Find the best matching 'WWP - FRR - xH' line style for a given FRR value string."""
     if not frr_value:
         return None
-    frr_upper = frr_value.strip().upper()
-    # Try exact match first (e.g., "WWP - FRR - 1HR")
-    for name, style in all_styles.items():
-        if "FRR" in name.upper() and frr_upper in name.upper():
+    frr_norm = frr_value.strip().upper()
+    # Try partial match inside line style names that contain 'FRR'
+    # e.g. '1.5HR' should match 'WWP - FRR - 1.5H'
+    # '.75HR' should match 'WWP - FRR - 3/4H'
+    candidates = {name: style for name, style in all_styles.items()
+                  if "FRR" in name.upper()}
+
+    # Build a stripped rating token (remove HR suffix for matching)
+    token = frr_norm.replace("HR", "").replace(" ", "")
+    # Special case: .75HR -> 3/4H and 75HR -> 3/4H
+    if token in (".75", "75", "0.75"):
+        token = "3/4"
+
+    for name, style in candidates.items():
+        name_norm = name.upper().replace(" ", "")
+        if token.upper() in name_norm:
             return style
-    # Try with dashes replacing slashes (e.g., 3/4HR → 3-4HR)
-    frr_dash = frr_upper.replace("/", "-")
-    for name, style in all_styles.items():
-        if "FRR" in name.upper() and frr_dash in name.upper():
-            return style
+
     return None
 
 
@@ -147,7 +157,7 @@ def create_frr_lines_for_walls(walls, frr_param_name, active_view):
             if param.StorageType == DB.StorageType.String:
                 frr_val = param.AsString() or ""
 
-            if not frr_val or frr_val.upper() == "0HR":
+            if not frr_val or frr_val.strip().upper() == "0HR":
                 skipped_zero += 1
                 continue
 
@@ -155,7 +165,9 @@ def create_frr_lines_for_walls(walls, frr_param_name, active_view):
                 detail_line = doc.Create.NewDetailCurve(active_view, curve)
                 style = find_style_for_frr(frr_val, all_styles)
                 if style is not None:
-                    detail_line.LineStyle = style
+                    ls_param = detail_line.LookupParameter("Line Style")
+                    if ls_param is not None:
+                        ls_param.Set(style.Id)
                 created += 1
             except Exception:
                 pass

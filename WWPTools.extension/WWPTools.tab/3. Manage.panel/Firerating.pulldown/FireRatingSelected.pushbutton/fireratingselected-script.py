@@ -1,9 +1,9 @@
 #!python3
 # -*- coding: utf-8 -*-
-"""Create Fire Rating Lines for Selected Walls.
+"""Create Fire Rating Lines for Selected Walls in Current View.
 
-Operates on the currently selected walls in the active view,
-applying line styles based on the FRR Walls parameter value.
+Operates on the currently selected walls, reading each wall's 'FRR Walls'
+parameter and drawing a detail line with the matching WWP - FRR - xH line style.
 """
 import os
 import sys
@@ -32,13 +32,14 @@ def get_all_line_styles():
 def find_style_for_frr(frr_value, all_styles):
     if not frr_value:
         return None
-    frr_upper = frr_value.strip().upper()
-    for name, style in all_styles.items():
-        if "FRR" in name.upper() and frr_upper in name.upper():
-            return style
-    frr_dash = frr_upper.replace("/", "-")
-    for name, style in all_styles.items():
-        if "FRR" in name.upper() and frr_dash in name.upper():
+    frr_norm = frr_value.strip().upper()
+    candidates = {name: style for name, style in all_styles.items()
+                  if "FRR" in name.upper()}
+    token = frr_norm.replace("HR", "").replace(" ", "")
+    if token in (".75", "75", "0.75"):
+        token = "3/4"
+    for name, style in candidates.items():
+        if token.upper() in name.upper().replace(" ", ""):
             return style
     return None
 
@@ -86,7 +87,7 @@ def main():
             if param.StorageType == DB.StorageType.String:
                 frr_val = param.AsString() or ""
 
-            if not frr_val or frr_val.upper() == "0HR":
+            if not frr_val or frr_val.strip().upper() == "0HR":
                 skipped_zero += 1
                 continue
 
@@ -94,7 +95,9 @@ def main():
                 detail_line = doc.Create.NewDetailCurve(active_view, curve)
                 style = find_style_for_frr(frr_val, all_styles)
                 if style is not None:
-                    detail_line.LineStyle = style
+                    ls_param = detail_line.LookupParameter("Line Style")
+                    if ls_param is not None:
+                        ls_param.Set(style.Id)
                 created += 1
             except Exception:
                 pass
