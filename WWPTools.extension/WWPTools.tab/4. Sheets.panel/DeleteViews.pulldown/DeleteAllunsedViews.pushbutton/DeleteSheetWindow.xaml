@@ -1,0 +1,79 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Delete Sheets by Print Set"
+    Width="620" Height="600"
+    MinWidth="500" MinHeight="480"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="CanResizeWithGrip"
+    Background="#F6F8FB">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Delete Sheets by Print Set"
+                       FontSize="20" FontWeight="SemiBold"
+                       Foreground="#17324D" TextWrapping="Wrap"/>
+            <TextBlock Text="Select a print set to delete all its sheets."
+                       FontSize="12" Foreground="#4F6478"
+                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Print set list -->
+        <Border Grid.Row="1" BorderBrush="#D9E2EC" BorderThickness="1"
+                CornerRadius="4" Margin="0,0,0,8">
+            <ListBox x:Name="LstPrintSets"
+                     Background="White" BorderThickness="0"
+                     FontSize="13" Foreground="#17324D"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </Border>
+
+        <!-- Sheet count -->
+        <TextBlock Grid.Row="2" x:Name="LblCount"
+                   FontSize="12" Foreground="#17324D"
+                   Margin="0,0,0,4"/>
+
+        <!-- Sheets preview -->
+        <Border Grid.Row="3" BorderBrush="#D9E2EC" BorderThickness="1"
+                CornerRadius="4" Margin="0,0,0,10">
+            <ListBox x:Name="LstSheets"
+                     Background="#FAFBFC" BorderThickness="0"
+                     FontSize="12" Foreground="#4F6478"
+                     IsHitTestVisible="False"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        </Border>
+
+        <!-- Status -->
+        <TextBlock Grid.Row="4" x:Name="LblStatus"
+                   Foreground="#B42318" FontSize="12"
+                   Margin="0,4,0,8" TextWrapping="Wrap"/>
+
+        <!-- Buttons -->
+        <Grid Grid.Row="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" x:Name="BtnCancel"
+                    Content="Cancel" Width="90" Height="34"
+                    FontSize="13"
+                    Background="White" BorderBrush="#D9E2EC"
+                    Foreground="#17324D" Cursor="Hand"/>
+            <Button Grid.Column="3" x:Name="BtnDelete"
+                    Content="Delete Sheets" Width="120" Height="34"
+                    FontSize="13" FontWeight="SemiBold"
+                    Background="#B42318" Foreground="White"
+                    BorderThickness="0" Cursor="Hand"/>
+        </Grid>
+    </Grid>
+</Window>
