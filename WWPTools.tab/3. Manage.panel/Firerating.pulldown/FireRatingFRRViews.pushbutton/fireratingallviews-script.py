@@ -1,5 +1,11 @@
 #!python3
 # -*- coding: utf-8 -*-
+"""Create Fire Rating Lines for All Walls in FRR Views.
+
+Collects all views whose name contains 'FRR' (excluding Dependent views),
+deletes any existing FRR detail lines in those views, then redraws them
+based on each wall's FRR Walls parameter value.
+"""
 import os
 import sys
 import traceback
@@ -11,7 +17,6 @@ clr.AddReference("WindowsBase")
 
 from pyrevit.framework import EventHandler
 from System.IO import File
-from System.Windows import Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
@@ -24,12 +29,12 @@ if lib_path not in sys.path:
 import WWP_uiUtils as ui
 from WWP_versioning import apply_window_title
 from pyrevit import DB
+from System.Collections.Generic import List
 
 uidoc = getattr(__revit__, "ActiveUIDocument", None)
 doc = uidoc.Document if uidoc else None
 WINDOW_TITLE = "Create Fire Rating Lines — FRR Views"
 FRR_PARAM_NAME = "FRR Walls"
-# Views whose name or a parameter contains this indicator are processed
 FRR_VIEW_INDICATOR = "FRR"
 
 
@@ -51,7 +56,7 @@ def find_style_for_frr(frr_value, all_styles):
     for name, style in all_styles.items():
         if "FRR" in name.upper() and frr_upper in name.upper():
             return style
-    frr_dash = frr_upper.replace("/", "-")
+    frr_dash = frr_upper.replace("/", "-").replace(".", "-")
     for name, style in all_styles.items():
         if "FRR" in name.upper() and frr_dash in name.upper():
             return style
@@ -59,7 +64,7 @@ def find_style_for_frr(frr_value, all_styles):
 
 
 def collect_frr_views():
-    """Collect floor plan / section views whose name contains FRR."""
+    """Collect floor/section/detail views with 'FRR' in name, excluding Dependent views."""
     eligible_types = {
         DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan,
         DB.ViewType.Section, DB.ViewType.Elevation, DB.ViewType.Detail,
@@ -72,16 +77,29 @@ def collect_frr_views():
             continue
         if view.ViewType not in eligible_types:
             continue
-        if FRR_VIEW_INDICATOR.upper() in (view.Name or "").upper():
-            result.append(view)
+        name = view.Name or ""
+        if FRR_VIEW_INDICATOR.upper() not in name.upper():
             continue
-        # Also check a view parameter named "FRR" if present
-        param = view.LookupParameter("FRR")
-        if param is not None and param.StorageType == DB.StorageType.Integer:
-            if param.AsInteger() == 1:
-                result.append(view)
+        if "DEPENDENT" in name.upper():
+            continue
+        result.append(view)
     result.sort(key=lambda v: v.Name or "")
     return result
+
+
+def collect_existing_frr_lines(view):
+    lines = []
+    for elem in (DB.FilteredElementCollector(doc, view.Id)
+                 .OfCategory(DB.BuiltInCategory.OST_Lines)
+                 .WhereElementIsNotElementType()
+                 .ToElements()):
+        try:
+            style = elem.LineStyle
+            if style and "FRR" in (style.Name or ""):
+                lines.append(elem)
+        except Exception:
+            pass
+    return lines
 
 
 class FRRViewsDialog(object):
@@ -171,10 +189,10 @@ def process_view(view, frr_param_name, all_styles):
         if not frr_val or frr_val.upper() == "0HR":
             continue
         try:
-            detail_line = doc.Create.NewDetailCurve(view, wall.Location.Curve)
+            detail_line = doc.Create.NewDetailCurve(view, loc.Curve)
             style = find_style_for_frr(frr_val, all_styles)
             if style is not None:
-                detail_line.LineStyle = style
+                detail_line.LookupParameter("Line Style").Set(style.Id)
             created += 1
         except Exception:
             pass
@@ -189,7 +207,7 @@ def main():
     frr_views = collect_frr_views()
     if not frr_views:
         ui.uiUtils_alert(
-            "No views found with '{}' in their name.\n"
+            "No views found with '{}' in their name (excluding Dependent views).\n"
             "Rename views to include 'FRR' to use this tool.".format(FRR_VIEW_INDICATOR),
             title=WINDOW_TITLE,
         )
@@ -200,27 +218,43 @@ def main():
         return
 
     all_styles = get_all_line_styles()
+    total_deleted = 0
     total_created = 0
     errors = []
 
     t = DB.Transaction(doc, "Create Fire Rating Lines (All FRR Views)")
     t.Start()
     try:
+        # Step 1: Delete existing FRR lines in selected views
+        for view in dialog.selected_views:
+            existing = collect_existing_frr_lines(view)
+            if existing:
+                id_col = List[DB.ElementId]()
+                for ln in existing:
+                    id_col.Add(ln.Id)
+                doc.Delete(id_col)
+                total_deleted += len(existing)
+
+        # Step 2: Regenerate so new lines can be placed
+        doc.Regenerate()
+
+        # Step 3: Create new FRR lines
         for view in dialog.selected_views:
             try:
                 created = process_view(view, dialog.frr_param, all_styles)
                 total_created += created
             except Exception as ex:
                 errors.append("{}: {}".format(view.Name, str(ex)))
+
         t.Commit()
     except Exception:
         t.RollBack()
         raise
 
-    msg = "Created {} fire rating line(s) across {} view(s).".format(
-        total_created, len(dialog.selected_views))
+    msg = "Deleted {} old line(s). Created {} new fire rating line(s) across {} view(s).".format(
+        total_deleted, total_created, len(dialog.selected_views))
     if errors:
-        msg += "\n\nErrors in views:\n" + "\n".join(errors)
+        msg += "\n\nErrors:\n" + "\n".join(errors)
     ui.uiUtils_alert(msg, title=WINDOW_TITLE)
 
 
