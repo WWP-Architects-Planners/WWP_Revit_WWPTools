@@ -26,21 +26,6 @@ import WWP_uiUtils as ui
 # Category definitions
 # ---------------------------------------------------------------------------
 
-CATEGORIES = [
-    "Materials",
-    "Views",
-    "View Templates",
-    "Sheets",
-    "Levels",
-    "Grids",
-    "Rooms",
-    "Spaces",
-    "Areas",
-    "View Filters",
-    "Phases",
-    "Types (Selection)",
-]
-
 _SELECTION_CATEGORIES = {"Types (Selection)"}
 
 _SOURCE_LABELS = {
@@ -214,7 +199,7 @@ def plan_renames(elements, find_text, replace_text, prefix, suffix):
 def apply_renames(doc, planned, category):
     renamed = []
     failed = []
-    t = DB.Transaction(doc, "Bulk Rename {}".format(category))
+    t = DB.Transaction(doc, "Super Rename {}".format(category))
     try:
         t.Start()
         for elem, old_name, new_name in planned:
@@ -275,7 +260,7 @@ def _set_owner(window):
 def show_dialog():
     _ensure_theme()
 
-    xaml_path = os.path.join(script_dir, "BulkRenamer.xaml")
+    xaml_path = os.path.join(script_dir, "SuperRenamer.xaml")
     if not os.path.isfile(xaml_path):
         raise Exception("Missing XAML file: {}".format(xaml_path))
 
@@ -293,19 +278,23 @@ def show_dialog():
     btn_cancel   = window.FindName("BtnCancel")
     btn_apply    = window.FindName("BtnApply")
 
-    for cat in CATEGORIES:
-        cmb_category.Items.Add(cat)
     cmb_category.SelectedIndex = 0
 
     result = [None]  # use list so closure can mutate it
 
+    def _selected_category():
+        item = cmb_category.SelectedItem
+        try:
+            return str(item.Content or "")
+        except Exception:
+            return str(item or "")
+
     def _on_category_changed(sender, args):
-        cat = str(cmb_category.SelectedItem or "")
-        txt_source.Text = _source_label(cat)
+        txt_source.Text = _source_label(_selected_category())
 
     def _on_apply(sender, args):
         result[0] = {
-            "category": str(cmb_category.SelectedItem or ""),
+            "category": _selected_category(),
             "find":    txt_find.Text or "",
             "replace": txt_replace.Text or "",
             "prefix":  txt_prefix.Text or "",
@@ -347,7 +336,7 @@ def main():
     if not any([find_text, prefix, suffix]):
         ui.uiUtils_alert(
             "Provide at least a Find text, Prefix, or Suffix value.",
-            title="Bulk Renamer",
+            title="Super Renamer",
         )
         return
 
@@ -357,7 +346,7 @@ def main():
             msg = "No types found in the current selection.\nSelect elements or types in the Project Browser first."
         else:
             msg = "No {} found in the document.".format(category.lower())
-        ui.uiUtils_alert(msg, title="Bulk Renamer")
+        ui.uiUtils_alert(msg, title="Super Renamer")
         return
 
     planned, skipped = plan_renames(elements, find_text, replace_text, prefix, suffix)
@@ -365,7 +354,7 @@ def main():
     if not planned:
         ui.uiUtils_alert(
             "No elements matched the criteria.\nSkipped: {}".format(len(skipped)),
-            title="Bulk Renamer",
+            title="Super Renamer",
         )
         return
 
@@ -387,7 +376,7 @@ def main():
             lines.append("  {}  \u2192  {}  [{}]".format(old, new, reason))
 
     proceed = ui.uiUtils_show_text_report(
-        "Bulk Renamer \u2013 Preview",
+        "Super Renamer \u2013 Preview",
         "\n".join(lines),
         ok_text="Apply",
         cancel_text="Cancel",
@@ -410,7 +399,7 @@ def main():
             result_lines.append("  {}  \u2192  {}  ({})".format(old, new, ex))
 
     ui.uiUtils_show_text_report(
-        "Bulk Renamer \u2013 Results",
+        "Super Renamer \u2013 Results",
         "\n".join(result_lines),
         ok_text="Close",
         cancel_text=None,
@@ -423,4 +412,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        ui.uiUtils_alert(traceback.format_exc(), title="Bulk Renamer \u2013 Error")
+        ui.uiUtils_alert(traceback.format_exc(), title="Super Renamer \u2013 Error")
