@@ -3,19 +3,70 @@ import os
 import traceback
 
 from Autodesk.Revit import DB
+from Autodesk.Revit.DB import FailureProcessingResult
 import WWP_uiUtils as ui
-
-SILENT_MODE = False
 
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
 clr.AddReference('RevitServices')
 
 
-app = __revit__.Application
-uidoc = __revit__.ActiveUIDocument
+app    = __revit__.Application
+uidoc  = __revit__.ActiveUIDocument
 active_doc = uidoc.Document if uidoc else None
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dialog / failure suppressors (active only during batch processing)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _on_dialog_showing(sender, args):
+    """Auto-dismiss any Windows-native dialog boxes."""
+    try:
+        args.OverrideResult(1)
+    except Exception:
+        pass
+
+
+def _on_task_dialog_showing(sender, args):
+    """Auto-dismiss Revit TaskDialogs (result 2 = OK)."""
+    try:
+        args.OverrideResult(2)
+    except Exception:
+        pass
+
+
+def _on_failures_processing(sender, args):
+    """Delete all warnings and continue so no failure dialog appears."""
+    try:
+        fa = args.GetFailuresAccessor()
+        fa.DeleteAllWarnings()
+        args.SetProcessingResult(FailureProcessingResult.Continue)
+    except Exception:
+        pass
+
+
+def _suppress_dialogs():
+    try:
+        __revit__.DialogBoxShowing   += _on_dialog_showing
+        __revit__.TaskDialogShowing  += _on_task_dialog_showing
+        app.FailuresProcessing       += _on_failures_processing
+    except Exception:
+        pass
+
+
+def _restore_dialogs():
+    try:
+        __revit__.DialogBoxShowing   -= _on_dialog_showing
+        __revit__.TaskDialogShowing  -= _on_task_dialog_showing
+        app.FailuresProcessing       -= _on_failures_processing
+    except Exception:
+        pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Core helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
 def _pick_options():
     try:
@@ -28,9 +79,7 @@ def _pick_options():
             height=260,
             initial_folder="",
         )
-    except Exception as exc:
-        if not SILENT_MODE:
-            ui.uiUtils_alert(str(exc), title="Project Upgrader")
+    except Exception:
         return None
 
 
@@ -44,14 +93,8 @@ def _collect_files(folder, include_subfolders):
         for name in os.listdir(folder):
             files.append(os.path.join(folder, name))
 
-    result = []
-    for path in files:
-        if not os.path.isfile(path):
-            continue
-        ext = os.path.splitext(path)[1].lower()
-        if ext in (".rvt", ".rfa"):
-            result.append(path)
-    return result
+    return [p for p in files
+            if os.path.isfile(p) and os.path.splitext(p)[1].lower() in (".rvt", ".rfa")]
 
 
 def _build_save_path(file_path, version_suffix):
@@ -59,7 +102,6 @@ def _build_save_path(file_path, version_suffix):
     candidate = "{}_R{}{}".format(base, version_suffix, ext)
     if not os.path.exists(candidate):
         return candidate
-
     index = 2
     while True:
         candidate = "{}_R{}_{}{}".format(base, version_suffix, index, ext)
@@ -71,8 +113,14 @@ def _build_save_path(file_path, version_suffix):
 def _open_document(file_path, detach_option=None):
     model_path = DB.ModelPathUtils.ConvertUserVisiblePathToModelPath(file_path)
     options = DB.OpenOptions()
+    options.AuditOnOpen = False
     if detach_option is not None:
         options.DetachFromCentralOption = detach_option
+    try:
+        ws_config = DB.WorksetConfiguration(DB.WorksetConfigurationOption.CloseAllWorksets)
+        options.SetOpenWorksetsConfiguration(ws_config)
+    except Exception:
+        pass
     return app.OpenDocumentFile(model_path, options)
 
 
@@ -125,6 +173,10 @@ def _upgrade_family(file_path, version_suffix):
                 pass
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+
 def main():
     options = _pick_options()
     if not options:
@@ -133,15 +185,13 @@ def main():
     folder = options["folder"]
     include_subfolders = options["include_subfolders"]
     if not folder or not os.path.isdir(folder):
-        if not SILENT_MODE:
-            ui.uiUtils_alert("Please select a valid folder.", title="Project Upgrader")
+        ui.uiUtils_alert("Please select a valid folder.", title="Project Upgrader")
         return
 
     version_suffix = str(app.VersionNumber)[-2:]
     files = _collect_files(folder, include_subfolders)
     if not files:
-        if not SILENT_MODE:
-            ui.uiUtils_alert("No Revit files found in the selected folder.", title="Project Upgrader")
+        ui.uiUtils_alert("No Revit files found in the selected folder.", title="Project Upgrader")
         return
 
     active_path = None
@@ -149,48 +199,49 @@ def main():
         try:
             active_path = os.path.normcase(active_doc.PathName)
         except Exception:
-            active_path = None
+            pass
 
     upgraded = []
-    skipped = []
-    failed = []
+    skipped  = []
+    failed   = []
 
-    for file_path in files:
-        if active_path and os.path.normcase(file_path) == active_path:
-            skipped.append(file_path)
-            continue
+    _suppress_dialogs()
+    try:
+        for file_path in files:
+            if active_path and os.path.normcase(file_path) == active_path:
+                skipped.append(file_path)
+                continue
 
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext == ".rvt":
-            save_path, error = _upgrade_project(file_path, version_suffix)
-        else:
-            save_path, error = _upgrade_family(file_path, version_suffix)
+            ext = os.path.splitext(file_path)[1].lower()
+            if ext == ".rvt":
+                save_path, error = _upgrade_project(file_path, version_suffix)
+            else:
+                save_path, error = _upgrade_family(file_path, version_suffix)
 
-        if save_path:
-            upgraded.append(save_path)
-        else:
-            failed.append((file_path, error or "Unknown error"))
+            if save_path:
+                upgraded.append(save_path)
+            else:
+                failed.append((file_path, error or "Unknown error"))
+    finally:
+        _restore_dialogs()
 
     summary = [
         "Upgraded: {}".format(len(upgraded)),
-        "Skipped: {}".format(len(skipped)),
-        "Failed: {}".format(len(failed)),
+        "Skipped:  {}".format(len(skipped)),
+        "Failed:   {}".format(len(failed)),
     ]
     if failed:
         summary.append("\nFailures:")
         for path, error in failed[:10]:
-            summary.append("- {}: {}".format(path, error))
+            summary.append("  {}\n  -> {}".format(os.path.basename(path), error))
         if len(failed) > 10:
-            summary.append("... {} more".format(len(failed) - 10))
+            summary.append("  ... {} more".format(len(failed) - 10))
 
-    if not SILENT_MODE:
-        ui.uiUtils_alert("\n".join(summary), title="Project Upgrader")
+    ui.uiUtils_alert("\n".join(summary), title="Project Upgrader")
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception:
-        if not SILENT_MODE:
-            ui.uiUtils_alert(traceback.format_exc(), title="Project Upgrader - Error")
-
+        ui.uiUtils_alert(traceback.format_exc(), title="Project Upgrader - Error")
