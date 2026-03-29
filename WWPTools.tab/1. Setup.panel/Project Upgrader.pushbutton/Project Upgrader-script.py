@@ -5,7 +5,7 @@ import traceback
 from Autodesk.Revit import DB
 import WWP_uiUtils as ui
 
-SILENT_MODE = True
+SILENT_MODE = False
 
 clr.AddReference('RevitAPI')
 clr.AddReference('RevitAPIUI')
