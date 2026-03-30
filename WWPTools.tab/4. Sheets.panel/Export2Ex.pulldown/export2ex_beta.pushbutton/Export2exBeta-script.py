@@ -128,6 +128,14 @@ def get_default_dir(doc):
     return os.path.expanduser("~")
 
 
+def ensure_existing_dir(path, fallback=""):
+    if path and os.path.isdir(path):
+        return path
+    if fallback and os.path.isdir(fallback):
+        return fallback
+    return ""
+
+
 def collect_schedules(doc):
     schedules = []
     for view in DB.FilteredElementCollector(doc).OfClass(DB.ViewSchedule):
@@ -201,11 +209,15 @@ def show_export_form(ui, items, prechecked_indices, init_excel_path):
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
+        initial_directory = ensure_existing_dir(
+            os.path.dirname(current) if current else "",
+            os.path.dirname(init_excel_path) if init_excel_path else get_default_dir(get_active_doc()),
+        )
         file_path = ui.uiUtils_save_file_dialog(
             title="Export Schedules to Excel",
             filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
             default_extension="xlsx",
-            initial_directory=os.path.dirname(current) if current else "",
+            initial_directory=initial_directory,
             file_name=os.path.basename(current) if current else "Schedules.xlsx",
         )
         if file_path:

@@ -513,7 +513,10 @@ def _show_export_form(
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
-        init_dir = os.path.dirname(current) if current else ""
+        init_dir = ensure_existing_dir(
+            os.path.dirname(current) if current else "",
+            os.path.dirname(init_excel_path) if init_excel_path else "",
+        )
         file_path = ui.uiUtils_save_file_dialog(
             title="Export Schedules",
             filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
@@ -525,7 +528,7 @@ def _show_export_form(
             excel_path.Text = file_path
 
     def _browse_csv(_sender, _args):
-        init_dir = csv_folder.Text or ""
+        init_dir = ensure_existing_dir(csv_folder.Text or "", init_csv_dir)
         folder = ui.uiUtils_select_folder_dialog(
             title="Select CSV Folder",
             initial_directory=init_dir,
