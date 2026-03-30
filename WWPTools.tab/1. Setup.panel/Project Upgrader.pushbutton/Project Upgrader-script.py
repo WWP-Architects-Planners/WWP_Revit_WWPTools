@@ -110,6 +110,24 @@ def _build_save_path(file_path, version_suffix):
         index += 1
 
 
+def _unload_all_links(doc):
+    """Unload all RVT links so they are not reloaded or re-processed during save."""
+    try:
+        links = list(DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkType))
+        if not links:
+            return
+        t = DB.Transaction(doc, "Unload Links")
+        t.Start()
+        for lt in links:
+            try:
+                lt.Unload(None)
+            except Exception:
+                pass
+        t.Commit()
+    except Exception:
+        pass
+
+
 def _open_document(file_path, detach_option=None):
     model_path = DB.ModelPathUtils.ConvertUserVisiblePathToModelPath(file_path)
     options = DB.OpenOptions()
@@ -132,6 +150,7 @@ def _upgrade_project(file_path, version_suffix):
         except Exception:
             doc_on_disk = _open_document(file_path, DB.DetachFromCentralOption.DoNotDetach)
 
+        _unload_all_links(doc_on_disk)
         save_path = _build_save_path(file_path, version_suffix)
         save_options = DB.SaveAsOptions()
         save_options.OverwriteExistingFile = False
@@ -158,6 +177,7 @@ def _upgrade_family(file_path, version_suffix):
     doc_on_disk = None
     try:
         doc_on_disk = _open_document(file_path, None)
+        _unload_all_links(doc_on_disk)
         save_path = _build_save_path(file_path, version_suffix)
         save_options = DB.SaveAsOptions()
         save_options.OverwriteExistingFile = False
