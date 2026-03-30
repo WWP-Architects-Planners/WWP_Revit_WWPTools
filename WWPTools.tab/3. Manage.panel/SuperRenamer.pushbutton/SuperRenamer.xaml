@@ -1,0 +1,159 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Super Renamer"
+        Width="500"
+        Height="400"
+        MinWidth="420"
+        MinHeight="360"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/WWPTools.WpfUI;component/Themes/FlatTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Background" Value="#E5EAF0" />
+                <Setter Property="BorderBrush" Value="#CBD5E1" />
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            </Style>
+            <Style TargetType="Label">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Padding" Value="0,0,8,0" />
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Super Renamer"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource TextBrush}" />
+            <TextBlock Text="Find and replace names across your project."
+                       Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedBrush}"
+                       FontSize="12" />
+        </StackPanel>
+
+        <!-- Category selector -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Content="Category:" />
+            <ComboBox x:Name="CmbCategory" Grid.Column="1">
+                <ComboBoxItem Content="Materials"
+                              ToolTip="Rename all materials in the document (e.g. wall finishes, concrete types). Processes every material regardless of selection." />
+                <ComboBoxItem Content="Views"
+                              ToolTip="Rename all non-template views — floor plans, sections, elevations, 3D views, etc." />
+                <ComboBoxItem Content="View Templates"
+                              ToolTip="Rename all view templates. Templates are reusable view settings that can be applied across multiple views." />
+                <ComboBoxItem Content="Sheets"
+                              ToolTip="Rename all sheets in the document. Changes the sheet Name, not the sheet Number." />
+                <ComboBoxItem Content="Levels"
+                              ToolTip="Rename all levels (e.g. Level 1, Ground Floor). Changes propagate to all elements referencing those levels." />
+                <ComboBoxItem Content="Grids"
+                              ToolTip="Rename all grid lines (e.g. A, B, 1, 2). Useful for standardising grid naming conventions." />
+                <ComboBoxItem Content="Rooms"
+                              ToolTip="Rename all rooms. Changes the room Name parameter (not the room number)." />
+                <ComboBoxItem Content="Spaces"
+                              ToolTip="Rename all MEP spaces. Spaces are used in energy analysis and MEP coordination workflows." />
+                <ComboBoxItem Content="Areas"
+                              ToolTip="Rename all areas in area plans. Used for gross area and zone calculations." />
+                <ComboBoxItem Content="View Filters"
+                              ToolTip="Rename all view filters. Filters control element visibility and graphic overrides inside views." />
+                <ComboBoxItem Content="Phases"
+                              ToolTip="Rename all project phases (e.g. Existing, New Construction, Demolition)." />
+                <ComboBoxItem Content="Types (Selection)"
+                              ToolTip="Rename element types from your current Revit selection. Select elements or types in the Project Browser first — their family types will be renamed." />
+            </ComboBox>
+        </Grid>
+
+        <!-- Source info -->
+        <TextBlock x:Name="TxtSource"
+                   Grid.Row="4"
+                   Foreground="{StaticResource MutedBrush}"
+                   FontSize="11"
+                   Text="Source: All elements in document" />
+
+        <!-- Find / Replace / Prefix / Suffix fields -->
+        <Border Grid.Row="6"
+                Padding="14,12"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Label Grid.Row="0" Grid.Column="0" Content="Find:"
+                       ToolTip="Text to search for within the existing name. Case-sensitive. Leave blank to only apply a Prefix or Suffix." />
+                <TextBox x:Name="TxtFind" Grid.Row="0" Grid.Column="1"
+                         ToolTip="Text to search for within the existing name. Case-sensitive. Leave blank to only apply a Prefix or Suffix." />
+
+                <Label Grid.Row="2" Grid.Column="0" Content="Replace:"
+                       ToolTip="Text to substitute in place of the found text. Leave blank to delete the found text without replacement." />
+                <TextBox x:Name="TxtReplace" Grid.Row="2" Grid.Column="1"
+                         ToolTip="Text to substitute in place of the found text. Leave blank to delete the found text without replacement." />
+
+                <Label Grid.Row="4" Grid.Column="0" Content="Prefix:"
+                       ToolTip="Text prepended to the start of every matched name. Applied after the Find/Replace step." />
+                <TextBox x:Name="TxtPrefix" Grid.Row="4" Grid.Column="1"
+                         ToolTip="Text prepended to the start of every matched name. Applied after the Find/Replace step." />
+
+                <Label Grid.Row="6" Grid.Column="0" Content="Suffix:"
+                       ToolTip="Text appended to the end of every matched name. Applied after the Find/Replace step." />
+                <TextBox x:Name="TxtSuffix" Grid.Row="6" Grid.Column="1"
+                         ToolTip="Text appended to the end of every matched name. Applied after the Find/Replace step." />
+            </Grid>
+        </Border>
+
+        <!-- Buttons -->
+        <DockPanel Grid.Row="8" Margin="0,16,0,0">
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button x:Name="BtnCancel"
+                        MinWidth="90"
+                        Margin="0,0,8,0"
+                        Content="Cancel"
+                        IsCancel="True"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+                <Button x:Name="BtnApply"
+                        MinWidth="150"
+                        Content="Preview &amp; Apply"
+                        IsDefault="True"
+                        ToolTip="Preview all planned renames before committing any changes to the document." />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>
