@@ -11,9 +11,88 @@ clr.AddReference('RevitAPIUI')
 clr.AddReference('RevitServices')
 
 
-app    = __revit__.Application
-uidoc  = __revit__.ActiveUIDocument
+app        = __revit__.Application
+uidoc      = __revit__.ActiveUIDocument
 active_doc = uidoc.Document if uidoc else None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pre-scan: detect local links by reading raw bytes (no Revit open needed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _scan_local_links(file_path, candidate_basenames):
+    """
+    Read the file's binary content and search for UTF-16-LE encoded filenames.
+    Revit stores linked file paths as plain UTF-16-LE strings in the OLE binary,
+    so a raw byte search is reliable without needing to open the file in Revit.
+    Returns the subset of candidate_basenames found in this file.
+    """
+    found = set()
+    try:
+        with open(file_path, 'rb') as f:
+            data = f.read()
+        for name in candidate_basenames:
+            if name.encode('utf-16-le') in data:
+                found.add(name)
+    except Exception:
+        pass
+    return found
+
+
+def _build_link_map(files):
+    """
+    For each file, find which other files in the same batch it links to.
+    Returns dict: file_path -> [linked_file_paths]
+    Scan is done on raw bytes so no Revit open is required.
+    """
+    basename_to_path = {}
+    for fp in files:
+        bn = os.path.basename(fp)
+        basename_to_path[bn.lower()] = fp   # key is lowercase for matching
+
+    link_map = {}
+    for fp in files:
+        me = os.path.basename(fp).lower()
+        candidates = [bn for bn in basename_to_path if bn != me]
+        found_lower = _scan_local_links(fp, candidates)
+        link_map[fp] = [basename_to_path[n] for n in found_lower]
+
+    return link_map
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Temporary rename helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_HIDDEN_EXT = ".upgrade_hidden"
+
+
+def _hide_links(linked_paths):
+    """
+    Rename each linked file to <name>.upgrade_hidden so Revit cannot find it.
+    Returns dict of {original_path: temp_path} for files successfully renamed.
+    """
+    hidden = {}
+    for lp in linked_paths:
+        if not os.path.exists(lp):
+            continue
+        temp = lp + _HIDDEN_EXT
+        try:
+            os.rename(lp, temp)
+            hidden[lp] = temp
+        except Exception:
+            pass
+    return hidden
+
+
+def _restore_links(hidden):
+    """Rename temp files back to their original names."""
+    for orig, temp in hidden.items():
+        if os.path.exists(temp):
+            try:
+                os.rename(temp, orig)
+            except Exception:
+                pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +100,6 @@ active_doc = uidoc.Document if uidoc else None
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _on_dialog_showing(sender, args):
-    """Auto-dismiss any Windows-native dialog boxes."""
     try:
         args.OverrideResult(1)
     except Exception:
@@ -29,7 +107,6 @@ def _on_dialog_showing(sender, args):
 
 
 def _on_task_dialog_showing(sender, args):
-    """Auto-dismiss Revit TaskDialogs (result 2 = OK)."""
     try:
         args.OverrideResult(2)
     except Exception:
@@ -37,7 +114,6 @@ def _on_task_dialog_showing(sender, args):
 
 
 def _on_failures_processing(sender, args):
-    """Delete all warnings and continue so no failure dialog appears."""
     try:
         fa = args.GetFailuresAccessor()
         fa.DeleteAllWarnings()
@@ -48,18 +124,18 @@ def _on_failures_processing(sender, args):
 
 def _suppress_dialogs():
     try:
-        __revit__.DialogBoxShowing   += _on_dialog_showing
-        __revit__.TaskDialogShowing  += _on_task_dialog_showing
-        app.FailuresProcessing       += _on_failures_processing
+        __revit__.DialogBoxShowing  += _on_dialog_showing
+        __revit__.TaskDialogShowing += _on_task_dialog_showing
+        app.FailuresProcessing      += _on_failures_processing
     except Exception:
         pass
 
 
 def _restore_dialogs():
     try:
-        __revit__.DialogBoxShowing   -= _on_dialog_showing
-        __revit__.TaskDialogShowing  -= _on_task_dialog_showing
-        app.FailuresProcessing       -= _on_failures_processing
+        __revit__.DialogBoxShowing  -= _on_dialog_showing
+        __revit__.TaskDialogShowing -= _on_task_dialog_showing
+        app.FailuresProcessing      -= _on_failures_processing
     except Exception:
         pass
 
@@ -110,24 +186,6 @@ def _build_save_path(file_path, version_suffix):
         index += 1
 
 
-def _unload_all_links(doc):
-    """Unload all RVT links so they are not reloaded or re-processed during save."""
-    try:
-        links = list(DB.FilteredElementCollector(doc).OfClass(DB.RevitLinkType))
-        if not links:
-            return
-        t = DB.Transaction(doc, "Unload Links")
-        t.Start()
-        for lt in links:
-            try:
-                lt.Unload(None)
-            except Exception:
-                pass
-        t.Commit()
-    except Exception:
-        pass
-
-
 def _open_document(file_path, detach_option=None):
     model_path = DB.ModelPathUtils.ConvertUserVisiblePathToModelPath(file_path)
     options = DB.OpenOptions()
@@ -150,7 +208,6 @@ def _upgrade_project(file_path, version_suffix):
         except Exception:
             doc_on_disk = _open_document(file_path, DB.DetachFromCentralOption.DoNotDetach)
 
-        _unload_all_links(doc_on_disk)
         save_path = _build_save_path(file_path, version_suffix)
         save_options = DB.SaveAsOptions()
         save_options.OverwriteExistingFile = False
@@ -177,7 +234,6 @@ def _upgrade_family(file_path, version_suffix):
     doc_on_disk = None
     try:
         doc_on_disk = _open_document(file_path, None)
-        _unload_all_links(doc_on_disk)
         save_path = _build_save_path(file_path, version_suffix)
         save_options = DB.SaveAsOptions()
         save_options.OverwriteExistingFile = False
@@ -221,6 +277,11 @@ def main():
         except Exception:
             pass
 
+    # Scan all files BEFORE opening any of them to find which link which.
+    # Files referenced by another file get temporarily renamed so Revit
+    # cannot load them as links when the host file is opened.
+    link_map = _build_link_map(files)
+
     upgraded = []
     skipped  = []
     failed   = []
@@ -232,11 +293,17 @@ def main():
                 skipped.append(file_path)
                 continue
 
-            ext = os.path.splitext(file_path)[1].lower()
-            if ext == ".rvt":
-                save_path, error = _upgrade_project(file_path, version_suffix)
-            else:
-                save_path, error = _upgrade_family(file_path, version_suffix)
+            # Hide linked files so Revit skips loading them on open
+            hidden = _hide_links(link_map.get(file_path, []))
+            try:
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext == ".rvt":
+                    save_path, error = _upgrade_project(file_path, version_suffix)
+                else:
+                    save_path, error = _upgrade_family(file_path, version_suffix)
+            finally:
+                # Always restore before moving to the next file
+                _restore_links(hidden)
 
             if save_path:
                 upgraded.append(save_path)
