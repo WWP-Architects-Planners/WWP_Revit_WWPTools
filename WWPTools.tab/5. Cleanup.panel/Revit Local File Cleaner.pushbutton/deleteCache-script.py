@@ -6,7 +6,6 @@ import ctypes
 from WWP_compat import configparser, io_open, read_config_file
 
 app = __revit__.Application
-doc = __revit__.ActiveUIDocument.Document
 
 confirm_response = ctypes.windll.user32.MessageBoxW(
     None,

@@ -513,17 +513,36 @@ def _show_export_form(
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
+        file_name = os.path.basename(current) if current else "Schedules.xlsx"
         init_dir = ensure_existing_dir(
             os.path.dirname(current) if current else "",
             os.path.dirname(init_excel_path) if init_excel_path else "",
         )
-        file_path = ui.uiUtils_save_file_dialog(
-            title="Export Schedules",
-            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-            default_extension="xlsx",
-            initial_directory=init_dir,
-            file_name=os.path.basename(current) if current else "Schedules.xlsx",
-        )
+        try:
+            file_path = ui.uiUtils_save_file_dialog(
+                title="Export Schedules",
+                filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                default_extension="xlsx",
+                initial_directory=init_dir,
+                file_name=file_name,
+            )
+        except Exception as exc:
+            log_exception("Browse Excel dialog failed", exc)
+            try:
+                file_path = ui.uiUtils_save_file_dialog(
+                    title="Export Schedules",
+                    filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                    default_extension="xlsx",
+                    initial_directory="",
+                    file_name=file_name,
+                )
+            except Exception as retry_exc:
+                log_exception("Browse Excel dialog retry failed", retry_exc)
+                ui.uiUtils_alert(
+                    "Could not open the Excel save dialog. Check the suggested path and try again.",
+                    title="Multiple Schedules Exporter",
+                )
+                return
         if file_path:
             excel_path.Text = file_path
 
@@ -1334,13 +1353,32 @@ def main():
     if mode == 0:
         last_excel_dir = os.path.dirname(last_excel_path) if last_excel_path else ""
         init_dir = ensure_existing_dir(last_excel_dir, default_dir)
-        file_path = ui.uiUtils_save_file_dialog(
-            title="Export Schedules",
-            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
-            default_extension="xlsx",
-            initial_directory=init_dir,
-            file_name=os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx",
-        )
+        file_name = os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx"
+        try:
+            file_path = ui.uiUtils_save_file_dialog(
+                title="Export Schedules",
+                filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                default_extension="xlsx",
+                initial_directory=init_dir,
+                file_name=file_name,
+            )
+        except Exception as exc:
+            log_exception("Legacy save dialog failed", exc)
+            try:
+                file_path = ui.uiUtils_save_file_dialog(
+                    title="Export Schedules",
+                    filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+                    default_extension="xlsx",
+                    initial_directory="",
+                    file_name=file_name,
+                )
+            except Exception as retry_exc:
+                log_exception("Legacy save dialog retry failed", retry_exc)
+                ui.uiUtils_alert(
+                    "Could not open the Excel save dialog. Check the suggested path and try again.",
+                    title="Multiple Schedules Exporter",
+                )
+                return
         file_path = normalize_excel_output_path(file_path)
         if not file_path:
             ui.uiUtils_alert(
