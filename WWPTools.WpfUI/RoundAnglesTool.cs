@@ -39,7 +39,8 @@ namespace WWPTools.WpfUI
     internal sealed class RoundAnglesController
     {
         private const string Title = "Round Off-Axis Sketch Lines";
-        private const string TargetWarningText = "Line in Sketch is slightly off axis and may cause inaccuracies.";
+        private const string OffAxisWarningCoreText = "slightly off axis";
+        private const string OffAxisWarningAccuracyText = "may cause inaccuracies";
         private const int AnglePrecision = 2;
         private const double AngleEpsilonDegrees = 1e-6;
 
@@ -229,7 +230,18 @@ namespace WWPTools.WpfUI
 
             if (applicable.Count == 0)
             {
-                _window.ShowInfo("There are no pending rows left in the current list.", Title);
+                var totalRows = (items ?? Array.Empty<RoundAnglesItem>()).Count(item => item != null);
+                var groupedRows = (items ?? Array.Empty<RoundAnglesItem>()).Count(item => item != null && item.Status == RoundAnglesItemStatus.GroupedSkip);
+                var failedRows = (items ?? Array.Empty<RoundAnglesItem>()).Count(item => item != null && item.Status == RoundAnglesItemStatus.Failed);
+                var message = totalRows == 0
+                    ? "There are no rows in the current list. Refresh to rescan the model."
+                    : string.Format(
+                        CultureInfo.InvariantCulture,
+                        "There are no pending rows left in the current list. Remaining visible rows: {0}. Failed: {1}. Grouped skips: {2}. Refresh to rescan the model warnings.",
+                        totalRows,
+                        failedRows,
+                        groupedRows);
+                _window.ShowInfo(message, Title);
                 return;
             }
 
@@ -406,8 +418,18 @@ namespace WWPTools.WpfUI
         private static IList<object> CollectTargetWarnings(Document doc)
         {
             return (doc.GetWarnings()?.Cast<object>() ?? Enumerable.Empty<object>())
-                .Where(warning => NormalizeText(WarningDescription(warning)) == NormalizeText(TargetWarningText))
+                .Where(warning => IsSupportedOffAxisWarning(WarningDescription(warning)))
                 .ToList();
+        }
+
+        private static bool IsSupportedOffAxisWarning(string description)
+        {
+            var normalized = NormalizeText(description);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return false;
+
+            return normalized.IndexOf(OffAxisWarningCoreText, StringComparison.OrdinalIgnoreCase) >= 0
+                && normalized.IndexOf(OffAxisWarningAccuracyText, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void BuildItemForWarning(Document doc, object warning, int warningIndex, IList<RoundAnglesItem> items, IDictionary<string, int> skipped, int? editableGroupId)
@@ -419,7 +441,13 @@ namespace WWPTools.WpfUI
                 return;
             }
 
-            var element = failingElements.Last();
+            var element = ResolveTargetElement(failingElements);
+            if (element == null)
+            {
+                IncrementSkipped(skipped, "No supported line target");
+                return;
+            }
+
             if (IsPropertyLine(element))
             {
                 IncrementSkipped(skipped, "Property line");
@@ -484,6 +512,49 @@ namespace WWPTools.WpfUI
                 line,
                 rotatedCurve,
                 element.Pinned));
+        }
+
+        private static Element ResolveTargetElement(IEnumerable<Element> failingElements)
+        {
+            var elements = (failingElements ?? Enumerable.Empty<Element>())
+                .Where(element => element != null)
+                .ToList();
+
+            if (elements.Count == 0)
+                return null;
+
+            foreach (var element in elements.Where(IsPreferredOffAxisTarget))
+                return element;
+
+            foreach (var element in elements.Where(IsUsableOffAxisTarget))
+                return element;
+
+            return elements.LastOrDefault();
+        }
+
+        private static bool IsPreferredOffAxisTarget(Element element)
+        {
+            if (!IsUsableOffAxisTarget(element))
+                return false;
+
+            var categoryName = CategoryName(element);
+            return string.Equals(categoryName, "Grids", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "Lines", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "Area Boundary", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "Area Boundary Lines", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "Sketch Lines", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "Model Lines", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(categoryName, "<Area Boundary>", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsUsableOffAxisTarget(Element element)
+        {
+            if (element == null || IsPropertyLine(element))
+                return false;
+
+            var locationCurve = element.Location as LocationCurve;
+            var line = locationCurve?.Curve as Line;
+            return CurveAngleDegrees(line).HasValue;
         }
 
         private static void IncrementSkipped(IDictionary<string, int> skipped, string reason)
