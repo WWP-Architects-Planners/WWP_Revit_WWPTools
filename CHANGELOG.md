@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.6] - 2026-03-25
 
+## [1.2.7] - 2026-04-01
+
+### Added
+- Export2Ex: restored the local `Export2Ex` pulldown layout with separate `Classic` and `Beta` exporters
+
+### Changed
+- Cleanup: renamed `Round Angles` to `Fix Angles` for a clearer tool label
+
+### Fixed
+- Export2Ex Beta and Classic: hardened Excel save dialog startup so invalid remembered paths do not crash the tool window, with safer fallback behavior for pyRevit 5.3.1 and newer environments
+- Export2Ex: preserved the locally updated exporter workflow and beta entry during branch sync/recovery
+
 ### Added
 - pyRevit compatibility: added a shared runtime compatibility layer for pyRevit 5.3.1 and 6.1 file, config, and HTTP handling
 
