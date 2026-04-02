@@ -9,10 +9,11 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import DB, revit
 from pyrevit.framework import EventHandler
-from System.IO import File, StringReader
+from System.IO import File
+from System.Windows import RoutedEventHandler
+from System.Windows.Controls import SelectionChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
-from System.Xml import XmlReader
 
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
@@ -265,8 +266,7 @@ def show_dialog():
         raise Exception("Missing XAML file: {}".format(xaml_path))
 
     xaml_text = File.ReadAllText(xaml_path)
-    xml_reader = XmlReader.Create(StringReader(xaml_text))
-    window = XamlReader.Load(xml_reader)
+    window = XamlReader.Parse(xaml_text)
     _set_owner(window)
 
     cmb_category = window.FindName("CmbCategory")
@@ -307,9 +307,9 @@ def show_dialog():
         window.DialogResult = False
         window.Close()
 
-    cmb_category.SelectionChanged += EventHandler(_on_category_changed)
-    btn_apply.Click  += EventHandler(_on_apply)
-    btn_cancel.Click += EventHandler(_on_cancel)
+    cmb_category.SelectionChanged += SelectionChangedEventHandler(_on_category_changed)
+    btn_apply.Click  += RoutedEventHandler(_on_apply)
+    btn_cancel.Click += RoutedEventHandler(_on_cancel)
 
     if window.ShowDialog() != True:
         return None
