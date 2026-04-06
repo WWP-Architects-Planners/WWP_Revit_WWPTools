@@ -1,12 +1,26 @@
+import clr
+import os
+import sys
 import traceback
 
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
+
 from Autodesk.Revit import DB
+from System.IO import File
+from System.Windows import RoutedEventHandler
+from System.Windows.Interop import WindowInteropHelper
+from System.Windows.Markup import XamlReader
+
+script_dir = os.path.dirname(__file__)
+lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
 
 import WWP_uiUtils as ui
 
-
 TITLE = "Views Duplicator"
-DESCRIPTION = "Replace String"
 PARAM_VIEW_SUBCATEGORY = "View Subcategory"
 
 
@@ -51,6 +65,17 @@ def _ensure_unique_name(existing, base_name):
         index += 1
 
 
+def _build_new_name(original, find_text, replace_text, prefix, suffix):
+    name = original
+    if find_text:
+        name = name.replace(find_text, replace_text)
+    if prefix:
+        name = prefix + name
+    if suffix:
+        name = name + suffix
+    return name
+
+
 def _param_to_string(param):
     if param is None:
         return ""
@@ -93,32 +118,99 @@ def _set_view_subcategory(view, suffix, errors):
 
 def _duplicate_option_from_value(value):
     mapping = {
-        "Duplicate": DB.ViewDuplicateOption.Duplicate,
-        "AsDependent": DB.ViewDuplicateOption.AsDependent,
+        "Duplicate":     DB.ViewDuplicateOption.Duplicate,
+        "AsDependent":   DB.ViewDuplicateOption.AsDependent,
         "WithDetailing": DB.ViewDuplicateOption.WithDetailing,
     }
     return mapping.get(value, DB.ViewDuplicateOption.WithDetailing)
 
 
-def _build_form_result():
-    options = [
-        ("Duplicate View", "Duplicate"),
-        ("Duplicate as Dependent", "AsDependent"),
-        ("Duplicate with Details", "WithDetailing"),
-    ]
-    labels = [opt[0] for opt in options]
-    values = [opt[1] for opt in options]
-    return ui.uiUtils_duplicate_view_options(
-        option_labels=labels,
-        option_values=values,
-        default_index=2,
-        title=TITLE,
-        description=DESCRIPTION,
-        prefix_default="",
-        suffix_default="-copy",
-        ok_text="Set Values",
-    )
+# ---------------------------------------------------------------------------
+# WPF dialog
+# ---------------------------------------------------------------------------
 
+def _ensure_theme():
+    try:
+        ver = int(str(__revit__.Application.VersionNumber))
+    except Exception:
+        ver = None
+    dll_name = (
+        "WWPTools.WpfUI.net8.0-windows.dll"
+        if ver and ver >= 2025
+        else "WWPTools.WpfUI.net48.dll"
+    )
+    dll_path = os.path.join(lib_path, dll_name)
+    if not os.path.isfile(dll_path):
+        return
+    try:
+        if hasattr(clr, "AddReferenceToFileAndPath"):
+            clr.AddReferenceToFileAndPath(dll_path)
+        else:
+            clr.AddReference(dll_path)
+    except Exception:
+        pass
+
+
+def show_dialog(view_count):
+    _ensure_theme()
+
+    uidoc = __revit__.ActiveUIDocument
+    xaml_path = os.path.join(script_dir, "DuplicateViewWindow.xaml")
+    window = XamlReader.Parse(File.ReadAllText(xaml_path))
+
+    try:
+        helper = WindowInteropHelper(window)
+        helper.Owner = uidoc.Application.MainWindowHandle if uidoc else 0
+    except Exception:
+        pass
+
+    txt_source     = window.FindName("TxtSource")
+    rb_duplicate   = window.FindName("RbDuplicate")
+    rb_dependent   = window.FindName("RbDependent")
+    rb_detailing   = window.FindName("RbWithDetailing")
+    txt_find       = window.FindName("TxtFind")
+    txt_replace    = window.FindName("TxtReplace")
+    txt_prefix     = window.FindName("TxtPrefix")
+    txt_suffix     = window.FindName("TxtSuffix")
+    btn_cancel     = window.FindName("BtnCancel")
+    btn_duplicate  = window.FindName("BtnDuplicate")
+
+    txt_source.Text = "Source: {} view(s) selected".format(view_count)
+
+    result = [None]
+
+    def _on_duplicate(sender, args):
+        if rb_duplicate.IsChecked:
+            opt = "Duplicate"
+        elif rb_dependent.IsChecked:
+            opt = "AsDependent"
+        else:
+            opt = "WithDetailing"
+        result[0] = {
+            "duplicate_option": opt,
+            "find":    txt_find.Text or "",
+            "replace": txt_replace.Text or "",
+            "prefix":  txt_prefix.Text or "",
+            "suffix":  txt_suffix.Text or "",
+        }
+        window.DialogResult = True
+        window.Close()
+
+    def _on_cancel(sender, args):
+        window.DialogResult = False
+        window.Close()
+
+    btn_duplicate.Click += RoutedEventHandler(_on_duplicate)
+    btn_cancel.Click    += RoutedEventHandler(_on_cancel)
+
+    if window.ShowDialog() != True:
+        return None
+    return result[0]
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     uidoc = __revit__.ActiveUIDocument
@@ -131,18 +223,19 @@ def main():
         ui.uiUtils_alert("Select at least one view.", title=TITLE)
         return
 
-    form_result = _build_form_result()
+    form_result = show_dialog(len(views))
     if not form_result:
         return
 
-    prefix = form_result.get("prefix", "")
-    suffix = form_result.get("suffix", "")
-    option_value = form_result.get("duplicate_option")
-    duplicate_option = _duplicate_option_from_value(option_value)
+    find_text        = form_result.get("find", "")
+    replace_text     = form_result.get("replace", "")
+    prefix           = form_result.get("prefix", "")
+    suffix           = form_result.get("suffix", "")
+    duplicate_option = _duplicate_option_from_value(form_result.get("duplicate_option"))
 
     existing_names = _build_existing_names(doc)
     errors = []
-    duplicated = []
+    new_ids = []
 
     transaction = DB.Transaction(doc, "Duplicate Views")
     transaction.Start()
@@ -156,7 +249,9 @@ def main():
                 continue
 
             clean_name = _clean_name(view.Name)
-            target_name = _ensure_unique_name(existing_names, "{}{}{}".format(prefix, clean_name, suffix))
+            new_name = _build_new_name(clean_name, find_text, replace_text, prefix, suffix)
+            target_name = _ensure_unique_name(existing_names, new_name)
+
             try:
                 new_view.Name = target_name
             except Exception as exc:
@@ -168,10 +263,19 @@ def main():
                 errors.append("Failed to remove template from '{}': {}".format(target_name, exc))
 
             _set_view_subcategory(new_view, suffix, errors)
-            duplicated.append(new_view)
+            new_ids.append(new_id)
     finally:
         if transaction.HasStarted():
             transaction.Commit()
+
+    # Select the duplicated views instead of the originals
+    if new_ids:
+        try:
+            from System.Collections.Generic import List
+            id_list = List[DB.ElementId](new_ids)
+            uidoc.Selection.SetElementIds(id_list)
+        except Exception:
+            pass
 
     if skipped:
         errors.append("Skipped {} non-view selections.".format(len(skipped)))
