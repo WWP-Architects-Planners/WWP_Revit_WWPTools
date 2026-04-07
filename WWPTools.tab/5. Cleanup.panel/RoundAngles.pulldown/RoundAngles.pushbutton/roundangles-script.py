@@ -9,7 +9,7 @@ from Autodesk.Revit import UI
 
 TITLE = "Round Off-Axis Sketch Lines"
 SCRIPT_DIR = os.path.dirname(__file__)
-LIB_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "lib"))
+LIB_PATH = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "..", "lib"))
 
 if LIB_PATH not in sys.path:
     sys.path.append(LIB_PATH)
