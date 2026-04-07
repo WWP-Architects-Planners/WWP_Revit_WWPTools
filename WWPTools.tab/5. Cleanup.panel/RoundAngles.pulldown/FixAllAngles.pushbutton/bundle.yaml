@@ -1,0 +1,3 @@
+title: "Fix All\nAngles"
+tooltip: "Batch-fixes all off-axis sketch/model lines (via Revit warnings) AND all grid line angles AND snaps grid spacing to integer mm from dimension chains."
+author: "Jason Tian"
