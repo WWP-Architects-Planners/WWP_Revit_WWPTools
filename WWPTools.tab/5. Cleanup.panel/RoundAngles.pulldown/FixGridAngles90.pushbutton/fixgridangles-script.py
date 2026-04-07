@@ -255,143 +255,143 @@ def _move_grid_along_axis(doc, grid, axis_direction, delta_distance):
     return True
 
 
-def _move_grid_shake(doc, grid, axis_direction, delta_distance):
-    """Move grid to target via a shake: overshoot by SHAKE_MM then come back.
-    This forces Revit to commit the final position cleanly rather than
-    leaving a sub-millimetre floating-point residual from the original location."""
-    if abs(delta_distance) <= 1e-12:
-        return False
-    shake_ft = SHAKE_MM / 304.8
-    # Step 1 — overshoot
-    overshoot = delta_distance + shake_ft
-    move1 = DB.XYZ(axis_direction.X * overshoot, axis_direction.Y * overshoot, 0.0)  # type: ignore
-    DB.ElementTransformUtils.MoveElement(doc, grid.Id, move1)  # type: ignore
-    # Step 2 — come back to exact target
-    move2 = DB.XYZ(axis_direction.X * -shake_ft, axis_direction.Y * -shake_ft, 0.0)  # type: ignore
-    DB.ElementTransformUtils.MoveElement(doc, grid.Id, move2)  # type: ignore
-    return True
+def _collect_grid_targets(doc, view):
+    """Return a list of (grid, axis_direction, target_scalar_ft) for every grid
+    referenced by a dimension in *view* whose position should be snapped to the
+    nearest integer millimetre."""
+    if view is None:
+        return []
+
+    pending = []
+    processed_grid_ids = set()
+
+    for dim in DB.FilteredElementCollector(doc, view.Id).OfClass(DB.Dimension):  # type: ignore
+        try:
+            curve = dim.Curve
+        except Exception:
+            continue
+        if not isinstance(curve, DB.Line):
+            continue
+
+        try:
+            ref_array = dim.References
+            if ref_array is None or ref_array.Size < 2:
+                continue
+        except Exception:
+            continue
+
+        refs = []
+        try:
+            for i in range(ref_array.Size):
+                reference = ref_array.get_Item(i)
+                element = doc.GetElement(reference.ElementId)
+                if isinstance(element, DB.Grid):
+                    refs.append(element)
+        except Exception:
+            continue
+
+        if len(refs) < 2:
+            continue
+
+        axis_direction = _dimension_direction_xy(dim)
+        if axis_direction is None:
+            continue
+
+        try:
+            segments = dim.Segments
+        except Exception:
+            segments = None
+
+        has_segments = segments is not None and segments.Size > 0
+
+        # Simple two-reference dimension: use dim.Value directly.
+        if not has_segments and len(refs) == 2:
+            try:
+                single_value = dim.Value
+            except Exception:
+                continue
+            if single_value is None:
+                continue
+            anchor_mid = _grid_midpoint(refs[0])
+            if anchor_mid is None:
+                continue
+            anchor_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
+            anchor_scalar = round(anchor_raw * 304.8) / 304.8
+            target_scalar = anchor_scalar + round(single_value * 304.8) / 304.8
+            grid = refs[1]
+            if grid.Id.IntegerValue not in processed_grid_ids:
+                processed_grid_ids.add(grid.Id.IntegerValue)
+                pending.append((grid, axis_direction, target_scalar))
+            continue
+
+        if not has_segments:
+            continue
+
+        anchor_mid = _grid_midpoint(refs[0])
+        if anchor_mid is None:
+            continue
+        anchor_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
+        anchor_scalar = round(anchor_raw * 304.8) / 304.8
+        cumulative_mm = 0.0
+        assert segments is not None
+
+        for index in range(1, len(refs)):
+            try:
+                segment = segments.get_Item(index - 1)
+            except Exception:
+                break
+            cumulative_mm += round(segment.Value * 304.8)
+            target_scalar = anchor_scalar + cumulative_mm / 304.8
+            grid = refs[index]
+            if grid.Id.IntegerValue not in processed_grid_ids:
+                processed_grid_ids.add(grid.Id.IntegerValue)
+                pending.append((grid, axis_direction, target_scalar))
+
+    return pending
 
 
 def _snap_grid_chain_dimensions_to_integers(doc, view):
-    if view is None:
+    pending = _collect_grid_targets(doc, view)
+    if not pending:
         return 0, []
 
     moved = 0
     failures = []
-    processed_grid_ids = set()
+    shake_ft = SHAKE_MM / 304.8
 
     transaction = DB.Transaction(doc, "Snap Grid Chain Distances")  # type: ignore
     transaction.Start()
     try:
-        for dim in DB.FilteredElementCollector(doc, view.Id).OfClass(DB.Dimension):  # type: ignore
+        # Pass 1: overshoot every grid past its target so Revit releases the
+        # original floating-point position entirely.
+        for grid, axis_direction, target_scalar in pending:
+            grid_mid = _grid_midpoint(grid)
+            if grid_mid is None:
+                continue
+            current_scalar = grid_mid.X * axis_direction.X + grid_mid.Y * axis_direction.Y
+            delta = (target_scalar + shake_ft) - current_scalar
+            move = DB.XYZ(axis_direction.X * delta, axis_direction.Y * delta, 0.0)  # type: ignore
+            DB.ElementTransformUtils.MoveElement(doc, grid.Id, move)  # type: ignore
+
+        # Commit the overshoot so Revit re-computes positions from scratch.
+        doc.Regenerate()
+
+        # Pass 2: move each grid from its overshooted position back to the
+        # exact integer-mm target.  Delta is computed from the live position
+        # after regeneration, not from a fixed -500 mm offset.
+        for grid, axis_direction, target_scalar in pending:
             try:
-                curve = dim.Curve
-            except Exception:
-                continue
-            if not isinstance(curve, DB.Line):
-                continue
-
-            try:
-                ref_array = dim.References
-                if ref_array is None or ref_array.Size < 2:
-                    continue
-            except Exception:
-                continue
-
-            refs = []
-            try:
-                for i in range(ref_array.Size):
-                    reference = ref_array.get_Item(i)
-                    element = doc.GetElement(reference.ElementId)
-                    if isinstance(element, DB.Grid):
-                        refs.append(element)
-            except Exception:
-                continue
-
-            if len(refs) < 2:
-                continue
-
-            axis_direction = _dimension_direction_xy(dim)
-            if axis_direction is None:
-                continue
-
-            try:
-                segments = dim.Segments
-            except Exception:
-                segments = None
-
-            has_segments = segments is not None and segments.Size > 0
-            # A simple two-reference dimension has no segments; use dim.Value instead.
-            if not has_segments and len(refs) == 2:
-                try:
-                    single_value = dim.Value
-                except Exception:
-                    continue
-                if single_value is None:
-                    continue
-                anchor = refs[0]
-                anchor_mid = _grid_midpoint(anchor)
-                if anchor_mid is None:
-                    continue
-                anchor_scalar_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
-                anchor_scalar = round(anchor_scalar_raw * 304.8) / 304.8
-                snapped_mm = round(single_value * 304.8)
-                target_scalar = anchor_scalar + snapped_mm / 304.8
-                grid = refs[1]
-                if grid.Id.IntegerValue not in processed_grid_ids:
-                    grid_mid = _grid_midpoint(grid)
-                    if grid_mid is not None:
-                        current_scalar = grid_mid.X * axis_direction.X + grid_mid.Y * axis_direction.Y
-                        delta = target_scalar - current_scalar
-                        try:
-                            if _move_grid_shake(doc, grid, axis_direction, delta):
-                                processed_grid_ids.add(grid.Id.IntegerValue)
-                                moved += 1
-                        except Exception as ex:
-                            failures.append((grid.Id.IntegerValue, str(ex)))
-                continue
-
-            if not has_segments:
-                continue
-
-            anchor = refs[0]
-            anchor_mid = _grid_midpoint(anchor)
-            if anchor_mid is None:
-                continue
-
-            anchor_scalar_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
-            # Snap the anchor to the nearest integer mm so its floating-point
-            # offset does not propagate to every subsequent target position.
-            anchor_scalar = round(anchor_scalar_raw * 304.8) / 304.8
-            cumulative_mm = 0.0
-            assert segments is not None
-
-            for index in range(1, len(refs)):
-                try:
-                    segment = segments.get_Item(index - 1)
-                except Exception:
-                    break
-
-                segment_mm = segment.Value * 304.8
-                cumulative_mm += round(segment_mm)
-                target_scalar = anchor_scalar + (cumulative_mm / 304.8)
-
-                grid = refs[index]
-                if grid.Id.IntegerValue in processed_grid_ids:
-                    continue
-
                 grid_mid = _grid_midpoint(grid)
                 if grid_mid is None:
                     continue
-
                 current_scalar = grid_mid.X * axis_direction.X + grid_mid.Y * axis_direction.Y
                 delta = target_scalar - current_scalar
-                try:
-                    if _move_grid_shake(doc, grid, axis_direction, delta):
-                        processed_grid_ids.add(grid.Id.IntegerValue)
-                        moved += 1
-                except Exception as ex:
-                    failures.append((grid.Id.IntegerValue, str(ex)))
+                if abs(delta) > 1e-12:
+                    move = DB.XYZ(axis_direction.X * delta, axis_direction.Y * delta, 0.0)  # type: ignore
+                    DB.ElementTransformUtils.MoveElement(doc, grid.Id, move)  # type: ignore
+                moved += 1
+            except Exception as ex:
+                failures.append((grid.Id.IntegerValue, str(ex)))
 
         doc.Regenerate()
         transaction.Commit()
