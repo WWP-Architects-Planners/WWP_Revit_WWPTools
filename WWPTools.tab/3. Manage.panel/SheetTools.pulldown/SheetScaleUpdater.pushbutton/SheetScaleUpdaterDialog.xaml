@@ -238,10 +238,26 @@
                           Margin="0,0,0,14"
                           Style="{StaticResource ToggleSwitchCheckBox}" />
 
-                <TextBlock Grid.Row="3"
-                           Text="Select sheets to update"
-                           Margin="0,0,0,8"
-                           Style="{StaticResource FieldLabelStyle}" />
+                <StackPanel Grid.Row="3" Margin="0,0,0,8">
+                    <DockPanel>
+                        <TextBlock Text="Select sheets to update"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource FieldLabelStyle}" />
+                        <CheckBox x:Name="AllSheetsCheckBox"
+                                  Content="All Sheets"
+                                  DockPanel.Dock="Right"
+                                  HorizontalAlignment="Right"
+                                  VerticalAlignment="Center"
+                                  Style="{StaticResource ToggleSwitchCheckBox}" />
+                    </DockPanel>
+                    <TextBlock x:Name="AllSheetsWarningText"
+                               Text="To update individual sheets, uncheck the 'All Sheets' option."
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="12"
+                               FontStyle="Italic"
+                               Margin="0,5,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
 
                 <ListBox x:Name="SheetsList"
                          Grid.Row="4"
