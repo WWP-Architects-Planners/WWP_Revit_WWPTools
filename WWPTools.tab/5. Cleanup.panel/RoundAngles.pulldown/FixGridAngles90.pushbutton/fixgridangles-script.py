@@ -319,6 +319,10 @@ def _collect_grid_targets(doc, view):
                 continue
             anchor_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
             anchor_scalar = round(anchor_raw * 304.8) / 304.8
+            # Snap the anchor itself if it is not already at an integer mm.
+            if refs[0].Id.IntegerValue not in processed_grid_ids and abs(anchor_scalar - anchor_raw) > 1e-12:
+                processed_grid_ids.add(refs[0].Id.IntegerValue)
+                pending.append((refs[0], axis_direction, anchor_scalar))
             target_scalar = anchor_scalar + round(single_value * 304.8) / 304.8
             grid = refs[1]
             if grid.Id.IntegerValue not in processed_grid_ids:
@@ -334,6 +338,10 @@ def _collect_grid_targets(doc, view):
             continue
         anchor_raw = anchor_mid.X * axis_direction.X + anchor_mid.Y * axis_direction.Y
         anchor_scalar = round(anchor_raw * 304.8) / 304.8
+        # Snap the anchor itself if it is not already at an integer mm.
+        if refs[0].Id.IntegerValue not in processed_grid_ids and abs(anchor_scalar - anchor_raw) > 1e-12:
+            processed_grid_ids.add(refs[0].Id.IntegerValue)
+            pending.append((refs[0], axis_direction, anchor_scalar))
         cumulative_mm = 0.0
         assert segments is not None
 
