@@ -330,15 +330,8 @@ def _apply_grid_rotations(doc, records):
                 end = line.GetEndPoint(1)
                 midpoint = DB.XYZ((start.X + end.X) * 0.5, (start.Y + end.Y) * 0.5, (start.Z + end.Z) * 0.5)  # type: ignore
 
-                exact_dir = _exact_dir_for_cardinal(target_angle)
-                if exact_dir is not None:
-                    half_len = line.Length * 0.5
-                    new_start = DB.XYZ(midpoint.X - exact_dir.X * half_len, midpoint.Y - exact_dir.Y * half_len, midpoint.Z)  # type: ignore
-                    new_end   = DB.XYZ(midpoint.X + exact_dir.X * half_len, midpoint.Y + exact_dir.Y * half_len, midpoint.Z)  # type: ignore
-                    grid.Curve = DB.Line.CreateBound(new_start, new_end)  # type: ignore
-                else:
-                    axis = DB.Line.CreateUnbound(midpoint, DB.XYZ.BasisZ)  # type: ignore
-                    DB.ElementTransformUtils.RotateElement(doc, grid.Id, axis, math.radians(delta))  # type: ignore
+                axis = DB.Line.CreateUnbound(midpoint, DB.XYZ.BasisZ)  # type: ignore
+                DB.ElementTransformUtils.RotateElement(doc, grid.Id, axis, math.radians(delta))  # type: ignore
 
                 updated += 1
             except Exception as ex:
@@ -352,6 +345,7 @@ def _apply_grid_rotations(doc, records):
                     except Exception:
                         pass
 
+        doc.Regenerate()
         transaction.Commit()
     except Exception:
         transaction.RollBack()
