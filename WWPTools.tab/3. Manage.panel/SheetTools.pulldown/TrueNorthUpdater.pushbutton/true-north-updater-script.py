@@ -61,6 +61,22 @@ def _is_numeric_parameter(param):
     except Exception:
         return False
 
+def _is_angle_parameter(param):
+    if not param or not getattr(param, "Definition", None):
+        return False
+    definition = param.Definition
+    try:
+        if hasattr(definition, "GetDataType") and hasattr(DB, "SpecTypeId"):
+            return definition.GetDataType() == DB.SpecTypeId.Angle
+    except Exception:
+        pass
+    try:
+        if hasattr(definition, "ParameterType") and definition.ParameterType == DB.ParameterType.Angle:
+            return True
+    except Exception:
+        pass
+    return False
+
 def _collect_titleblocks():
     return list(
         DB.FilteredElementCollector(doc)
@@ -529,7 +545,8 @@ def main():
                 if param.IsReadOnly:
                     failed_sheets.append(sheet_label + " - Parameter is read-only ({})".format(resolved_owner or ""))
                 elif param.StorageType == DB.StorageType.Double:
-                    param.Set(float(angle_value))
+                    value_to_set = math.radians(angle_value) if _is_angle_parameter(param) else float(angle_value)
+                    param.Set(value_to_set)
                     updated_sheets.append(sheet_name)
                     updated_count += 1
                 elif param.StorageType == DB.StorageType.Integer:
