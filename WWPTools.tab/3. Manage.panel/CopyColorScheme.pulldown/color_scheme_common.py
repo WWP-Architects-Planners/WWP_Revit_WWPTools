@@ -1,37 +1,63 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 from pyrevit import DB
 from System import Activator, Type
 from System.Runtime.InteropServices import Marshal
+try:
+    from System.Reflection import BindingFlags
+except Exception:
+    BindingFlags = None
 
 import WWP_colorSchemeUtils as csu
 try:
     from openpyxl import Workbook, load_workbook
+    from openpyxl.utils import get_column_letter
 except Exception:
     Workbook = None
     load_workbook = None
-
-try:
-    Reflection = __import__('System.Reflection', fromlist=['BindingFlags'])
-    BindingFlags = Reflection.BindingFlags
-except Exception:
-    BindingFlags = None
-
+    get_column_letter = None
 
 EXCEL_SHEET_NAME = "ColorScheme"
 FORMAT_VERSION = "1"
-_BASE_FLAGS = (BindingFlags.Public | BindingFlags.Instance | BindingFlags.OptionalParamBinding) if BindingFlags is not None else None
+_BASE_FLAGS = None
+
+
+def _binding_flag(name):
+    if BindingFlags is None:
+        return None
+    try:
+        return getattr(BindingFlags, name)
+    except Exception:
+        return None
+
+
+def _base_flags():
+    public_flag = _binding_flag("Public")
+    instance_flag = _binding_flag("Instance")
+    optional_flag = _binding_flag("OptionalParamBinding")
+    if public_flag is None or instance_flag is None or optional_flag is None:
+        return None
+    try:
+        return public_flag | instance_flag | optional_flag
+    except Exception:
+        return None
 
 
 def elem_id_int(elem_id):
     try:
         return int(elem_id.IntegerValue)
     except Exception:
-        try:
-            return int(elem_id)
-        except Exception:
-            return None
+        pass
+    try:
+        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .IntegerValue
+    except Exception:
+        pass
+    try:
+        return int(elem_id)
+    except Exception:
+        return None
 
 
 def scheme_area_scheme_id(scheme):
@@ -160,7 +186,7 @@ def parse_storage_type(token):
     return None
 
 
-def entry_value_to_text(entry, storage_type):
+def entry_value_to_text(entry, storage_type, doc=None):
     value = csu._entry_get_value(entry, storage_type)
     if storage_type == DB.StorageType.Double:
         try:
@@ -168,7 +194,20 @@ def entry_value_to_text(entry, storage_type):
         except Exception:
             return ""
     if storage_type == DB.StorageType.ElementId:
-        return "" if value is None else str(elem_id_int(value))
+        if value is None:
+            return ""
+        # For key-schedule parameters the entry stores the key row ElementId.
+        # Resolve to the element's Name so callers can match by human-readable key
+        # name rather than raw integer ID.
+        if doc is not None:
+            try:
+                elem = doc.GetElement(value)
+                name = getattr(elem, "Name", None) if elem else None
+                if name:
+                    return str(name)
+            except Exception:
+                pass
+        return str(elem_id_int(value))
     return "" if value is None else str(value)
 
 
@@ -248,28 +287,40 @@ def build_payload_from_scheme(doc, scheme):
 
 
 def _com_get(obj, name):
+    flags = _base_flags()
+    if flags is None:
+        raise Exception("Reflection BindingFlags are unavailable.")
     try:
-        return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.GetProperty, None, obj, None)
+        return obj.GetType().InvokeMember(name, flags | _binding_flag("GetProperty"), None, obj, None)
     except Exception:
-        return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, [])
+        return obj.GetType().InvokeMember(name, flags | _binding_flag("InvokeMethod"), None, obj, [])
 
 
 def _com_set(obj, name, value):
+    flags = _base_flags()
+    if flags is None:
+        raise Exception("Reflection BindingFlags are unavailable.")
     try:
-        obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.SetProperty, None, obj, [value])
+        obj.GetType().InvokeMember(name, flags | _binding_flag("SetProperty"), None, obj, [value])
     except Exception:
-        obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, [value])
+        obj.GetType().InvokeMember(name, flags | _binding_flag("InvokeMethod"), None, obj, [value])
 
 
 def _com_call(obj, name, *args):
+    flags = _base_flags()
+    if flags is None:
+        raise Exception("Reflection BindingFlags are unavailable.")
     try:
-        return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, list(args))
+        return obj.GetType().InvokeMember(name, flags | _binding_flag("InvokeMethod"), None, obj, list(args))
     except Exception:
-        return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.GetProperty, None, obj, list(args))
+        return obj.GetType().InvokeMember(name, flags | _binding_flag("GetProperty"), None, obj, list(args))
 
 
 def _com_call_strict(obj, name, *args):
-    return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, list(args))
+    flags = _base_flags()
+    if flags is None:
+        raise Exception("Reflection BindingFlags are unavailable.")
+    return obj.GetType().InvokeMember(name, flags | _binding_flag("InvokeMethod"), None, obj, list(args))
 
 
 def _try_delete_file(path, log=None):
@@ -491,11 +542,63 @@ def _to_float(text, default=None):
         return default
 
 
+def inspect_excel_workbook(path, max_preview_rows=8, max_columns=32):
+    if load_workbook is None:
+        raise Exception("openpyxl is not available for Excel column mapping.")
+
+    wb = load_workbook(path, data_only=True)
+    sheets = []
+    for ws in wb.worksheets:
+        max_col = int(getattr(ws, "max_column", 0) or 0)
+        max_row = int(getattr(ws, "max_row", 0) or 0)
+        if max_col <= 0:
+            continue
+        max_col = min(max_col, max_columns)
+        columns = []
+        for col_idx in range(1, max_col + 1):
+            letter = get_column_letter(col_idx) if callable(get_column_letter) else str(col_idx)
+            header_value = ws.cell(row=1, column=col_idx).value
+            header_text = "" if header_value is None else str(header_value).strip()
+            columns.append({
+                "index": col_idx - 1,
+                "letter": letter,
+                "header": header_text,
+                "label": "{} - {}".format(letter, header_text or "Column {}".format(col_idx)),
+            })
+
+        preview_rows = []
+        for row_idx in range(2, max_row + 1):
+            row_values = []
+            has_content = False
+            for col_idx in range(1, max_col + 1):
+                raw = ws.cell(row=row_idx, column=col_idx).value
+                text = "" if raw is None else str(raw).strip()
+                if text:
+                    has_content = True
+                row_values.append(text)
+            if not has_content:
+                continue
+            preview_rows.append(row_values)
+            if len(preview_rows) >= max_preview_rows:
+                break
+
+        sheets.append({
+            "name": ws.title,
+            "columns": columns,
+            "preview_rows": preview_rows,
+            "row_count": max_row,
+        })
+
+    if not sheets:
+        raise Exception("No readable worksheets were found in the workbook.")
+    return {"sheets": sheets}
+
+
 def import_payload_from_excel(path):
     if load_workbook is not None:
         wb = load_workbook(path, data_only=True)
         if EXCEL_SHEET_NAME not in wb.sheetnames:
-            raise Exception("Worksheet '{}' was not found in the workbook.".format(EXCEL_SHEET_NAME))
+            raise Exception("Workbook is not in WWP color scheme export format.")
         ws = wb[EXCEL_SHEET_NAME]
         rows = []
         for row in ws.iter_rows(values_only=True):
@@ -637,6 +740,401 @@ def import_payload_from_excel(path):
                 pass
 
 
+def _hex_pair_to_int(value):
+    try:
+        return int(value, 16)
+    except Exception:
+        return None
+
+
+def _parse_color_text(value):
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return None
+    if text.startswith("#"):
+        text = text[1:]
+    text = text.strip()
+    if re.match(r"^[0-9A-Fa-f]{6}$", text):
+        return (
+            _hex_pair_to_int(text[0:2]),
+            _hex_pair_to_int(text[2:4]),
+            _hex_pair_to_int(text[4:6]),
+        )
+    if re.match(r"^[0-9A-Fa-f]{8}$", text):
+        return (
+            _hex_pair_to_int(text[2:4]),
+            _hex_pair_to_int(text[4:6]),
+            _hex_pair_to_int(text[6:8]),
+        )
+
+    normalized = re.sub(r"(?i)rgb", "", text)
+    parts = [part for part in re.split(r"[^0-9]+", normalized) if part != ""]
+    if len(parts) >= 3:
+        try:
+            r = max(0, min(255, int(parts[0])))
+            g = max(0, min(255, int(parts[1])))
+            b = max(0, min(255, int(parts[2])))
+            return (r, g, b)
+        except Exception:
+            return None
+    return None
+
+
+def _openpyxl_cell_fill_rgb(cell):
+    try:
+        fill = getattr(cell, "fill", None)
+        if fill is None:
+            return None
+        if getattr(fill, "patternType", None) not in ("solid", "gray125"):
+            return None
+        for color_attr in ("fgColor", "start_color"):
+            color = getattr(fill, color_attr, None)
+            if color is None:
+                continue
+            rgb = getattr(color, "rgb", None)
+            if rgb:
+                parsed = _parse_color_text(rgb)
+                if parsed:
+                    return parsed
+    except Exception:
+        pass
+    return None
+
+
+def _coerce_mapped_value(raw_value, storage_type):
+    if storage_type == "Integer":
+        value = _to_int(raw_value, None)
+        if value is None:
+            raise Exception("Value '{}' is not a valid integer.".format(raw_value))
+        return str(value)
+    if storage_type == "Double":
+        value = _to_float(raw_value, None)
+        if value is None:
+            raise Exception("Value '{}' is not a valid number.".format(raw_value))
+        return "{:.12g}".format(value)
+    if storage_type == "ElementId":
+        value = _to_int(raw_value, None)
+        if value is None:
+            raise Exception(
+                "Value '{}' is not a valid ElementId.\n"
+                "The selected target color scheme uses an ElementId-backed parameter, so mapped values must be numeric Revit element ids.\n"
+                "Choose a text/string-based target scheme instead, or supply numeric ids in the value column."
+                .format(raw_value)
+            )
+        return str(value)
+    return "" if raw_value is None else str(raw_value).strip()
+
+
+def _normalize_match_text(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _match_aliases(value):
+    normalized = _normalize_match_text(value)
+    if not normalized:
+        return []
+    aliases = [normalized]
+    spaced = " ".join(normalized.replace("_", " ").replace("-", " ").split())
+    compact = re.sub(r"[\s_-]+", "", normalized)
+    for alias in (spaced, compact):
+        if alias and alias not in aliases:
+            aliases.append(alias)
+    return aliases
+
+
+def _elementid_entry_lookup(target_scheme):
+    lookup = {}
+    doc = getattr(target_scheme, "Document", None)
+    try:
+        entries = list(target_scheme.GetEntries())
+    except Exception:
+        entries = []
+    for entry in entries:
+        caption = csu._entry_caption(entry)
+        storage_type = getattr(entry, "StorageType", None)
+        value = csu._entry_get_value(entry, storage_type)
+        value_int = elem_id_int(value)
+        if value_int is None:
+            continue
+        keys = []
+        resolved_value_text = entry_value_to_text(entry, storage_type, doc=doc)
+        for candidate in (caption, resolved_value_text, csu._format_entry_value(entry)):
+            for alias in _match_aliases(candidate):
+                if alias not in keys:
+                    keys.append(alias)
+        for key in keys:
+            if key and key not in lookup:
+                lookup[key] = {"caption": caption, "value": value_int}
+    return lookup
+
+
+def _default_fill_pattern_id(doc, target_scheme):
+    try:
+        for entry in list(target_scheme.GetEntries()):
+            fill_pattern_id = getattr(entry, "FillPatternId", None)
+            if fill_pattern_id and fill_pattern_id != DB.ElementId.InvalidElementId:
+                return elem_id_int(fill_pattern_id)
+    except Exception:
+        pass
+
+    try:
+        collector = DB.FilteredElementCollector(doc).OfClass(DB.FillPatternElement)
+        for element in collector:
+            pattern = element.GetFillPattern()
+            if pattern is not None and getattr(pattern, "IsSolidFill", False):
+                return elem_id_int(element.Id)
+    except Exception:
+        pass
+    return None
+
+
+def build_payload_from_mapped_excel(path, mapping, target_snapshot):
+    if load_workbook is None:
+        raise Exception("openpyxl is not available for Excel column mapping.")
+
+    sheet_name = (mapping.get("sheet_name") or "").strip()
+    if not sheet_name:
+        raise Exception("No worksheet was selected.")
+
+    wb = load_workbook(path, data_only=True)
+    if sheet_name not in wb.sheetnames:
+        raise Exception("Worksheet '{}' was not found in the workbook.".format(sheet_name))
+
+    ws = wb[sheet_name]
+    value_index = int(mapping.get("value_column_index", -1))
+    if value_index < 0:
+        raise Exception("No value column was selected.")
+    color_index = int(mapping.get("color_column_index", -1))
+    label_index = int(mapping.get("label_column_index", value_index))
+    use_fill_color = bool(mapping.get("use_fill_color", True))
+    storage_type = ""
+    entry_storage_types = target_snapshot.get("entry_storage_types") or []
+    if entry_storage_types:
+        storage_type = entry_storage_types[0]
+    if not storage_type:
+        storage_type = "String"
+
+    category_name_value = target_snapshot.get("category_name", "")
+    area_scheme_name_value = target_snapshot.get("area_scheme_name", "")
+    base_name = os.path.splitext(os.path.basename(path))[0]
+    payload = {
+        "format_version": FORMAT_VERSION,
+        "scheme_name": "{} Import".format(base_name or "Color Scheme"),
+        "category_name": category_name_value,
+        "category_id": target_snapshot.get("category_id"),
+        "area_scheme_name": area_scheme_name_value,
+        "title": target_snapshot.get("title", ""),
+        "parameter_id": target_snapshot.get("parameter_id"),
+        "parameter_name": target_snapshot.get("parameter_name", ""),
+        "is_by_range": bool(target_snapshot.get("is_by_range")),
+        "is_by_value": bool(target_snapshot.get("is_by_value")),
+        "is_by_percentage": bool(target_snapshot.get("is_by_percentage")),
+        "entries": [],
+    }
+
+    default_fill_pattern_id = None
+    try:
+        from Autodesk.Revit import DB as _DB  # keep namespace local-safe
+        _ = _DB
+    except Exception:
+        pass
+
+    doc = mapping.get("doc")
+    target_scheme = mapping.get("target_scheme")
+    if doc is not None and target_scheme is not None:
+        default_fill_pattern_id = _default_fill_pattern_id(doc, target_scheme)
+    elementid_lookup = _elementid_entry_lookup(target_scheme) if storage_type == "ElementId" and target_scheme is not None else {}
+
+    seen_values = set()
+    for row_idx in range(2, int(getattr(ws, "max_row", 0) or 0) + 1):
+        value_cell = ws.cell(row=row_idx, column=value_index + 1)
+        raw_value = value_cell.value
+        if raw_value is None or str(raw_value).strip() == "":
+            continue
+        raw_value_text = "" if raw_value is None else str(raw_value).strip()
+        if storage_type == "ElementId":
+            matched = None
+            for alias in _match_aliases(raw_value_text):
+                matched = elementid_lookup.get(alias)
+                if matched is not None:
+                    break
+            if matched is None:
+                raise Exception(
+                    "Value '{}' did not match any existing displayed values in the selected ElementId-backed color scheme.\n"
+                    "Pick a target scheme whose existing entries contain this key, or choose a text-based target scheme."
+                    .format(raw_value_text)
+                )
+            value_text = str(matched.get("value"))
+        else:
+            value_text = _coerce_mapped_value(raw_value, storage_type)
+        if value_text in seen_values:
+            continue
+        seen_values.add(value_text)
+
+        label_cell = ws.cell(row=row_idx, column=label_index + 1) if label_index >= 0 else value_cell
+        caption = "" if label_cell.value is None else str(label_cell.value).strip()
+        if not caption:
+            if storage_type == "ElementId":
+                caption = (matched.get("caption") if matched is not None else "") or raw_value_text
+            else:
+                caption = value_text
+
+        rgb = None
+        if color_index >= 0:
+            color_cell = ws.cell(row=row_idx, column=color_index + 1)
+            if use_fill_color:
+                rgb = _openpyxl_cell_fill_rgb(color_cell)
+            if rgb is None:
+                rgb = _parse_color_text(color_cell.value)
+        if rgb is None:
+            raise Exception("No usable color was found for row {}.".format(row_idx))
+
+        payload["entries"].append({
+            "caption": caption,
+            "storage_type": storage_type,
+            "value": value_text,
+            "color_r": rgb[0],
+            "color_g": rgb[1],
+            "color_b": rgb[2],
+            "fill_pattern_id": default_fill_pattern_id,
+            "is_visible": True,
+        })
+
+    if not payload["entries"]:
+        raise Exception("No mapped rows with both value and color data were found.")
+    return payload
+
+
+def build_color_map_from_excel(path, mapping):
+    """Read an Excel file and return a {value_text: (r, g, b)} lookup."""
+    if load_workbook is None:
+        raise Exception("openpyxl is not available for Excel column mapping.")
+
+    sheet_name = (mapping.get("sheet_name") or "").strip()
+    if not sheet_name:
+        raise Exception("No worksheet was selected.")
+
+    wb = load_workbook(path, data_only=True)
+    if sheet_name not in wb.sheetnames:
+        raise Exception("Worksheet '{}' was not found in the workbook.".format(sheet_name))
+
+    ws = wb[sheet_name]
+    value_index = int(mapping.get("value_column_index", -1))
+    if value_index < 0:
+        raise Exception("No value column was selected.")
+    color_index = int(mapping.get("color_column_index", -1))
+    if color_index < 0:
+        raise Exception("No color column was selected.")
+    use_fill_color = bool(mapping.get("use_fill_color", True))
+
+    color_map = {}
+    for row_idx in range(2, int(getattr(ws, "max_row", 0) or 0) + 1):
+        value_cell = ws.cell(row=row_idx, column=value_index + 1)
+        raw_value = value_cell.value
+        if raw_value is None or str(raw_value).strip() == "":
+            continue
+        value_text = str(raw_value).strip()
+
+        color_cell = ws.cell(row=row_idx, column=color_index + 1)
+        rgb = None
+        if use_fill_color:
+            rgb = _openpyxl_cell_fill_rgb(color_cell)
+        if rgb is None:
+            rgb = _parse_color_text(color_cell.value)
+        if rgb is None:
+            continue
+        color_map[value_text] = rgb
+
+    if not color_map:
+        raise Exception("No rows with both a value and a color were found in the workbook.")
+    return color_map
+
+
+
+
+
+def apply_color_map_to_scheme(target, color_map, log=None):
+    """Update only the colors of existing scheme entries whose value matches a key in color_map."""
+    _log(log, "Applying to scheme: '{}' (Id={}) categoryId={} areaSchemeId={}".format(
+        getattr(target, "Name", "<unknown>"),
+        elem_id_int(getattr(target, "Id", None)),
+        elem_id_int(getattr(target, "CategoryId", None)),
+        elem_id_int(scheme_area_scheme_id(target)),
+    ))
+    try:
+        entries = list(target.GetEntries())
+    except Exception:
+        return False, "Could not read existing entries from the color scheme."
+
+    _log(log, "=== Color override: {} scheme entries, {} Excel keys ===".format(
+        len(entries), len(color_map)))
+    _log(log, "Excel keys (first 5): {}".format(list(color_map.keys())[:5]))
+
+    doc = getattr(target, "Document", None)
+    updated = 0
+    skipped = []
+    for i, entry in enumerate(entries):
+        storage_type = getattr(entry, "StorageType", None)
+        raw_value = csu._entry_get_value(entry, storage_type)
+        caption = csu._entry_caption(entry)
+        value_text = entry_value_to_text(entry, storage_type, doc=doc)
+        if i < 5:
+            _log(log, "Entry[{}] storage_type={} raw_value={!r} value_text={!r} caption={!r}".format(
+                i, storage_type, raw_value, value_text, caption))
+
+        # Guard against IronPython .NET null-to-string artefacts
+        if not value_text or value_text == "None":
+            value_text = ""
+        # Fallback: match by entry caption (the name Revit shows in the color scheme dialog)
+        if not value_text:
+            value_text = caption
+        if not value_text:
+            continue
+
+        rgb = color_map.get(value_text)
+        if rgb is None:
+            skipped.append(value_text)
+            continue
+
+        if hasattr(entry, "Color"):
+            try:
+                entry.Color = DB.Color(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+                updated += 1
+            except Exception as ex:
+                _log(log, "Failed to set color for '{}': {}".format(value_text, str(ex)))
+
+    if updated == 0:
+        return False, (
+            "No scheme entries were matched to Excel Key Names.\n"
+            "Verify that the Value column selected in the mapping dialog contains the same "
+            "values as the color scheme (e.g. RES_AMENITY_INDOOR_GF).\n"
+            "Unmatched scheme values: {}".format(", ".join(skipped[:10]) if skipped else "<none>")
+        )
+
+    set_entries = getattr(target, "SetEntries", None)
+    if not callable(set_entries):
+        return False, "Target scheme API does not support SetEntries."
+
+    set_entries(csu._to_entry_collection(entries))
+    csu._regenerate_scheme_document(target)
+    refreshed = list(target.GetEntries())
+    if refreshed:
+        # After SetEntries + Regenerate, Revit may blend/reset colors for "In Use"
+        # entries and clears their ElementId values, so value/caption matching is
+        # not reliable here. Copy colors directly by index position instead.
+        # Do NOT regenerate after this second SetEntries — a second Regenerate
+        # causes Revit to blend the colors again.
+        if len(refreshed) == len(entries):
+            for src, tgt in zip(entries, refreshed):
+                csu._copy_entry_visuals(src, tgt)
+        else:
+            csu._patch_entry_colors(refreshed, entries, log=log, stage="color-override-post-set")
+        set_entries(csu._to_entry_collection(refreshed))
+    _log(log, "Color override: {} entries updated, {} skipped (not in Excel — colors left unchanged).".format(
+        updated, len(skipped)))
+    return True, None
+
+
 def build_entry_from_payload(item):
     storage_type = parse_storage_type(item.get("storage_type"))
     if storage_type is None:
@@ -687,6 +1185,107 @@ def build_entry_from_payload(item):
         except Exception:
             pass
     return entry
+
+
+def _payload_item_match_keys(item):
+    keys = []
+    for candidate in (item.get("caption", ""), item.get("value", "")):
+        for alias in _match_aliases(candidate):
+            if alias not in keys:
+                keys.append(alias)
+    return keys
+
+
+def _existing_entry_match_keys(entry, doc=None):
+    keys = []
+    storage_type = getattr(entry, "StorageType", None)
+    raw_value = csu._entry_get_value(entry, storage_type)
+    candidates = [
+        csu._entry_caption(entry),
+        entry_value_to_text(entry, storage_type, doc=doc),
+        csu._format_entry_value(entry),
+    ]
+    if storage_type == DB.StorageType.ElementId:
+        candidates.append(str(elem_id_int(raw_value)))
+    for candidate in candidates:
+        for alias in _match_aliases(candidate):
+            if alias not in keys:
+                keys.append(alias)
+    return keys
+
+
+def merge_payload_into_scheme(target, payload, log=None):
+    for attr, key in (("Title", "title"), ("IsByRange", "is_by_range"), ("IsByValue", "is_by_value"), ("IsByPercentage", "is_by_percentage")):
+        if hasattr(target, attr) and key in payload:
+            try:
+                setattr(target, attr, payload.get(key))
+            except Exception:
+                pass
+
+    try:
+        entries = list(target.GetEntries())
+    except Exception:
+        return False, "Could not read existing entries from the target scheme."
+
+    doc = getattr(target, "Document", None)
+    lookup = {}
+    for idx, entry in enumerate(entries):
+        for key in _existing_entry_match_keys(entry, doc=doc):
+            if key and key not in lookup:
+                lookup[key] = idx
+
+    updated = 0
+    added_entries = []
+    desired_entries = list(entries)
+
+    for item in payload.get("entries", []):
+        match_index = None
+        for key in _payload_item_match_keys(item):
+            if key in lookup:
+                match_index = lookup.get(key)
+                break
+
+        if match_index is not None:
+            entry = desired_entries[match_index]
+            r = item.get("color_r")
+            g = item.get("color_g")
+            b = item.get("color_b")
+            if r is not None and g is not None and b is not None and hasattr(entry, "Color"):
+                try:
+                    entry.Color = DB.Color(int(r), int(g), int(b))
+                    updated += 1
+                except Exception as ex:
+                    _log(log, "Failed to set merged color for '{}': {}".format(item.get("caption", "") or item.get("value", ""), str(ex)))
+            continue
+
+        try:
+            new_entry = build_entry_from_payload(item)
+            desired_entries.append(new_entry)
+            added_entries.append(new_entry)
+        except Exception as ex:
+            return False, "Failed to build a new entry for '{}': {}".format(item.get("caption", "") or item.get("value", ""), str(ex))
+
+    if not updated and not added_entries:
+        return False, "No matching entries were updated and no new entries were added."
+
+    set_entries = getattr(target, "SetEntries", None)
+    if not callable(set_entries):
+        return False, "Target scheme API does not support SetEntries."
+
+    set_entries(csu._to_entry_collection(desired_entries))
+    csu._regenerate_scheme_document(target)
+    refreshed = list(target.GetEntries())
+    if refreshed:
+        if len(refreshed) == len(desired_entries):
+            for src, tgt in zip(desired_entries, refreshed):
+                csu._copy_entry_visuals(src, tgt)
+        else:
+            csu._patch_entry_colors(refreshed, desired_entries, log=log, stage="merge-post-set")
+        set_entries(csu._to_entry_collection(refreshed))
+        csu._regenerate_scheme_document(target)
+
+    _log(log, "Merged payload into scheme: {} existing entries recolored, {} new entries added.".format(updated, len(added_entries)))
+    return True, None
 
 
 def apply_payload_to_scheme(target, payload, log=None):

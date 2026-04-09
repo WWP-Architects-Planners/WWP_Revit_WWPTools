@@ -5,7 +5,6 @@ import sys
 import importlib
 from pyrevit import revit, script
 import WWP_uiUtils as ui
-from pyrevit.framework import EventHandler
 from System.IO import File
 from System.Windows import Visibility
 from System.Windows.Interop import WindowInteropHelper
@@ -113,8 +112,8 @@ def _show_selection_dialog(display_names):
         window.DialogResult = False
         window.Close()
 
-    ok_btn.Click += EventHandler(_on_ok)
-    cancel_btn.Click += EventHandler(_on_cancel)
+    ok_btn.Click += _on_ok
+    cancel_btn.Click += _on_cancel
     if window.ShowDialog() != True:
         return None
     return result if result.get("ok") else None
