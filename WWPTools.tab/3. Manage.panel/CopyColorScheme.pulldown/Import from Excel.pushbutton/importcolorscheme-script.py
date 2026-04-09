@@ -234,6 +234,7 @@ def _show_mapping_dialog(uidoc, workbook_info):
     sheet_combo = window.FindName("WorksheetCombo")
     value_combo = window.FindName("ValueColumnCombo")
     color_combo = window.FindName("ColorColumnCombo")
+    use_fill_check = window.FindName("UseCellFillCheck")
     color_override_check = window.FindName("ColorOverrideCheck")
     preview_box = window.FindName("PreviewText")
     validation = window.FindName("ValidationText")
@@ -299,7 +300,7 @@ def _show_mapping_dialog(uidoc, workbook_info):
         result["value_column_index"] = int(value_combo.SelectedIndex)
         result["color_column_index"] = int(color_combo.SelectedIndex)
         result["label_column_index"] = int(value_combo.SelectedIndex)
-        result["use_fill_color"] = False
+        result["use_fill_color"] = bool(getattr(use_fill_check, "IsChecked", False))
         result["color_override_only"] = bool(getattr(color_override_check, "IsChecked", False))
         window.DialogResult = True
         window.Close()

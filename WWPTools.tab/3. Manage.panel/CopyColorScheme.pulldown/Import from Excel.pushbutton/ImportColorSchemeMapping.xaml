@@ -77,7 +77,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0"
-                           Text="Select which Excel columns drive the color scheme value and color. The color column is read from text such as 255,0,0 or RGB(255,0,0)."
+                           Text="Select which Excel columns drive the color scheme value and color."
                            TextWrapping="Wrap"
                            Foreground="#374151"
                            Margin="0,0,0,12"/>
@@ -96,9 +96,13 @@
                     <StackPanel Grid.Column="2">
                         <TextBlock Text="Color Column" Margin="0,0,0,6" Foreground="#6B7280" FontWeight="SemiBold"/>
                         <ComboBox x:Name="ColorColumnCombo" Margin="0,0,0,10"/>
-                        <CheckBox x:Name="ColorOverrideCheck"
+                        <CheckBox x:Name="UseCellFillCheck"
                                   IsChecked="True"
                                   Margin="0,6,0,0"
+                                  Content="Use the cell fill color first, then fall back to the cell text (supports RGB / hex text)." />
+                        <CheckBox x:Name="ColorOverrideCheck"
+                                  IsChecked="True"
+                                  Margin="0,12,0,0"
                                   Content="Color override only — match existing entries by value and update colors only (preserves fill pattern, visibility, and captions)." />
                     </StackPanel>
                 </Grid>
