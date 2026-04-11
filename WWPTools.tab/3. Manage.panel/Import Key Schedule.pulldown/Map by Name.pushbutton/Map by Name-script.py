@@ -22,6 +22,13 @@ from WWP_settings import get_tool_settings
 import WWP_uiUtils as ui
 
 
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
+
 config, save_config = get_tool_settings("MapKeyScheduleByName", doc=revit.doc)
 
 
@@ -56,7 +63,7 @@ def _is_bic_value(cat_id, bic):
     if not cat_id:
         return False
     try:
-        return cat_id.IntegerValue == int(bic)
+        return _elem_id_int(cat_id) == int(bic)
     except Exception:
         return False
 
@@ -65,7 +72,7 @@ def _element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:

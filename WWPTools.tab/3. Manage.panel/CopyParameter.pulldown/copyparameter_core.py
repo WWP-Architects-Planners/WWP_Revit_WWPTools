@@ -3,6 +3,13 @@ from Autodesk.Revit import UI
 import WWP_uiUtils as ui
 
 
+def _elem_id_int(eid):
+    try:
+        return eid.Value        # Revit 2024+ (Int64)
+    except AttributeError:
+        return eid.Value  # Revit 2023-
+
+
 TITLE = "Copy Parameter"
 
 
@@ -166,7 +173,7 @@ def collect_category_records(doc):
         name = (category.Name or "").strip()
         if not name:
             continue
-        key = int(category.Id.IntegerValue)
+        key = _elem_id_int(category.Id)
         if key not in categories:
             categories[key] = {
                 "id": category.Id,

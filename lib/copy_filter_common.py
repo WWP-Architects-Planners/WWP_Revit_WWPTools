@@ -1,3 +1,4 @@
+from System import Int64
 import ast
 import os
 
@@ -8,6 +9,14 @@ from Autodesk.Revit import DB
 _WPFUI_THEME_READY = False
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def normalize_text(value):
     return " ".join(str(value or "").split()).strip()
 
@@ -16,7 +25,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -26,7 +35,7 @@ def element_id_value(elem_id):
 
 
 def to_element_id(value):
-    return DB.ElementId(int(value))
+    return DB.ElementId(Int64(int(value)))
 
 
 def get_active_view(uidoc):

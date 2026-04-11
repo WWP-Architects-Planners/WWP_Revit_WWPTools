@@ -182,7 +182,7 @@ def _element_id_int(element_id):
         return None
     if hasattr(element_id, "IntegerValue"):
         try:
-            return int(element_id.IntegerValue)
+            return int(_elem_id_int(element_id))
         except Exception:
             pass
     if hasattr(element_id, "Value"):
@@ -219,6 +219,13 @@ def _show_true_north_dialog(
     from System.Windows.Markup import XamlReader
     from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
     xaml_path = os.path.join(os.path.dirname(__file__), "TrueNorthUpdaterDialog.xaml")
     if not os.path.isfile(xaml_path):

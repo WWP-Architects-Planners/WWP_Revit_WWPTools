@@ -24,6 +24,14 @@ TITLE = "Views Duplicator"
 PARAM_VIEW_SUBCATEGORY = "View Subcategory"
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _clean_name(name):
     if not name:
         return ""
@@ -90,7 +98,7 @@ def _param_to_string(param):
         if param.StorageType == DB.StorageType.Double:
             return str(param.AsDouble())
         if param.StorageType == DB.StorageType.ElementId:
-            return str(param.AsElementId().IntegerValue)
+            return str(_elem_id_int(param.AsElementId()))
     except Exception:
         return ""
     return ""

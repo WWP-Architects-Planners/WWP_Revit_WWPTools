@@ -3,7 +3,7 @@
 import os
 import re
 from pyrevit import DB
-from System import Activator, Type
+from System import Activator, Int64, Type
 from System.Runtime.InteropServices import Marshal
 try:
     from System.Reflection import BindingFlags
@@ -23,6 +23,14 @@ EXCEL_SHEET_NAME = "ColorScheme"
 FORMAT_VERSION = "1"
 _BASE_FLAGS = None
 
+
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
 def _binding_flag(name):
     if BindingFlags is None:
@@ -47,11 +55,11 @@ def _base_flags():
 
 def elem_id_int(elem_id):
     try:
-        return int(elem_id.IntegerValue)
+        return int(_elem_id_int(elem_id))
     except Exception:
         pass
     try:
-        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .IntegerValue
+        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .Value
     except Exception:
         pass
     try:
@@ -1165,7 +1173,7 @@ def build_entry_from_payload(item):
     fill_pattern_id = item.get("fill_pattern_id")
     if fill_pattern_id is not None and hasattr(entry, "FillPatternId"):
         try:
-            entry.FillPatternId = DB.ElementId(int(fill_pattern_id))
+            entry.FillPatternId = DB.ElementId(Int64(int(fill_pattern_id)))
         except Exception:
             pass
     for attr in ("IsVisible", "Visible"):

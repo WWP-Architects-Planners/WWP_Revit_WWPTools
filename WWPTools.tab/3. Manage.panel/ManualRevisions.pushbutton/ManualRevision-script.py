@@ -18,9 +18,10 @@ clr.AddReference("WindowsBase")
 
 from pyrevit import revit, DB
 
-from pyrevit.framework import EventHandler
+
 from System.IO import File
-from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult
+from System.Windows.Controls import SelectionChangedEventHandler
+from System.Windows import MessageBox, MessageBoxButton, MessageBoxResult, RoutedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 
@@ -195,24 +196,24 @@ def get_sheet_selection_state():
     for element_id in selection_ids:
         element = doc.GetElement(element_id)
         if isinstance(element, DB.ViewSheet):
-            preselected_ids.add(element.Id.IntegerValue)
+            preselected_ids.add(_elem_id_int(element.Id))
 
     if not preselected_ids:
         active = uidoc.ActiveView
         if isinstance(active, DB.ViewSheet):
-            preselected_ids.add(active.Id.IntegerValue)
-            active_sheet_id = active.Id.IntegerValue
+            preselected_ids.add(_elem_id_int(active.Id))
+            active_sheet_id = _elem_id_int(active.Id)
     else:
         active = uidoc.ActiveView
         if isinstance(active, DB.ViewSheet):
-            active_sheet_id = active.Id.IntegerValue
+            active_sheet_id = _elem_id_int(active.Id)
 
     if active_sheet_id is not None:
         active_first = []
         others = []
         for sheet in sheet_list:
             try:
-                if sheet.Id.IntegerValue == active_sheet_id:
+                if _elem_id_int(sheet.Id) == active_sheet_id:
                     active_first.append(sheet)
                 else:
                     others.append(sheet)
@@ -223,7 +224,7 @@ def get_sheet_selection_state():
     preselected_indices = []
     for index, sheet in enumerate(sheet_list):
         try:
-            if sheet.Id.IntegerValue in preselected_ids:
+            if _elem_id_int(sheet.Id) in preselected_ids:
                 preselected_indices.append(index)
         except Exception:
             continue
@@ -333,7 +334,7 @@ def save_target_titleblock_selection(target_type):
     setattr(
         config,
         CONFIG_FIELDS["target_titleblock"],
-        str(target_type.Id.IntegerValue) if target_type is not None else "",
+        _elem_id_int(str(target_type.Id)) if target_type is not None else "",
     )
     save_config()
 
@@ -445,7 +446,7 @@ def _revision_sort_key(revision):
         except Exception:
             pass
     try:
-        return (1, int(revision.Id.IntegerValue))
+        return (1, _elem_id_int(int(revision.Id)))
     except Exception:
         return (2, 0)
 
@@ -583,7 +584,7 @@ def _type_id_integer_value(type_id):
     if type_id is None:
         return None
     try:
-        return int(type_id.IntegerValue)
+        return int(_elem_id_int(type_id))
     except Exception:
         pass
     try:
@@ -598,7 +599,7 @@ def find_titleblock_type_by_id(titleblock_types, type_id_value):
         return None
     for titleblock_type in list(titleblock_types or []):
         try:
-            if str(titleblock_type.Id.IntegerValue) == type_id_text:
+            if _elem_id_int(str(titleblock_type.Id)) == type_id_text:
                 return titleblock_type
         except Exception:
             continue
@@ -608,12 +609,12 @@ def find_titleblock_type_by_id(titleblock_types, type_id_value):
 def choose_target_titleblock_id(titleblock_types, current_type_id, saved_target_type_id):
     saved_target = find_titleblock_type_by_id(titleblock_types, saved_target_type_id)
     if saved_target is not None:
-        return str(saved_target.Id.IntegerValue)
+        return _elem_id_int(str(saved_target.Id))
 
     current_id_text = str(current_type_id or "").strip()
     for titleblock_type in list(titleblock_types or []):
         try:
-            current_id = str(titleblock_type.Id.IntegerValue)
+            current_id = _elem_id_int(str(titleblock_type.Id))
         except Exception:
             continue
         if current_id != current_id_text:
@@ -701,16 +702,16 @@ class ManualRevisionDialog(object):
             self._cmb_right_dates,
             self._cmb_right_descs,
         ]:
-            combo_box.SelectionChanged += EventHandler(self._on_mapping_changed)
+            combo_box.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
 
-        self._cmb_target_titleblock.SelectionChanged += EventHandler(self._on_mapping_changed)
-        self._chk_ignore_single_column.Checked += EventHandler(self._on_mapping_changed)
-        self._chk_ignore_single_column.Unchecked += EventHandler(self._on_mapping_changed)
-        self._sheets_list.SelectionChanged += EventHandler(self._on_selection_changed)
-        self._btn_select_all.Click += EventHandler(self._on_select_all)
-        self._btn_clear_selection.Click += EventHandler(self._on_clear_selection)
-        self._btn_apply.Click += EventHandler(self._on_apply)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
+        self._cmb_target_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_mapping_changed)
+        self._chk_ignore_single_column.Checked += RoutedEventHandler(self._on_mapping_changed)
+        self._chk_ignore_single_column.Unchecked += RoutedEventHandler(self._on_mapping_changed)
+        self._sheets_list.SelectionChanged += SelectionChangedEventHandler(self._on_selection_changed)
+        self._btn_select_all.Click += RoutedEventHandler(self._on_select_all)
+        self._btn_clear_selection.Click += RoutedEventHandler(self._on_clear_selection)
+        self._btn_apply.Click += RoutedEventHandler(self._on_apply)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
 
         self._loading = False
         self._refresh_values_from_mapping()
@@ -724,14 +725,14 @@ class ManualRevisionDialog(object):
         try:
             active_view = uidoc.ActiveView
             if isinstance(active_view, DB.ViewSheet):
-                current_sheet_id = active_view.Id.IntegerValue
+                current_sheet_id = _elem_id_int(active_view.Id)
         except Exception:
             current_sheet_id = None
 
         for index, sheet in enumerate(self.sheet_list):
             sheet_prefix = ""
             try:
-                if current_sheet_id is not None and sheet.Id.IntegerValue == current_sheet_id:
+                if current_sheet_id is not None and _elem_id_int(sheet.Id) == current_sheet_id:
                     sheet_prefix = "[Current Sheet] "
             except Exception:
                 sheet_prefix = ""
@@ -750,6 +751,13 @@ class ManualRevisionDialog(object):
     def _make_list_item(label, index):
         from System.Windows.Controls import ListBoxItem
 
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
         item = ListBoxItem()
         item.Content = label
         item.Tag = index
@@ -758,7 +766,7 @@ class ManualRevisionDialog(object):
     @staticmethod
     def _type_id_string(titleblock_type):
         try:
-            return str(titleblock_type.Id.IntegerValue)
+            return _elem_id_int(str(titleblock_type.Id))
         except Exception:
             return ""
 
@@ -930,7 +938,7 @@ class ManualRevisionDialog(object):
         self.result = {
             "param_map": param_map,
             "selected_indices": selected_indices,
-            "target_type_id": str(target_type.Id.IntegerValue),
+            "target_type_id": _elem_id_int(str(target_type.Id)),
             "ignore_single_column": self._ignore_single_column(),
         }
         self.window.DialogResult = True
@@ -966,7 +974,7 @@ def main():
     current_type_id = ""
     reference_titleblock_type_id = get_sheet_titleblock_type_id(reference_sheet)
     if reference_titleblock_type_id is not None:
-        current_type_id = str(reference_titleblock_type_id.IntegerValue)
+        current_type_id = str(_elem_id_int(reference_titleblock_type_id))
     saved_target_type_id = get_saved_target_titleblock_id()
     target_type_id = choose_target_titleblock_id(titleblock_types, current_type_id, saved_target_type_id)
 

@@ -17,12 +17,12 @@ clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
-from pyrevit.framework import EventHandler
+
 from System.IO import File
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Controls import ComboBoxItem, Label, ComboBox, Grid, ColumnDefinition
-from System.Windows import Thickness, GridLength
+from System.Windows import GridLength, RoutedEventHandler, Thickness
 
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
@@ -98,9 +98,9 @@ class FireRatingAllDialog(object):
         self._txt_param.Text = default_param
         self._update_count()
 
-        self._btn_run.Click += EventHandler(self._on_run)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
-        self._txt_param.TextChanged += EventHandler(lambda s, a: setattr(self, '_status_clear', True))
+        self._btn_run.Click += RoutedEventHandler(self._on_run)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._txt_param.TextChanged += RoutedEventHandler(lambda s, a: setattr(self, '_status_clear', True))
 
         self.frr_param = None
         self.accepted = False
@@ -157,8 +157,8 @@ class FRRMappingDialog(object):
         for frr_val in unmapped_values:
             self._add_row(frr_val, saved_map.get(frr_val, ""))
 
-        self._btn_ok.Click += EventHandler(self._on_ok)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
+        self._btn_ok.Click += RoutedEventHandler(self._on_ok)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
 
         self.mapping = {}  # frr_val -> style_name ("" means skip)
         self.accepted = False

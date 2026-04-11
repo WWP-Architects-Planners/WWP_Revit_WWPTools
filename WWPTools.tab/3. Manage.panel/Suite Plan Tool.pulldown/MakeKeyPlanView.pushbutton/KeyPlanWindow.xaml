@@ -1,0 +1,99 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Make Keyplans"
+    Width="520" Height="320"
+    MinWidth="400" MinHeight="260"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="CanResizeWithGrip"
+    Background="#F6F8FB">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Make Keyplans"
+                       FontSize="20" FontWeight="SemiBold"
+                       Foreground="#17324D" TextWrapping="Wrap" />
+            <TextBlock Text="Create keyplan views with a filled region highlighting the selected suite area(s)."
+                       FontSize="12" Foreground="#4F6478"
+                       Margin="0,4,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Form -->
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="160" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Area -->
+            <TextBlock Grid.Row="0" Grid.Column="0"
+                       Text="Selected Area:"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="#17324D" VerticalAlignment="Center" />
+            <TextBlock x:Name="AreaLabel"
+                       Grid.Row="0" Grid.Column="1"
+                       Text="(not selected)"
+                       FontSize="12" Foreground="#4F6478"
+                       VerticalAlignment="Center" TextWrapping="Wrap" />
+
+            <!-- Keyplan Template -->
+            <TextBlock Grid.Row="2" Grid.Column="0"
+                       Text="Keyplan Template:"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="#17324D" VerticalAlignment="Center" />
+            <ComboBox x:Name="TemplateCombo"
+                      Grid.Row="2" Grid.Column="1"
+                      Height="30" FontSize="12"
+                      Background="White" BorderBrush="#D9E2EC" />
+
+            <!-- Fill Type -->
+            <TextBlock Grid.Row="4" Grid.Column="0"
+                       Text="Fill Type:"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="#17324D" VerticalAlignment="Center" />
+            <ComboBox x:Name="FillTypeCombo"
+                      Grid.Row="4" Grid.Column="1"
+                      Height="30" FontSize="12"
+                      Background="White" BorderBrush="#D9E2EC" />
+
+            <!-- Validation -->
+            <TextBlock x:Name="ValidationText"
+                       Grid.Row="6" Grid.ColumnSpan="2"
+                       Foreground="#B42318" FontSize="12"
+                       TextWrapping="Wrap" Visibility="Collapsed" />
+        </Grid>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="OkButton"
+                    Content="Create" Width="100" Height="34"
+                    FontSize="13" FontWeight="SemiBold"
+                    Background="#1976D2" Foreground="White"
+                    BorderThickness="0" Cursor="Hand"
+                    Margin="0,0,8,0" />
+            <Button x:Name="CancelButton"
+                    Content="Cancel" Width="90" Height="34"
+                    FontSize="13"
+                    Background="White" Foreground="#17324D"
+                    BorderBrush="#D9E2EC" Cursor="Hand" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,4 +1,4 @@
-﻿#! python3
+#! python3
 from __future__ import division
 
 import math
@@ -14,6 +14,14 @@ from WWP_uiUtils import (
 
 doc = revit.doc
 
+
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
 def get_active_phase(document):
     """Return the active view phase if available; otherwise last project phase."""
@@ -252,7 +260,7 @@ def main():
             skipped.append(door.Id)
             continue
 
-        room_id = room.Id.IntegerValue
+        room_id = _elem_id_int(room.Id)
         entry = by_room_id.setdefault(room_id, {"room": room, "doors": [], "room_number": room_number})
         entry["doors"].append(door)
 

@@ -3,7 +3,22 @@
 import os
 import sys
 
-from pyrevit import DB, revit, script
+from pyrevit import DB, HOST_APP, script
+
+
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
+def get_doc():
+    doc = HOST_APP.doc
+    if doc is None:
+        raise Exception("No active Revit document.")
+    return doc
 
 
 def add_lib_path():
@@ -44,7 +59,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return -1
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -336,7 +351,7 @@ def export_to_excel(doc, selections, file_path, ui):
 
 
 def main():
-    doc = revit.doc
+    doc = get_doc()
     ui = load_uiutils()
 
     options = [

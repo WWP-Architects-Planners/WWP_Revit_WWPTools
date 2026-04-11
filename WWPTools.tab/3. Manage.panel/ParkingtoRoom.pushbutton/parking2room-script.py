@@ -17,6 +17,14 @@ if lib_path not in sys.path:
 from WWP_versioning import apply_window_title
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _load_uiutils():
     try:
         import WWP_uiUtils as ui
@@ -166,14 +174,14 @@ def _get_room_label(room):
         label = "{} - {}".format(number, name)
     else:
         label = number or name or "Room"
-    return "{} (Id:{})".format(label, room.Id.IntegerValue)
+    return "{} (Id:{})".format(label, _elem_id_int(room.Id))
 
 
 def _collect_room_parking_map(rooms, parkings):
-    room_map = {r.Id.IntegerValue: [] for r in rooms}
+    room_map = {_elem_id_int(r.Id): [] for r in rooms}
     room_solids = {}
     for room in rooms:
-        room_solids[room.Id.IntegerValue] = _get_room_solid(room.Document, room)
+        room_solids[_elem_id_int(room.Id)] = _get_room_solid(room.Document, room)
 
     for parking in parkings:
         assigned = False
@@ -183,7 +191,7 @@ def _collect_room_parking_map(rooms, parkings):
             best_room_id = None
             best_volume = 0.0
             for room in rooms:
-                room_solid = room_solids.get(room.Id.IntegerValue)
+                room_solid = room_solids.get(_elem_id_int(room.Id))
                 if room_solid is None:
                     continue
                 intersection = 0.0
@@ -191,7 +199,7 @@ def _collect_room_parking_map(rooms, parkings):
                     intersection += _intersection_volume(solid, room_solid)
                 if intersection > best_volume:
                     best_volume = intersection
-                    best_room_id = room.Id.IntegerValue
+                    best_room_id = _elem_id_int(room.Id)
             if best_room_id is not None and best_volume > 0:
                 room_map[best_room_id].append(parking)
                 assigned = True
@@ -204,7 +212,7 @@ def _collect_room_parking_map(rooms, parkings):
             continue
         for room in rooms:
             if _room_contains_point(room, point):
-                room_map[room.Id.IntegerValue].append(parking)
+                room_map[_elem_id_int(room.Id)].append(parking)
                 break
     return room_map
 
@@ -284,14 +292,14 @@ def _get_param_value(param, doc):
             return param.AsDouble()
         if stype == DB.StorageType.ElementId:
             elem_id = param.AsElementId()
-            if elem_id and elem_id.IntegerValue > 0:
+            if elem_id and _elem_id_int(elem_id) > 0:
                 try:
                     elem = doc.GetElement(elem_id)
                     if elem:
                         return elem.Name
                 except Exception:
                     pass
-            return elem_id.IntegerValue
+            return _elem_id_int(elem_id)
     except Exception:
         return None
     return None
@@ -475,7 +483,7 @@ def main():
         return
 
     room_parking = _collect_room_parking_map(rooms, parkings)
-    rooms_with_parking = [r for r in rooms if room_parking.get(r.Id.IntegerValue)]
+    rooms_with_parking = [r for r in rooms if room_parking.get(_elem_id_int(r.Id))]
     if not rooms_with_parking:
         ui.uiUtils_alert("No rooms with parking found in the current view.", title="Parking Count in Room")
         return
@@ -551,7 +559,7 @@ def main():
     try:
         tx.Start()
         for room in selected_rooms:
-            parking_list = room_parking.get(room.Id.IntegerValue, [])
+            parking_list = room_parking.get(_elem_id_int(room.Id), [])
             if not parking_list:
                 skipped += 1
                 continue

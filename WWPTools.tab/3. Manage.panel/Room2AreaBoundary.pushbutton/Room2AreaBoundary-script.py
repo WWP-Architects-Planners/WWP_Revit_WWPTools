@@ -12,6 +12,14 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _load_uiutils():
     import WWP_uiUtils as ui
     return ui
@@ -29,7 +37,7 @@ def _get_selected_rooms(doc):
         if e is None:
             continue
         try:
-            if e.Category and e.Category.Id.IntegerValue == int(DB.BuiltInCategory.OST_Rooms):
+            if e.Category and _elem_id_int(e.Category.Id) == int(DB.BuiltInCategory.OST_Rooms):
                 rooms.append(e)
         except Exception:
             continue
@@ -143,8 +151,8 @@ def _format_area_plan_label(doc, view):
     view_name = view.Name or ""
 
     if scheme_name:
-        return "{} — {} — {}".format(scheme_name, lvl_name, view_name)
-    return "{} — {}".format(lvl_name, view_name)
+        return "{} - {} - {}".format(scheme_name, lvl_name, view_name)
+    return "{} - {}".format(lvl_name, view_name)
 
 
 def _get_area_boundary_category_ids():
@@ -219,7 +227,7 @@ def _delete_duplicate_boundaries_in_view(doc, view, step=1e-4):
             if not cat:
                 continue
             if boundary_ids:
-                if cat.Id.IntegerValue not in boundary_ids:
+                if _elem_id_int(cat.Id) not in boundary_ids:
                     continue
             else:
                 cname = (cat.Name or "").lower()
@@ -506,18 +514,18 @@ def main():
     ui = _load_uiutils()
     doc = revit.doc
     if doc is None:
-        ui.uiUtils_alert("No active document.", title="Room → Area Boundaries")
+        ui.uiUtils_alert("No active document.", title="Room to Area Boundaries")
         return
 
     area_plans = _get_area_plan_views(doc)
     if not area_plans:
-        ui.uiUtils_alert("No Area Plan views found in this project.", title="Room → Area Boundaries")
+        ui.uiUtils_alert("No Area Plan views found in this project.", title="Room to Area Boundaries")
         return
 
     labels = [_format_area_plan_label(doc, v) for v in area_plans]
     selected_indices = ui.uiUtils_select_indices(
         labels,
-        title="Room → Area Boundaries",
+        title="Room to Area Boundaries",
         prompt="Select target Area Plan(s) (levels):",
         multiselect=True,
         width=980,
@@ -543,7 +551,7 @@ def main():
     if not selected_rooms:
         if not ui.uiUtils_confirm(
             "No Rooms selected.\nProcess ALL Rooms on the selected level(s)?",
-            title="Room → Area Boundaries",
+            title="Room to Area Boundaries",
         ):
             return
     
@@ -563,7 +571,7 @@ def main():
     # Avoid copying these since Name/Number are handled directly
     skip_names = {"Name", "Number", "Area", "Perimeter", "Level"}
 
-    t = DB.Transaction(doc, "Room Boundary → Area Boundary")
+    t = DB.Transaction(doc, "Room Boundary to Area Boundary")
     try:
         t.Start()
 
@@ -688,7 +696,7 @@ def main():
             t.RollBack()
         except Exception:
             pass
-        ui.uiUtils_alert(traceback.format_exc(), title="Room → Area Boundaries")
+        ui.uiUtils_alert(traceback.format_exc(), title="Room to Area Boundaries")
         return
 
     report.append("")
@@ -705,7 +713,7 @@ def main():
     report.append("Failed parameter sets (writable match but Set failed): {}".format(total_failed_params))
 
     ui.uiUtils_show_text_report(
-        "Room → Area Boundaries - Results",
+        "Room to Area Boundaries - Results",
         "\n".join(report),
         ok_text="Close",
         cancel_text=None,
@@ -720,6 +728,6 @@ if __name__ == "__main__":
     except Exception:
         try:
             ui = _load_uiutils()
-            ui.uiUtils_alert(traceback.format_exc(), title="Room → Area Boundaries")
+            ui.uiUtils_alert(traceback.format_exc(), title="Room to Area Boundaries")
         except Exception:
             raise

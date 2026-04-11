@@ -1,3 +1,4 @@
+from System import Int64
 import clr
 import os
 import sys
@@ -48,10 +49,10 @@ def _is_titleblock(element):
     titleblock_builtin_id = int(DB.BuiltInCategory.OST_TitleBlocks)
     # Try Revit 2025 method first (IntegerValue property)
     if hasattr(category_id, 'IntegerValue'):
-        return category_id.IntegerValue == titleblock_builtin_id
+        return _elem_id_int(category_id) == titleblock_builtin_id
     # Revit 2026 method: convert to long for ElementId constructor
     try:
-        titleblock_id = DB.ElementId(int(titleblock_builtin_id))
+        titleblock_id = DB.ElementId(Int64(int(titleblock_builtin_id)))
         return category_id == titleblock_id
     except:
         # Fallback: compare as integers
@@ -202,6 +203,13 @@ def _show_sheet_scale_dialog(
     from System.Windows.Markup import XamlReader
     from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
     xaml_path = os.path.join(os.path.dirname(__file__), "SheetScaleUpdaterDialog.xaml")
     if not os.path.isfile(xaml_path):
@@ -380,7 +388,7 @@ def _element_id_int(element_id):
         return None
     if hasattr(element_id, "IntegerValue"):
         try:
-            return int(element_id.IntegerValue)
+            return int(_elem_id_int(element_id))
         except Exception:
             pass
     if hasattr(element_id, "Value"):

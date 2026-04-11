@@ -11,10 +11,10 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from pyrevit import revit, DB
-from pyrevit.framework import EventHandler
+
 from System.IO import File
-from System.Windows import CornerRadius, TextAlignment, TextWrapping, Thickness, VerticalAlignment
-from System.Windows.Controls import Border, CheckBox, ListBoxItem, TextBlock, TextChangedEventHandler
+from System.Windows import CornerRadius, RoutedEventHandler, TextAlignment, TextWrapping, Thickness, VerticalAlignment
+from System.Windows.Controls import Border, CheckBox, ListBoxItem, SelectionChangedEventHandler, TextBlock, TextChangedEventHandler
 from System.Windows.Input import Cursors, MouseButtonEventHandler, MouseButtonState, MouseEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -45,6 +45,14 @@ PREVIEW_MARGIN = 24.0
 
 _WPFUI_THEME_READY = False
 
+
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
 def _read_bundle_title():
     bundle_path = os.path.join(script_dir, "bundle.yaml")
@@ -111,7 +119,7 @@ def _element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -460,12 +468,12 @@ class LayoutPreviewWindow(object):
         self._build_view_records(preselected_view_ids)
         self._rebuild_views_list()
 
-        self._cmb_titleblock.SelectionChanged += EventHandler(self._on_titleblock_changed)
-        self._btn_auto_layout.Click += EventHandler(self._on_auto_layout)
-        self._btn_select_visible.Click += EventHandler(self._on_select_visible)
-        self._btn_clear_visible.Click += EventHandler(self._on_clear_visible)
-        self._btn_create.Click += EventHandler(self._on_create)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
+        self._cmb_titleblock.SelectionChanged += SelectionChangedEventHandler(self._on_titleblock_changed)
+        self._btn_auto_layout.Click += RoutedEventHandler(self._on_auto_layout)
+        self._btn_select_visible.Click += RoutedEventHandler(self._on_select_visible)
+        self._btn_clear_visible.Click += RoutedEventHandler(self._on_clear_visible)
+        self._btn_create.Click += RoutedEventHandler(self._on_create)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
         self._txt_view_search.TextChanged += TextChangedEventHandler(self._on_search_changed)
         self._preview_host.SizeChanged += self._on_preview_size_changed
 
@@ -510,8 +518,8 @@ class LayoutPreviewWindow(object):
         checkbox.Content = record["label"]
         checkbox.IsChecked = bool(record.get("selected"))
         checkbox.VerticalAlignment = VerticalAlignment.Center
-        checkbox.Checked += EventHandler(self._on_view_checked)
-        checkbox.Unchecked += EventHandler(self._on_view_checked)
+        checkbox.Checked += RoutedEventHandler(self._on_view_checked)
+        checkbox.Unchecked += RoutedEventHandler(self._on_view_checked)
         item.Content = checkbox
         item.Tag = record
         return item

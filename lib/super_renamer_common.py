@@ -21,6 +21,14 @@ uidoc = __revit__.ActiveUIDocument
 doc = uidoc.Document if uidoc else None
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _mode_config(mode):
     if mode == "selection":
         return {
@@ -88,7 +96,7 @@ def _add_unique(targets, seen_ids, element):
     if element is None:
         return
     try:
-        element_id = element.Id.IntegerValue
+        element_id = _elem_id_int(element.Id)
     except Exception:
         return
     if element_id in seen_ids:
@@ -129,7 +137,7 @@ def _get_selected_targets(current_doc):
             _add_unique(targets, seen_ids, element)
             continue
         try:
-            category_id = element.Category.Id.IntegerValue if element.Category else None
+            category_id = _elem_id_int(element.Category.Id) if element.Category else None
         except Exception:
             category_id = None
         if category_id in (

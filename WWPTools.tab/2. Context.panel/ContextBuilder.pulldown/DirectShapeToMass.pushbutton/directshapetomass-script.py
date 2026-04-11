@@ -18,6 +18,42 @@ SOURCE_APP_IDS = ("WWPTools.WebContextBuilder", "WWPTools.BuildingImporter")
 MAX_FAILURES_IN_REPORT = 30
 DEBUG_LOG_FILE_NAME = "DirectShapeToMass.debug.log"
 _DEBUG_LOG_BUFFER = []
+SOURCE_CATEGORIES = (
+    DB.BuiltInCategory.OST_Mass,
+    DB.BuiltInCategory.OST_GenericModel,
+)
+OUTPUT_CATEGORY_OPTIONS = (
+    {
+        "category": DB.BuiltInCategory.OST_Mass,
+        "label": "Mass (recommended)",
+        "family_prefix": "WWP_ConvertedMass",
+        "result_label": "Mass families",
+        "template_keywords": ("conceptual mass", "mass"),
+        "exclude_keywords": ("generic model",),
+    },
+    {
+        "category": DB.BuiltInCategory.OST_GenericModel,
+        "label": "Generic Model",
+        "family_prefix": "WWP_ConvertedGenericModel",
+        "result_label": "Generic Model families",
+        "template_keywords": ("generic model", "generic models"),
+        "exclude_keywords": (
+            "face based",
+            "ceiling based",
+            "floor based",
+            "roof based",
+            "wall based",
+            "line based",
+            "pattern based",
+            "adaptive",
+            "detail item",
+            "annotation",
+            "profile",
+            "tag",
+            "titleblock",
+        ),
+    },
+)
 
 
 script_dir = os.path.dirname(__file__)
@@ -26,6 +62,13 @@ if lib_path not in sys.path:
     sys.path.append(lib_path)
 
 import WWP_uiUtils as ui
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
 
 def _get_uidoc():
@@ -79,6 +122,22 @@ def _get_comment(element):
     return ""
 
 
+def _get_string_parameter(element, parameter_name):
+    try:
+        parameter = element.LookupParameter(parameter_name)
+        if parameter:
+            value = parameter.AsString()
+            if value:
+                return value
+    except Exception:
+        pass
+    return ""
+
+
+def _get_exchange_name(element):
+    return _get_string_parameter(element, "Exchange Name")
+
+
 class _OverwriteFamilyLoadOptions(DB.IFamilyLoadOptions):
     def OnFamilyFound(self, familyInUse, overwriteParameterValues):
         try:
@@ -99,33 +158,57 @@ class _OverwriteFamilyLoadOptions(DB.IFamilyLoadOptions):
         return True
 
 
-def _make_safe_name(text, fallback):
+def _make_safe_name(text, fallback, max_length=80):
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", text or "")
     safe = safe.strip("_.")
-    return safe or fallback
+    if not safe:
+        return fallback
+    if len(safe) > max_length:
+        import hashlib
+        h = hashlib.md5(safe.encode("utf-8", errors="replace")).hexdigest()[:8]
+        safe = safe[:max_length - 9].rstrip("_.") + "_" + h
+    return safe
 
 
-def _find_mass_family_template(app):
+def _category_display_name(built_in_category):
+    if built_in_category == DB.BuiltInCategory.OST_Mass:
+        return "Mass"
+    if built_in_category == DB.BuiltInCategory.OST_GenericModel:
+        return "Generic Model"
+    return str(built_in_category)
+
+
+def _find_family_template(app, output_option):
     template_root = getattr(app, "FamilyTemplatePath", None)
     if not template_root or not os.path.isdir(template_root):
         return None
 
     candidates = []
+    include_keywords = tuple(keyword.lower() for keyword in output_option.get("template_keywords", ()) if keyword)
+    exclude_keywords = tuple(keyword.lower() for keyword in output_option.get("exclude_keywords", ()) if keyword)
     for root, _, files in os.walk(template_root):
         for file_name in files:
             lowered_name = file_name.lower()
             if not lowered_name.endswith(".rft"):
                 continue
-            if "mass" not in lowered_name:
+            lowered_path = os.path.join(root, file_name).lower()
+            if include_keywords and not any(keyword in lowered_path for keyword in include_keywords):
+                continue
+            if exclude_keywords and any(keyword in lowered_path for keyword in exclude_keywords):
                 continue
             full_path = os.path.join(root, file_name)
-            lowered_path = full_path.lower()
             score = 100
             if "conceptual mass" in lowered_path:
                 score = 0
+            elif "metric generic model" in lowered_path:
+                score = 5
             elif "metric" in lowered_name and "mass" in lowered_name:
                 score = 10
+            elif "metric" in lowered_name and "generic model" in lowered_name:
+                score = 10
             elif lowered_name == "mass.rft":
+                score = 20
+            elif lowered_name == "generic model.rft":
                 score = 20
             candidates.append((score, len(full_path), full_path))
 
@@ -182,16 +265,19 @@ def _flush_debug_log():
 
 def _is_target_category(element):
     try:
-        category_id_value = element.Category.Id.IntegerValue
-        return category_id_value in (int(DB.BuiltInCategory.OST_Mass), int(DB.BuiltInCategory.OST_GenericModel))
+        category_id_value = _elem_id_int(element.Category.Id)
+        return category_id_value in [int(category) for category in SOURCE_CATEGORIES]
     except Exception:
         return False
 
 
 def _is_supported_import(element, allow_any_directshape=False):
-    if element is None or not isinstance(element, DB.DirectShape):
+    if element is None:
         return False
     if not _is_target_category(element):
+        return False
+    # Skip elements that were already produced by a previous run of this tool
+    if _get_comment(element).startswith("Converted from DirectShape"):
         return False
     if allow_any_directshape:
         return True
@@ -200,12 +286,62 @@ def _is_supported_import(element, allow_any_directshape=False):
     if app_id in SOURCE_APP_IDS:
         return True
 
+    if _get_exchange_name(element):
+        return True
+
     comment = _get_comment(element)
     return comment.startswith("Web Context Builder |") or comment.startswith("OSM feature:")
 
 
+def _iter_category_elements(doc):
+    try:
+        category_filter = DB.ElementMulticategoryFilter(List[DB.BuiltInCategory](list(SOURCE_CATEGORIES)))
+        collector = DB.FilteredElementCollector(doc).WhereElementIsNotElementType().WherePasses(category_filter)
+        return list(collector)
+    except Exception:
+        elements = []
+        for element in DB.FilteredElementCollector(doc).WhereElementIsNotElementType():
+            if _is_target_category(element):
+                elements.append(element)
+        return elements
+
+
+def _mesh_to_solid(mesh):
+    """Try to convert a DB.Mesh to a DB.Solid using TessellatedShapeBuilder."""
+    try:
+        builder = DB.TessellatedShapeBuilder()
+        builder.OpenConnectedFaceSet(False)
+        for i in range(mesh.NumTriangles):
+            try:
+                tri = mesh.get_Triangle(i)
+                pts = List[DB.XYZ]()  # type: ignore[misc]
+                pts.Add(tri.get_Vertex(0))  # type: ignore[union-attr]
+                pts.Add(tri.get_Vertex(1))  # type: ignore[union-attr]
+                pts.Add(tri.get_Vertex(2))  # type: ignore[union-attr]
+                builder.AddFace(DB.TessellatedFace(pts, DB.ElementId.InvalidElementId))  # type: ignore[arg-type]
+            except Exception:
+                pass
+        builder.CloseConnectedFaceSet()
+        builder.Target = DB.TessellatedShapeBuilderTarget.Solid  # type: ignore[misc]
+        builder.Fallback = DB.TessellatedShapeBuilderFallback.Mesh  # type: ignore[misc]
+        result = builder.Build()
+        if result is None:
+            return None
+        for geo_obj in result.GetGeometricalObjects():  # type: ignore[union-attr]
+            if isinstance(geo_obj, DB.Solid):
+                try:
+                    if abs(geo_obj.Volume) > 1e-9 and geo_obj.Faces.Size > 0:
+                        return geo_obj
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
 def _iter_solids(geometry_element):
     solids = []
+    fallback_meshes = []
     if geometry_element is None:
         return solids
 
@@ -216,11 +352,20 @@ def _iter_solids(geometry_element):
                     solids.append(geometry_object)
             except Exception:
                 pass
+        elif isinstance(geometry_object, DB.Mesh):
+            fallback_meshes.append(geometry_object)
         elif isinstance(geometry_object, DB.GeometryInstance):
             try:
                 solids.extend(_iter_solids(geometry_object.GetInstanceGeometry()))
             except Exception:
                 pass
+
+    # No Brep solids found - try converting any meshes to solids
+    if not solids:
+        for mesh in fallback_meshes:
+            solid = _mesh_to_solid(mesh)
+            if solid is not None:
+                solids.append(solid)
 
     return solids
 
@@ -235,7 +380,16 @@ def _get_element_solids(element):
     geometry = element.get_Geometry(options)
     solids = _iter_solids(geometry)
     solids.sort(key=lambda solid: solid.Volume, reverse=True)
-    return solids
+
+    # Deduplicate solids with nearly identical volumes (same geometry instanced multiple times)
+    deduplicated = []
+    seen_volumes = []
+    for solid in solids:
+        vol = solid.Volume
+        if not any(abs(vol - v) < 1e-6 for v in seen_volumes):
+            deduplicated.append(solid)
+            seen_volumes.append(vol)
+    return deduplicated
 
 
 def _get_candidate_elements(doc, uidoc):
@@ -249,16 +403,37 @@ def _get_candidate_elements(doc, uidoc):
         selected = []
 
     if selected:
-        _log_debug("Using {} selected DirectShape element(s).".format(len(selected)))
+        _log_debug("Using {} selected source element(s).".format(len(selected)))
         return selected, "Current selection"
 
     imported = []
-    for element in DB.FilteredElementCollector(doc).OfClass(DB.DirectShape):
+    fallback = []
+    for element in _iter_category_elements(doc):
+        fallback.append(element)
         if _is_supported_import(element, allow_any_directshape=False):
             imported.append(element)
 
-    _log_debug("Using {} imported DirectShape element(s).".format(len(imported)))
-    return imported, "Imported Web Context / Building Importer direct shapes"
+    if imported:
+        _log_debug("Using {} imported source element(s).".format(len(imported)))
+        return imported, "Imported Web Context / Building Importer / Data Exchange elements"
+
+    _log_debug("No tagged imports found. Falling back to {} element(s) from Mass / Generic Models.".format(len(fallback)))
+    return fallback, "All elements in Mass / Generic Models"
+
+
+def _prompt_output_category():
+    labels = [option["label"] for option in OUTPUT_CATEGORY_OPTIONS]
+    selected = ui.uiUtils_select_indices(
+        labels,
+        title=TITLE,
+        prompt="Select the output category for converted families:",
+        multiselect=False,
+        width=420,
+        height=260,
+    )
+    if not selected:
+        return None
+    return OUTPUT_CATEGORY_OPTIONS[selected[0]]
 
 
 def _load_family_into_project(doc, family_path, family_name):
@@ -267,7 +442,7 @@ def _load_family_into_project(doc, family_path, family_name):
     before_family_ids = set()
     try:
         for candidate in DB.FilteredElementCollector(doc).OfClass(DB.Family):
-            before_family_ids.add(candidate.Id.IntegerValue)
+            before_family_ids.add(_elem_id_int(candidate.Id))
     except Exception:
         pass
     _log_debug("Project family count before load: {}".format(len(before_family_ids)))
@@ -323,7 +498,7 @@ def _load_family_into_project(doc, family_path, family_name):
             for candidate in DB.FilteredElementCollector(doc).OfClass(DB.Family):
                 try:
                     candidate_name = candidate.Name or ""
-                    if candidate.Id.IntegerValue not in before_family_ids:
+                    if _elem_id_int(candidate.Id) not in before_family_ids:
                         new_families.append(candidate)
                     if candidate_name == family_name:
                         exact_matches.append(candidate)
@@ -359,7 +534,7 @@ def _load_family_into_project(doc, family_path, family_name):
 
     if family is not None:
         try:
-            _log_debug("Resolved loaded family: id={} name='{}'".format(family.Id.IntegerValue, family.Name or "<unnamed>"))
+            _log_debug("Resolved loaded family: id={} name='{}'".format(_elem_id_int(family.Id), family.Name or "<unnamed>"))
         except Exception:
             _log_debug("Resolved loaded family object.")
     else:
@@ -368,9 +543,25 @@ def _load_family_into_project(doc, family_path, family_name):
     return family, load_error
 
 
-def _place_family_instance(doc, family, comment_text):
+def _get_solid_base_point(solids):
+    """Return the bottom-centre XY point of the largest solid, at Z=0, for instance placement."""
     try:
-        _log_debug("Placing family instance for family id={} name='{}'".format(family.Id.IntegerValue, family.Name or "<unnamed>"))
+        solid = solids[0]
+        bb = solid.GetBoundingBox()
+        if bb is not None:
+            mid_x = (bb.Min.X + bb.Max.X) * 0.5
+            mid_y = (bb.Min.Y + bb.Max.Y) * 0.5
+            return DB.XYZ(mid_x, mid_y, 0.0)
+    except Exception:
+        pass
+    return DB.XYZ(0.0, 0.0, 0.0)
+
+
+def _place_family_instance(doc, family, comment_text, placement_point=None):
+    if placement_point is None:
+        placement_point = DB.XYZ(0.0, 0.0, 0.0)
+    try:
+        _log_debug("Placing family instance for family id={} name='{}'".format(_elem_id_int(family.Id), family.Name or "<unnamed>"))
     except Exception:
         _log_debug("Placing family instance for unresolved family metadata.")
     symbol_ids = list(family.GetFamilySymbolIds())
@@ -394,10 +585,11 @@ def _place_family_instance(doc, family, comment_text):
         except Exception:
             pass
 
+        pt = placement_point
         creation_attempts = [
-            lambda: doc.Create.NewFamilyInstance(DB.XYZ(0.0, 0.0, 0.0), symbol, DB.Structure.StructuralType.NonStructural),
-            lambda: doc.Create.NewFamilyInstance(DB.XYZ(0.0, 0.0, 0.0), symbol, doc.ActiveView),
-            lambda: doc.Create.NewFamilyInstance(DB.XYZ(0.0, 0.0, 0.0), symbol, doc.GetElement(doc.ActiveView.GenLevel.Id), DB.Structure.StructuralType.NonStructural),
+            lambda: doc.Create.NewFamilyInstance(pt, symbol, DB.Structure.StructuralType.NonStructural),
+            lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.ActiveView),
+            lambda: doc.Create.NewFamilyInstance(pt, symbol, doc.GetElement(doc.ActiveView.GenLevel.Id), DB.Structure.StructuralType.NonStructural),
         ]
         errors = []
         for attempt in creation_attempts:
@@ -406,7 +598,7 @@ def _place_family_instance(doc, family, comment_text):
                 if instance is not None:
                     _set_comment(instance, comment_text)
                     transaction.Commit()
-                    _log_debug("Placed family instance id={}".format(instance.Id.IntegerValue))
+                    _log_debug("Placed family instance id={}".format(_elem_id_int(instance.Id)))
                     return instance
             except Exception as ex:
                 errors.append(str(ex))
@@ -473,9 +665,10 @@ def _add_material_instance_param(family_doc, freeform_elements):
         _log_debug("No material parameter found on freeform element - association skipped.")
 
 
-def _convert_element_to_mass_family(doc, element, solids):
-    _log_debug("Converting DirectShape element id={} app_id='{}' app_data='{}' solids={}".format(
-        element.Id.IntegerValue,
+def _convert_element_to_family(doc, element, solids, output_option):
+    _log_debug("Converting source element id={} type='{}' app_id='{}' app_data='{}' solids={}".format(
+        _elem_id_int(element.Id),
+        element.GetType().FullName if element is not None else "<none>",
         (getattr(element, "ApplicationId", None) or ""),
         (getattr(element, "ApplicationDataId", None) or ""),
         len(solids),
@@ -484,31 +677,52 @@ def _convert_element_to_mass_family(doc, element, solids):
     if app is None:
         raise Exception("Unable to access the Revit application.")
 
-    template_path = _find_mass_family_template(app)
+    template_path = _find_family_template(app, output_option)
     if not template_path:
         template_root = getattr(app, "FamilyTemplatePath", None) or "<not set>"
         raise Exception(
-            "No mass family template was found under Revit's Family Template Path.\n"
+            "No {} family template was found under Revit's Family Template Path.\n"
             "Current path: {}\n"
-            "Set Revit's Family Template Path to a location that contains a Conceptual Mass template and try again."
-            .format(template_root)
+            "Set Revit's Family Template Path to a location that contains a suitable {} template and try again."
+            .format(_category_display_name(output_option["category"]), template_root, _category_display_name(output_option["category"]))
         )
-    _log_debug("Using mass family template: {}".format(template_path))
+    _log_debug("Using {} family template: {}".format(_category_display_name(output_option["category"]), template_path))
 
-    source_key = (getattr(element, "ApplicationDataId", None) or "").strip()
+    elem_id = _elem_id_int(element.Id)
+
+    # Prefer IFC GUID (unique per element on IFC imports), then Exchange Name,
+    # then ApplicationDataId, then type name, then fall back to element ID.
+    source_key = _get_string_parameter(element, "IfcGUID")
     if not source_key:
-        source_key = "Element_{}".format(element.Id.IntegerValue)
-    family_name = _make_safe_name("WWP_ConvertedMass_{}".format(source_key), "WWP_ConvertedMass_{}".format(element.Id.IntegerValue))
+        source_key = _get_string_parameter(element, "IFC GUID")
+    if not source_key:
+        source_key = _get_exchange_name(element)
+    if not source_key:
+        source_key = (getattr(element, "ApplicationDataId", None) or "").strip()
+    if not source_key:
+        try:
+            type_id = element.GetTypeId()
+            if type_id is not None and type_id != DB.ElementId.InvalidElementId:
+                type_elem = doc.GetElement(type_id)
+                if type_elem is not None:
+                    source_key = (type_elem.Name or "").strip()
+        except Exception:
+            pass
+    if not source_key:
+        source_key = "Element_{}".format(elem_id)
+
+    family_prefix = output_option.get("family_prefix") or "WWP_ConvertedFamily"
+    family_name = _make_safe_name("{}_{}".format(family_prefix, source_key), "{}_{}".format(family_prefix, elem_id))
 
     family_doc = app.NewFamilyDocument(template_path)
     if family_doc is None:
-        raise Exception("Failed to open a new conceptual mass family document.")
+        raise Exception("Failed to open a new {} family document.".format(_category_display_name(output_option["category"])))
     _log_debug("Opened new family document for '{}'.".format(family_name))
 
     family_path = os.path.join(_ensure_cache_dir(), "{}.rfa".format(family_name))
     transaction = None
     try:
-        transaction = DB.Transaction(family_doc, "Create Converted Mass")
+        transaction = DB.Transaction(family_doc, "Create Converted {}".format(_category_display_name(output_option["category"])))
         transaction.Start()
 
         owner_family = getattr(family_doc, "OwnerFamily", None)
@@ -527,7 +741,7 @@ def _convert_element_to_mass_family(doc, element, solids):
         for solid in solids:
             freeform = freeform_cls.Create(family_doc, solid)
             if freeform is None:
-                raise Exception("Revit did not create a freeform element in the mass family.")
+                raise Exception("Revit did not create a freeform element in the {} family.".format(_category_display_name(output_option["category"])))
             _set_comment(freeform, source_comment)
             created_freeforms.append(freeform)
 
@@ -558,32 +772,79 @@ def _convert_element_to_mass_family(doc, element, solids):
     family, load_error = _load_family_into_project(doc, family_path, family_name)
     if family is None:
         if load_error:
-            raise Exception("Failed to load the generated mass family into the project. {}".format(load_error))
-        raise Exception("Failed to load the generated mass family into the project.")
+            raise Exception("Failed to load the generated {} family into the project. {}".format(_category_display_name(output_option["category"]), load_error))
+        raise Exception("Failed to load the generated {} family into the project.".format(_category_display_name(output_option["category"])))
 
     comment_text = "Converted from DirectShape {}{}".format(
-        element.Id.IntegerValue,
+        _elem_id_int(element.Id),
         " | {}".format(_get_comment(element)) if _get_comment(element) else "",
     )
-    return _place_family_instance(doc, family, comment_text)
+    placement_point = _get_solid_base_point(solids)
+    return _place_family_instance(doc, family, comment_text, placement_point)
 
 
-def _preview_text(scope_label, elements):
+def _get_solid_fill_pattern_id(doc):
+    try:
+        for fp in DB.FilteredElementCollector(doc).OfClass(DB.FillPatternElement):
+            try:
+                if fp.GetFillPattern().IsSolidFill:
+                    return fp.Id
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return DB.ElementId.InvalidElementId
+
+
+def _highlight_failed_elements(doc, failed_element_ids):
+    if not failed_element_ids:
+        return
+    try:
+        active_view = doc.ActiveView
+        if active_view is None:
+            return
+        red = DB.Color(255, 0, 0)
+        solid_fill_id = _get_solid_fill_pattern_id(doc)
+        override = DB.OverrideGraphicSettings()
+        override.SetProjectionLineColor(red)
+        override.SetSurfaceForegroundPatternColor(red)
+        override.SetCutForegroundPatternColor(red)
+        if solid_fill_id != DB.ElementId.InvalidElementId:
+            override.SetSurfaceForegroundPatternId(solid_fill_id)
+            override.SetCutForegroundPatternId(solid_fill_id)
+        transaction = DB.Transaction(doc, "Highlight Failed Elements")
+        transaction.Start()
+        for eid in failed_element_ids:
+            try:
+                active_view.SetElementOverrides(eid, override)
+            except Exception:
+                pass
+        transaction.Commit()
+        _log_debug("Applied red highlight to {} failed element(s).".format(len(failed_element_ids)))
+    except Exception as ex:
+        _log_debug("Could not apply failure highlights: {}".format(ex))
+
+
+def _preview_text(scope_label, elements, output_option):
     lines = [
         "Scope: {}".format(scope_label),
-        "DirectShape buildings found: {}".format(len(elements)),
-        "Output: one conceptual mass family per source DirectShape",
-        "Original DirectShapes will be kept.",
+        "Source elements found: {}".format(len(elements)),
+        "Supported categories: Mass, Generic Models",
+        "Output category: {}".format(_category_display_name(output_option["category"])),
+        "Output: one {} per source element".format((output_option.get("result_label") or "family").rstrip("s").lower()),
+        "Original source elements will be kept.",
         "",
         "Preview of first 20 source elements:",
     ]
 
     for element in elements[:20]:
         lines.append(
-            "Element {} | {} | {}".format(
-                element.Id.IntegerValue,
+            "Element {} | {} | {} | Type: {}{}".format(
+                _elem_id_int(element.Id),
                 (getattr(element, "ApplicationDataId", None) or "<no app data id>"),
                 _get_comment(element) or "<no comment>",
+                element.GetType().Name if element is not None else "<unknown>",
+                " | Exchange Name: {}".format(_get_exchange_name(element)) if _get_exchange_name(element) else "",
             )
         )
 
@@ -593,9 +854,9 @@ def _preview_text(scope_label, elements):
     return "\n".join(lines)
 
 
-def _summarize_results(created_count, failures):
+def _summarize_results(created_count, failures, output_option):
     lines = [
-        "Mass families created: {}".format(created_count),
+        "{} created: {}".format(output_option.get("result_label") or "Families", created_count),
         "Failures: {}".format(len(failures)),
     ]
 
@@ -620,12 +881,20 @@ def main():
 
     elements, scope_label = _get_candidate_elements(doc, uidoc)
     if not elements:
-        UI.TaskDialog.Show(TITLE, "No matching DirectShape buildings were found.\nSelect DirectShape buildings, or run this after Web Context Builder / Building Importer.")
+        UI.TaskDialog.Show(
+            TITLE,
+            "No matching elements were found in the Mass or Generic Models categories.\n"
+            "Select the source elements manually, or run this after Web Context Builder / Building Importer / Data Exchange.",
+        )
+        return
+
+    output_option = _prompt_output_category()
+    if output_option is None:
         return
 
     if not ui.uiUtils_show_text_report(
         "{} - Preview".format(TITLE),
-        _preview_text(scope_label, elements),
+        _preview_text(scope_label, elements, output_option),
         ok_text="Convert",
         cancel_text="Cancel",
         width=760,
@@ -635,20 +904,36 @@ def main():
 
     created_instances = []
     failures = []
+    failed_element_ids = []
 
+    # Extract all geometry BEFORE placing any families.
+    # Placing a family commits a transaction and triggers a model regeneration, which
+    # causes Revit to include the newly placed masses in subsequent elements' geometry
+    # trees - producing N copies for the Nth building processed.
+    element_solids = []
     for element in elements:
         try:
             solids = _get_element_solids(element)
             if not solids:
-                raise Exception("No valid solids were found in the DirectShape geometry.")
-            _log_debug("Element {} yielded {} solid(s).".format(element.Id.IntegerValue, len(solids)))
+                raise Exception("No valid solids were found in the source element geometry.")
+            _log_debug("Element {} yielded {} solid(s).".format(_elem_id_int(element.Id), len(solids)))
+            element_solids.append((element, solids))
+        except Exception as ex:
+            _log_debug("Element {} solid extraction failed: {}\n{}".format(_elem_id_int(element.Id), str(ex), traceback.format_exc()))
+            failures.append({"id": "element/{}".format(_elem_id_int(element.Id)), "reason": str(ex)})
+            failed_element_ids.append(element.Id)
 
-            instance = _convert_element_to_mass_family(doc, element, solids)
+    for element, solids in element_solids:
+        try:
+            instance = _convert_element_to_family(doc, element, solids, output_option)
             if instance is not None:
                 created_instances.append(instance)
         except Exception as ex:
-            _log_debug("Element {} failed: {}\n{}".format(element.Id.IntegerValue, str(ex), traceback.format_exc()))
-            failures.append({"id": "element/{}".format(element.Id.IntegerValue), "reason": str(ex)})
+            _log_debug("Element {} failed: {}\n{}".format(_elem_id_int(element.Id), str(ex), traceback.format_exc()))
+            failures.append({"id": "element/{}".format(_elem_id_int(element.Id)), "reason": str(ex)})
+            failed_element_ids.append(element.Id)
+
+    _highlight_failed_elements(doc, failed_element_ids)
 
     try:
         if created_instances:
@@ -659,7 +944,7 @@ def main():
     except Exception:
         pass
 
-    result_text = _summarize_results(len(created_instances), failures)
+    result_text = _summarize_results(len(created_instances), failures, output_option)
     if failures:
         log_path = _flush_debug_log()
         result_text += "\n\nDetailed debug log:\n{}".format(log_path)

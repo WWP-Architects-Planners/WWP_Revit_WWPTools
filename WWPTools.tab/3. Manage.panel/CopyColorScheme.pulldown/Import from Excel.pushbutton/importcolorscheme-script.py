@@ -56,11 +56,11 @@ def _log(message):
 
 def _elem_id_int(elem_id):
     try:
-        return int(elem_id.IntegerValue)
+        return int(_elem_id_int(elem_id))
     except Exception:
         pass
     try:
-        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .IntegerValue
+        return int(elem_id.Value)  # Revit 2024+ uses .Value instead of .Value
     except Exception:
         pass
     try:

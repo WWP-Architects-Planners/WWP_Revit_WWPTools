@@ -28,7 +28,7 @@ def _to_entry_collection(entries):
 
 def _elem_id_int(elem_id):
     try:
-        return int(elem_id.IntegerValue)
+        return int(_elem_id_int(elem_id))
     except Exception:
         try:
             return int(elem_id)
@@ -143,7 +143,7 @@ def _entry_set_value(entry, storage_type, value):
                     fn(int(value if value is not None else 0))
                     return True
             if hasattr(entry, "IntegerValue"):
-                entry.IntegerValue = int(value if value is not None else 0)
+                entry.Value = int(value if value is not None else 0)
                 return True
         if storage_type == DB.StorageType.Double:
             for name in ("SetDoubleValue",):
@@ -370,7 +370,7 @@ def _entry_visual_signature(entry):
         fp = getattr(entry, "FillPatternId", None)
         fp_i = None
         try:
-            fp_i = int(fp.IntegerValue) if fp is not None else None
+            fp_i = int(_elem_id_int(fp)) if fp is not None else None
         except Exception:
             fp_i = None
         vis = None
@@ -413,8 +413,8 @@ def _same_entry_value(a, b):
         vb = _entry_get_value(b, st_b)
         if st_a == DB.StorageType.ElementId:
             try:
-                ai = int(va.IntegerValue)
-                bi = int(vb.IntegerValue)
+                ai = int(_elem_id_int(va))
+                bi = int(_elem_id_int(vb))
                 return ai == bi
             except Exception:
                 return False

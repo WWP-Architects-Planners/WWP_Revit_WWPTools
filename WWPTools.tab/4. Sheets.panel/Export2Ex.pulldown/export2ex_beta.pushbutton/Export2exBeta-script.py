@@ -23,6 +23,14 @@ LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def sanitize_sheet_name(name):
     safe = re.sub(r"[:\\/?*\[\]]", "_", (name or "").strip())
     return (safe or "Schedule")[:31]
@@ -44,7 +52,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return -1
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -381,6 +389,17 @@ def safe_field_parameter_id(field):
     return param_id
 
 
+def is_key_schedule(view):
+    try:
+        definition = view.Definition
+    except Exception:
+        definition = None
+    try:
+        return bool(definition and definition.IsKeySchedule)
+    except Exception:
+        return False
+
+
 def get_element_type(doc, element):
     try:
         type_id = element.GetTypeId()
@@ -522,25 +541,117 @@ def get_field_text_for_element(doc, schedule, element, field_info, row_lookup):
     return ""
 
 
+def _inject_element_ids(headers, rows, ids):
+    """Prepend an 'Element ID' column to headers and rows.
+
+    `ids` is a parallel list of integer element IDs (or -1 for rows without
+    a traceable element, e.g. group-header rows).  Rows with id == -1 get an
+    empty cell in the Element ID column.
+    """
+    new_headers = ["Element ID"] + list(headers)
+    new_rows = []
+    for i, row in enumerate(rows):
+        eid = ids[i] if i < len(ids) else -1
+        new_rows.append(([str(eid)] if eid != -1 else [""]) + list(row))
+    return new_headers, new_rows
+
+
+def strip_leading_header_and_blanks(body_rows, headers=None):
+    """Remove duplicate column-header rows and blank separator rows from the
+    top of the body data.
+
+    Some schedule types (key schedules, schedules with the 'blank row before
+    data' appearance option) include the column-header row and/or a blank row
+    as the first rows of the body section.  Because the exporter already writes
+    its own bold header row, those body rows must be dropped to avoid
+    duplication and empty rows in the output.
+    """
+    if not body_rows:
+        return body_rows
+    result = list(body_rows)
+    headers_lower = [h.strip().lower() for h in headers] if headers else []
+    while result:
+        row = result[0]
+        row_lower = [cell.strip().lower() for cell in row]
+        if headers_lower and row_lower == headers_lower:
+            result.pop(0)
+        elif all(cell == "" for cell in row):
+            result.pop(0)
+        else:
+            break
+    return result
+
+
+def _strip_body_rows(body_rows, headers, raw_ids):
+    """Strip leading header/blank rows and keep raw_ids in sync.
+
+    Returns (stripped_rows, aligned_ids) where aligned_ids[i] is the element
+    ID that corresponds to stripped_rows[i].
+    """
+    n_before = len(body_rows)
+    stripped = strip_leading_header_and_blanks(body_rows, headers)
+    n_stripped = n_before - len(stripped)
+    aligned_ids = (raw_ids[n_stripped:n_stripped + len(stripped)]
+                   if raw_ids else [-1] * len(stripped))
+    return stripped, aligned_ids
+
+
 def build_schedule_export_rows(doc, schedule):
     fields = get_visible_schedule_fields(schedule)
     elements = collect_schedule_elements(schedule)
-    row_ids, row_lookup = build_schedule_row_lookup(schedule)
+    key_sched = is_key_schedule(schedule)
+
+    # GetCellText-based approach is the most reliable primary source because it
+    # reflects what Revit actually renders in the schedule, covering calculated
+    # value fields and schedules where GetCellElementId returns invalid IDs
+    # (grouped schedules, key schedules, etc.).
+    body_rows = build_schedule_body_rows(schedule)
+    # Fetch element IDs now, before any stripping, so indices stay aligned.
+    raw_ids = [] if key_sched else get_body_row_element_ids(schedule)
+
     if not fields:
-        body_rows = build_schedule_body_rows(schedule)
         headers = build_table_headers(schedule, len(body_rows[0]) if body_rows else 0)
+        body_rows, aligned_ids = _strip_body_rows(body_rows, headers, raw_ids)
+        if not key_sched:
+            headers, body_rows = _inject_element_ids(headers, body_rows, aligned_ids)
         return headers, body_rows, len(elements)
 
     headers = [field["heading"] for field in fields]
+
+    # Use direct cell text when available and column count matches visible fields.
+    if body_rows and len(body_rows[0]) == len(fields):
+        body_rows, aligned_ids = _strip_body_rows(body_rows, headers, raw_ids)
+        if not key_sched:
+            headers, body_rows = _inject_element_ids(headers, body_rows, aligned_ids)
+        return headers, body_rows, len(elements)
+
+    # Fall back to element-based parameter lookup when GetCellText gives nothing
+    # or the column count doesn't match.
+    row_ids, row_lookup = build_schedule_row_lookup(schedule)
     ordered_elements = order_schedule_elements(schedule, elements, row_ids)
     if not ordered_elements:
-        body_rows = build_schedule_body_rows(schedule)
+        body_rows, aligned_ids = _strip_body_rows(body_rows, headers, raw_ids)
+        if not key_sched:
+            headers, body_rows = _inject_element_ids(headers, body_rows, aligned_ids)
         return headers, body_rows, len(elements)
 
     rows = []
     for element in ordered_elements:
         row = [get_field_text_for_element(doc, schedule, element, field, row_lookup) for field in fields]
         rows.append(row)
+
+    # If the element-based approach also produces all-empty data, prefer the
+    # raw cell-text rows even when the column count differs.
+    if rows and all(all(cell == "" for cell in row) for row in rows) and body_rows:
+        body_rows, aligned_ids = _strip_body_rows(body_rows, headers, raw_ids)
+        if not key_sched:
+            headers, body_rows = _inject_element_ids(headers, body_rows, aligned_ids)
+        return headers, body_rows, len(elements)
+
+    # Element-based path: IDs come from the ordered elements directly.
+    if not key_sched:
+        elem_ids = [element_id_value(e.Id) for e in ordered_elements]
+        headers, rows = _inject_element_ids(headers, rows, elem_ids)
     return headers, rows, len(elements)
 
 

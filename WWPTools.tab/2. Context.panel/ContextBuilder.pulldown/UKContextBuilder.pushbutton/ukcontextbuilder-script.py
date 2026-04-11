@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from System import Uri
 from System.Collections.Generic import List
 from System.IO import File, StringReader
-from System.Windows import Visibility
+from System.Windows import RoutedEventHandler, Visibility
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
@@ -22,7 +22,7 @@ clr.AddReference("RevitAPI")
 clr.AddReference("RevitAPIUI")
 
 from Autodesk.Revit import DB, UI
-from pyrevit.framework import EventHandler
+
 from WWP_versioning import apply_window_title
 
 
@@ -939,17 +939,17 @@ def _show_dialog(doc):
         window.Close()
 
     if dryrun_button is not None:
-        dryrun_button.Click += EventHandler(_on_dryrun)
-    run_button.Click += EventHandler(_on_run)
-    cancel_button.Click += EventHandler(_on_cancel)
+        dryrun_button.Click += RoutedEventHandler(_on_dryrun)
+    run_button.Click += RoutedEventHandler(_on_run)
+    cancel_button.Click += RoutedEventHandler(_on_cancel)
     if locate_button is not None:
-        locate_button.Click += EventHandler(_on_locate)
+        locate_button.Click += RoutedEventHandler(_on_locate)
     if use_dense_area_checkbox is not None:
-        use_dense_area_checkbox.Checked += EventHandler(_update_dense_area_state)
-        use_dense_area_checkbox.Unchecked += EventHandler(_update_dense_area_state)
+        use_dense_area_checkbox.Checked += RoutedEventHandler(_update_dense_area_state)
+        use_dense_area_checkbox.Unchecked += RoutedEventHandler(_update_dense_area_state)
     if fast_mode_checkbox is not None:
-        fast_mode_checkbox.Checked += EventHandler(_update_dense_area_state)
-        fast_mode_checkbox.Unchecked += EventHandler(_update_dense_area_state)
+        fast_mode_checkbox.Checked += RoutedEventHandler(_update_dense_area_state)
+        fast_mode_checkbox.Unchecked += RoutedEventHandler(_update_dense_area_state)
     if map_browser is not None:
         map_browser.Navigating += _on_map_navigating
 

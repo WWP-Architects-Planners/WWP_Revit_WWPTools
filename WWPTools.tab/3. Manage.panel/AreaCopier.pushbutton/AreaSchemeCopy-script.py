@@ -3,10 +3,10 @@ import sys
 import traceback
 
 from pyrevit import DB, revit
-from pyrevit.framework import EventHandler
+
 from System.IO import File, StringReader
 from System import Uri
-from System.Windows import Visibility
+from System.Windows import RoutedEventHandler, Visibility
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
@@ -20,6 +20,14 @@ if lib_path not in sys.path:
 import WWP_colorSchemeUtils as csu
 from WWP_settings import get_tool_settings
 from WWP_versioning import apply_window_title
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 
 def _load_uiutils():
     try:
@@ -167,8 +175,8 @@ def _show_setup_dialog(scheme_names, level_names, defaults=None):
         window.DialogResult = False
         window.Close()
 
-    ok_btn.Click += EventHandler(_on_ok)
-    cancel_btn.Click += EventHandler(_on_cancel)
+    ok_btn.Click += RoutedEventHandler(_on_ok)
+    cancel_btn.Click += RoutedEventHandler(_on_cancel)
 
     if window.ShowDialog() != True:
         return None
@@ -265,7 +273,7 @@ def _get_boundary_curves(doc, view):
             continue
         if boundary_ids:
             try:
-                if cat.Id.IntegerValue not in boundary_ids:
+                if _elem_id_int(cat.Id) not in boundary_ids:
                     continue
             except Exception:
                 continue
@@ -576,7 +584,7 @@ def _collect_color_fill_schemes(doc):
 
 def _element_id_value(elem_id):
     try:
-        return int(elem_id.IntegerValue)
+        return int(_elem_id_int(elem_id))
     except Exception:
         return None
 

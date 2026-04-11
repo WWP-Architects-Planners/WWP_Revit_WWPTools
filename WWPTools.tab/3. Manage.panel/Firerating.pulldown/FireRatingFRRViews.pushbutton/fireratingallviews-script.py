@@ -15,8 +15,9 @@ clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
-from pyrevit.framework import EventHandler
+
 from System.IO import File
+from System.Windows import RoutedEventHandler
 from System.Windows.Controls import ListBoxItem
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
@@ -128,10 +129,10 @@ class FRRViewsDialog(object):
             item.IsSelected = True
             self._lst.Items.Add(item)
 
-        self._btn_run.Click += EventHandler(self._on_run)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
-        self._btn_select_all.Click += EventHandler(self._on_select_all)
-        self._btn_deselect_all.Click += EventHandler(self._on_deselect_all)
+        self._btn_run.Click += RoutedEventHandler(self._on_run)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_select_all.Click += RoutedEventHandler(self._on_select_all)
+        self._btn_deselect_all.Click += RoutedEventHandler(self._on_deselect_all)
 
         self.selected_views = []
         self.frr_param = None

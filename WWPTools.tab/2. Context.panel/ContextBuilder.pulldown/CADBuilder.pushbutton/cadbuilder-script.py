@@ -33,6 +33,14 @@ MAX_PREVIEW_ITEMS = 20
 MAX_FAILURE_ITEMS = 30
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _load_uiutils():
     script_dir = os.path.dirname(__file__)
     lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
@@ -151,7 +159,7 @@ def _format_import_label(element):
                 view_name = owner_view.Name
     except Exception:
         pass
-    return "{} [Id: {} | View: {}]".format(element.Name, element.Id.IntegerValue, view_name)
+    return "{} [Id: {} | View: {}]".format(element.Name, _elem_id_int(element.Id), view_name)
 
 
 def _choose_import_instance(doc, view, ui):
@@ -175,7 +183,7 @@ def _choose_import_instance(doc, view, ui):
 
     labels = []
     lookup = {}
-    for element in sorted(candidates, key=lambda item: (item.Name or "", item.Id.IntegerValue)):
+    for element in sorted(candidates, key=lambda item: (item.Name or "", _elem_id_int(item.Id))):
         label = _format_import_label(element)
         labels.append(label)
         lookup[label] = element
@@ -788,7 +796,7 @@ def main():
             direct_rings + segment_rings,
             point_tolerance,
             min_area_internal,
-            "cad:{}:{}".format(import_instance.Id.IntegerValue, layer_name),
+            "cad:{}:{}"._elem_id_int(format(import_instance.Id), layer_name),
         )
         features.extend(layer_features)
         discarded_counts[layer_name] = discarded_count

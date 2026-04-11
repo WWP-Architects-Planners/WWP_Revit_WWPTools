@@ -98,6 +98,14 @@ def get_category_definitions():
             "comparison_key": get_material_comparison_key,
         },
         {
+            "label": "Project Parameters",
+            "short_label": "Project Parameters",
+            "collector": collect_project_parameters,
+            "display_name": get_project_parameter_display_name,
+            "comparison_key": get_project_parameter_comparison_key,
+            "copy_func": copy_project_parameter,
+        },
+        {
             "label": "Color Fill Schemes",
             "short_label": "Color Fill Schemes",
             "collector": collect_elements_by_class,
@@ -273,6 +281,75 @@ def get_material_comparison_key(doc, element):
     return normalize_name(get_material_display_name(doc, element))
 
 
+def get_project_parameter_binding_records(doc):
+    records = []
+    iterator = doc.ParameterBindings.ForwardIterator()
+    while iterator.MoveNext():
+        definition = iterator.Key
+        binding = iterator.Current
+
+        try:
+            element = doc.GetElement(definition.Id)
+        except Exception:
+            element = None
+        if element is None:
+            continue
+
+        try:
+            is_instance = isinstance(binding, DB.InstanceBinding)
+        except Exception:
+            is_instance = False
+
+        categories = []
+        try:
+            categories = sorted(
+                [category.Name for category in binding.Categories if category and category.Name],
+                key=lambda name: name.lower(),
+            )
+        except Exception:
+            categories = []
+
+        guid_value = ""
+        try:
+            guid_value = str(element.GuidValue)
+        except Exception:
+            guid_value = ""
+
+        records.append(
+            {
+                "element": element,
+                "definition": definition,
+                "binding": binding,
+                "name": getattr(definition, "Name", None) or get_type_name(element) or "",
+                "is_instance": is_instance,
+                "categories": categories,
+                "guid": guid_value,
+            }
+        )
+    return records
+
+
+def get_project_parameter_display_name(doc, record):
+    name = record.get("name") or "Unnamed Project Parameter"
+    binding_kind = "Instance" if record.get("is_instance") else "Type"
+    categories = record.get("categories") or []
+    if categories:
+        preview = ", ".join(categories[:3])
+        if len(categories) > 3:
+            preview += ", +{}".format(len(categories) - 3)
+        return "{} | {} | {}".format(name, binding_kind, preview)
+    return "{} | {}".format(name, binding_kind)
+
+
+def get_project_parameter_comparison_key(doc, record):
+    guid_value = record.get("guid") or ""
+    if guid_value:
+        return "guid:{}".format(guid_value.lower())
+    name = normalize_name(record.get("name"))
+    binding_kind = "instance" if record.get("is_instance") else "type"
+    return "{}|{}".format(name, binding_kind)
+
+
 def get_category_name(doc, category_id):
     if category_id is None:
         return "Unknown Category"
@@ -365,6 +442,12 @@ def collect_elements_by_class(doc, category_def):
     elements = list(collector)
     elements.sort(key=lambda item: category_def["display_name"](doc, item).lower())
     return elements
+
+
+def collect_project_parameters(doc, category_def):
+    records = get_project_parameter_binding_records(doc)
+    records.sort(key=lambda item: category_def["display_name"](doc, item).lower())
+    return records
 
 
 def collect_curtain_wall_types(doc, category_def):
@@ -530,6 +613,13 @@ def copy_type(source_doc, target_doc, source_type):
     return list(copied_ids) if copied_ids is not None else []
 
 
+def copy_project_parameter(source_doc, target_doc, source_record):
+    source_element = source_record.get("element")
+    if source_element is None:
+        raise Exception("Project parameter element was not found in the source document.")
+    return copy_type(source_doc, target_doc, source_element)
+
+
 def build_summary(category_def, source_doc, copied_names, skipped_existing, errors):
     lines = [
         "Category: {}".format(category_def["label"]),
@@ -542,14 +632,14 @@ def build_summary(category_def, source_doc, copied_names, skipped_existing, erro
 
     if copied_names:
         lines.append("")
-        lines.append("Copied types:")
+        lines.append("Copied items:")
         lines.extend(copied_names[:15])
         if len(copied_names) > 15:
             lines.append("... ({}) more".format(len(copied_names) - 15))
 
     if skipped_existing:
         lines.append("")
-        lines.append("Skipped because the type already exists in the target:")
+        lines.append("Skipped because the item already exists in the target:")
         lines.extend(skipped_existing[:15])
         if len(skipped_existing) > 15:
             lines.append("... ({}) more".format(len(skipped_existing) - 15))
@@ -605,11 +695,12 @@ def main():
     copied_names = []
     errors = []
     transaction_name = "Transfer {}".format(category_def["label"])
+    copy_func = category_def.get("copy_func", copy_type)
     with revit.Transaction(transaction_name):
         for source_type in copy_candidates:
             type_name = category_def["display_name"](source_doc, source_type) or "<Unnamed Item>"
             try:
-                copy_type(source_doc, current_doc, source_type)
+                copy_func(source_doc, current_doc, source_type)
                 copied_names.append(type_name)
             except Exception as exc:
                 errors.append("{}: {}".format(type_name, str(exc)))

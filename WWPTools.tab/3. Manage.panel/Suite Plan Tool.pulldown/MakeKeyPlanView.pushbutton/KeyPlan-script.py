@@ -1,4 +1,10 @@
+import os
+
+from System import Int64
 import clr
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
 
 from pyrevit import revit, DB, script
 from WWP_settings import get_tool_settings
@@ -6,7 +12,20 @@ import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
 from System.Collections.Generic import List
+from System.IO import File
+from System.Windows import RoutedEventHandler, Visibility
+from System.Windows.Interop import WindowInteropHelper
+from System.Windows.Markup import XamlReader
 
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
+
+script_dir = os.path.dirname(__file__)
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -41,7 +60,7 @@ def pick_elements(bic, prompt):
         elems = []
         for ref in refs:
             elem = doc.GetElement(ref)
-            if elem and elem.Category and elem.Category.Id.IntegerValue == bic_id:
+            if elem and elem.Category and _elem_id_int(elem.Category.Id) == bic_id:
                 elems.append(elem)
         return elems
     finally:
@@ -56,7 +75,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -68,11 +87,11 @@ def element_id_value(elem_id):
 def element_is_category(elem, bic):
     if not elem or not elem.Category:
         return False
-    return elem.Category.Id.IntegerValue == int(bic)
+    return _elem_id_int(elem.Category.Id) == int(bic)
 
 
 def unique_view_name(base_name):
-    existing = set(v.Name for v in DB.FilteredElementCollector(doc).OfClass(DB.View))
+    existing = set(get_element_name(v) for v in DB.FilteredElementCollector(doc).OfClass(DB.View))
     if base_name not in existing:
         return base_name
     index = 1
@@ -85,9 +104,22 @@ def unique_view_name(base_name):
 
 def _safe_elem_label(elem):
     try:
-        return elem.Name or elem.Id.IntegerValue
+        return get_element_name(elem) or _elem_id_int(elem.Id)
     except Exception:
         return "(unavailable)"
+
+
+def get_element_name(elem, default=""):
+    if elem is None:
+        return default
+    try:
+        return elem.Name or default
+    except Exception:
+        pass
+    try:
+        return DB.Element.Name.__get__(elem) or default
+    except Exception:
+        return default
 
 
 def curve_loop_area_xy(curves):
@@ -149,6 +181,58 @@ def _rect_loop_from_bbox(bbox):
     return loop
 
 
+class KeyPlanOptionsDialog(object):
+    def __init__(self, template_names, fill_type_names, area_label,
+                 template_index=0, fill_type_index=0):
+        xaml_path = os.path.join(script_dir, "KeyPlanWindow.xaml")
+        xaml_text = File.ReadAllText(xaml_path)
+        self.window = XamlReader.Parse(xaml_text)
+        self.window.Title = "Make Keyplans"
+
+        helper = WindowInteropHelper(self.window)
+        helper.Owner = uidoc.Application.MainWindowHandle
+
+        self._lbl_area = self.window.FindName("AreaLabel")
+        self._cmb_template = self.window.FindName("TemplateCombo")
+        self._cmb_fill = self.window.FindName("FillTypeCombo")
+        self._btn_ok = self.window.FindName("OkButton")
+        self._btn_cancel = self.window.FindName("CancelButton")
+
+        self.result = None
+
+        self._btn_ok.Click += RoutedEventHandler(self._on_ok)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+
+        self._lbl_area.Text = area_label or "(not selected)"
+
+        for name in (template_names or []):
+            self._cmb_template.Items.Add(name)
+        for name in (fill_type_names or []):
+            self._cmb_fill.Items.Add(name)
+
+        if self._cmb_template.Items.Count > 0:
+            self._cmb_template.SelectedIndex = min(
+                template_index, self._cmb_template.Items.Count - 1)
+        if self._cmb_fill.Items.Count > 0:
+            self._cmb_fill.SelectedIndex = min(
+                fill_type_index, self._cmb_fill.Items.Count - 1)
+
+    def _on_ok(self, sender, args):
+        self.result = {
+            "template_index": self._cmb_template.SelectedIndex,
+            "fill_type_index": self._cmb_fill.SelectedIndex,
+        }
+        self.window.Close()
+
+    def _on_cancel(self, sender, args):
+        self.result = None
+        self.window.Close()
+
+    def show(self):
+        self.window.ShowDialog()
+        return self.result
+
+
 def main():
     base_view = doc.ActiveView
     if not isinstance(base_view, DB.ViewPlan):
@@ -158,7 +242,10 @@ def main():
     templates = [
         v for v in DB.FilteredElementCollector(doc).OfClass(DB.View) if v.IsTemplate
     ]
-    templates_sorted = sorted(templates, key=lambda v: v.Name)
+    templates_sorted = sorted(
+        templates,
+        key=lambda v: (get_element_name(v, "").lower(), element_id_value(v.Id) or 0),
+    )
 
     fill_types = (
         DB.FilteredElementCollector(doc)
@@ -166,7 +253,10 @@ def main():
         .WhereElementIsElementType()
         .ToElements()
     )
-    fill_types_sorted = sorted(fill_types, key=lambda f: f.Name)
+    fill_types_sorted = sorted(
+        fill_types,
+        key=lambda f: (get_element_name(f, "").lower(), element_id_value(f.Id) or 0),
+    )
 
     if not templates_sorted:
         uiutils.uiUtils_alert("No view templates found for this view type.", title="Make Keyplans")
@@ -184,22 +274,22 @@ def main():
 
     last_area_id = getattr(config, CONFIG_LAST_AREA_ID, None)
     if last_area_id:
-        area_elem = doc.GetElement(DB.ElementId(int(last_area_id)))
+        area_elem = doc.GetElement(DB.ElementId(Int64(int(last_area_id))))
         if element_is_category(area_elem, DB.BuiltInCategory.OST_Areas):
             state["areas"] = [area_elem]
-            state["area_label"] = area_elem.Name or area_elem.Id.IntegerValue
+            state["area_label"] = get_element_name(area_elem) or _elem_id_int(area_elem.Id)
 
     last_keyplan_template_id = getattr(config, CONFIG_LAST_KEYPLAN_TEMPLATE_ID, None)
     if last_keyplan_template_id:
         for idx, template in enumerate(templates_sorted):
-            if template.Id.IntegerValue == int(last_keyplan_template_id):
+            if _elem_id_int(template.Id) == int(last_keyplan_template_id):
                 state["keyplan_template_index"] = idx
                 break
 
     last_fill_type_id = getattr(config, CONFIG_LAST_FILL_TYPE_ID, None)
     if last_fill_type_id:
         for idx, fill_type in enumerate(fill_types_sorted):
-            if fill_type.Id.IntegerValue == int(last_fill_type_id):
+            if _elem_id_int(fill_type.Id) == int(last_fill_type_id):
                 state["fill_type_index"] = idx
                 break
 
@@ -223,18 +313,16 @@ def main():
     if len(areas) > 1:
         state["area_label"] = "{} areas selected".format(len(areas))
     else:
-        state["area_label"] = areas[0].Name or areas[0].Id.IntegerValue
+        state["area_label"] = get_element_name(areas[0]) or _elem_id_int(areas[0].Id)
 
-    result = uiutils.uiUtils_keyplan_options(
-        [t.Name for t in templates_sorted],
-        [f.Name for f in fill_types_sorted],
-        title="Make Keyplans",
+    dlg = KeyPlanOptionsDialog(
+        [get_element_name(t, "<unnamed template>") for t in templates_sorted],
+        [get_element_name(f, "<unnamed fill type>") for f in fill_types_sorted],
         area_label=state.get("area_label") or "(not selected)",
         template_index=state.get("keyplan_template_index", 0),
         fill_type_index=state.get("fill_type_index", 0),
-        width=640,
-        height=360,
     )
+    result = dlg.show()
     if result is None:
         return
 
@@ -281,7 +369,7 @@ def main():
                 )
                 continue
 
-            base_label = area.Number or area.Name or str(area.Id.IntegerValue)
+            base_label = area.Number or get_element_name(area) or _elem_id_int(str(area.Id))
             keyplan_view_id = base_view.Duplicate(DB.ViewDuplicateOption.Duplicate)
             keyplan_view = doc.GetElement(keyplan_view_id)
             keyplan_view.Name = unique_view_name("Keyplan - {}".format(base_label))
@@ -343,7 +431,7 @@ def main():
     for result in created:
         view = result.get("keyplan_view")
         area = result.get("area")
-        lines.append("- {} ({})".format(view.Name, _safe_elem_label(area)))
+        lines.append("- {} ({})".format(get_element_name(view, "<unnamed view>"), _safe_elem_label(area)))
     if failed:
         lines.append("")
         lines.append("Failed {} area(s):".format(len(failed)))

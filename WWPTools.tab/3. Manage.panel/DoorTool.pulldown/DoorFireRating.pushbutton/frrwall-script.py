@@ -9,8 +9,9 @@ clr.AddReference("PresentationFramework")
 clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
-from pyrevit.framework import EventHandler
+
 from System.IO import File
+from System.Windows import RoutedEventHandler
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
 
@@ -52,8 +53,8 @@ class FRRWallDialog(object):
         self._txt_frr.Text = "FRR Walls"
         self._txt_stc.Text = "STC Walls"
 
-        self._btn_run.Click += EventHandler(self._on_run)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
+        self._btn_run.Click += RoutedEventHandler(self._on_run)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
 
         self.frr_param = None
         self.stc_param = None

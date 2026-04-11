@@ -1,14 +1,34 @@
+import os
 import math
 import random
 
+from System import Int64
 import clr
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
+
 from pyrevit import revit, DB, script
 from WWP_settings import get_tool_settings
 import WWP_uiUtils as uiutils
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from Autodesk.Revit.UI import Selection as UISelection
 from System.Collections.Generic import List
+from System.IO import File
+from System.Windows import RoutedEventHandler, Visibility
+from System.Windows.Controls import SelectionChangedEventHandler
+from System.Windows.Interop import WindowInteropHelper
+from System.Windows.Markup import XamlReader
 
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
+
+script_dir = os.path.dirname(__file__)
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -49,7 +69,7 @@ def pick_element(bic, prompt):
         try:
             ref = uidoc.Selection.PickObject(UISelection.ObjectType.Element, prompt)
             elem = doc.GetElement(ref)
-            if elem and elem.Category and elem.Category.Id.IntegerValue == bic_id:
+            if elem and elem.Category and _elem_id_int(elem.Category.Id) == bic_id:
                 return elem
             uiutils.uiUtils_alert("Selected element is not the expected category. Please try again.")
         finally:
@@ -75,7 +95,7 @@ def pick_elements(bic, prompt):
         elems = []
         for ref in refs:
             elem = doc.GetElement(ref)
-            if elem and elem.Category and elem.Category.Id.IntegerValue == bic_id:
+            if elem and elem.Category and _elem_id_int(elem.Category.Id) == bic_id:
                 elems.append(elem)
         return elems
     finally:
@@ -199,7 +219,7 @@ def rotate_view_to_door(view, door):
         axis = DB.Line.CreateUnbound(view.Origin, z_axis)
         DB.ElementTransformUtils.RotateElement(doc, crop_elem.Id, axis, angle)
         return True, "Rotated crop element {} by {:.2f} deg.".format(
-            crop_elem.Id.IntegerValue, math.degrees(angle)
+            _elem_id_int(crop_elem.Id), math.degrees(angle)
         )
 
     angle_param = None
@@ -219,7 +239,7 @@ def rotate_view_to_door(view, door):
 
 
 def unique_view_name(base_name):
-    existing = set(v.Name for v in DB.FilteredElementCollector(doc).OfClass(DB.View))
+    existing = set(get_element_name(v) for v in DB.FilteredElementCollector(doc).OfClass(DB.View))
     if base_name not in existing:
         return base_name
     index = 1
@@ -252,7 +272,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -264,7 +284,7 @@ def element_id_value(elem_id):
 def element_is_category(elem, bic):
     if not elem or not elem.Category:
         return False
-    return elem.Category.Id.IntegerValue == int(bic)
+    return _elem_id_int(elem.Category.Id) == int(bic)
 
 
 def get_parameter_names(elem):
@@ -277,9 +297,22 @@ def get_parameter_names(elem):
 
 def _safe_elem_label(elem):
     try:
-        return elem.Name or elem.Id.IntegerValue
+        return get_element_name(elem) or _elem_id_int(elem.Id)
     except Exception:
         return "(unavailable)"
+
+
+def get_element_name(elem, default=""):
+    if elem is None:
+        return default
+    try:
+        return elem.Name or default
+    except Exception:
+        pass
+    try:
+        return DB.Element.Name.__get__(elem) or default
+    except Exception:
+        return default
 
 
 def _report_sheet_number(sheet):
@@ -302,10 +335,7 @@ def _door_name_matches(door):
         except Exception:
             return ""
 
-    try:
-        name = door.Name or ""
-    except Exception:
-        name = ""
+    name = get_element_name(door, "")
     symbol = None
     try:
         symbol = door.Symbol
@@ -318,7 +348,7 @@ def _door_name_matches(door):
         pass
     if symbol:
         try:
-            parts.append(symbol.Name or "")
+            parts.append(get_element_name(symbol, ""))
         except Exception:
             pass
         try:
@@ -541,8 +571,124 @@ def find_entry_door_in_area(area, view):
                 )
                 return candidates[0]
         return None
-    matches.sort(key=lambda d: d.Id.IntegerValue)
+    matches.sort(key=lambda d: _elem_id_int(d.Id))
     return matches[0]
+
+
+class MarketingViewOptionsDialog(object):
+    def __init__(self,
+                 sheet_params, template_names, titleblock_names,
+                 keyplan_template_names, fill_type_names,
+                 area_label="(not selected)", door_label="",
+                 keyplan_enabled=False, overwrite_existing=False,
+                 template_index=0, titleblock_index=0,
+                 keyplan_template_index=0, fill_type_index=0,
+                 sheet_number_param="", sheet_name_param=""):
+        xaml_path = os.path.join(script_dir, "MarketingViewWindow.xaml")
+        xaml_text = File.ReadAllText(xaml_path)
+        self.window = XamlReader.Parse(xaml_text)
+        self.window.Title = "Make Marketing View"
+
+        helper = WindowInteropHelper(self.window)
+        helper.Owner = uidoc.Application.MainWindowHandle
+
+        self._lbl_area = self.window.FindName("AreaLabel")
+        self._lbl_door = self.window.FindName("DoorLabel")
+        self._cmb_sheet_number = self.window.FindName("SheetNumberParamCombo")
+        self._cmb_sheet_name = self.window.FindName("SheetNameParamCombo")
+        self._cmb_template = self.window.FindName("TemplateCombo")
+        self._cmb_titleblock = self.window.FindName("TitleblockCombo")
+        self._chk_overwrite = self.window.FindName("OverwriteCheckBox")
+        self._chk_keyplan = self.window.FindName("KeyplanCheckBox")
+        self._cmb_keyplan_template = self.window.FindName("KeyplanTemplateCombo")
+        self._cmb_fill_type = self.window.FindName("FillTypeCombo")
+        self._btn_ok = self.window.FindName("OkButton")
+        self._btn_cancel = self.window.FindName("CancelButton")
+
+        self.result = None
+
+        self._btn_ok.Click += RoutedEventHandler(self._on_ok)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._chk_keyplan.Checked += RoutedEventHandler(self._on_keyplan_changed)
+        self._chk_keyplan.Unchecked += RoutedEventHandler(self._on_keyplan_changed)
+
+        # Populate labels
+        self._lbl_area.Text = area_label or "(not selected)"
+        self._lbl_door.Text = door_label or "(not found)"
+
+        # Populate combo boxes
+        for name in (sheet_params or []):
+            self._cmb_sheet_number.Items.Add(name)
+            self._cmb_sheet_name.Items.Add(name)
+        for name in (template_names or []):
+            self._cmb_template.Items.Add(name)
+        for name in (titleblock_names or []):
+            self._cmb_titleblock.Items.Add(name)
+        for name in (keyplan_template_names or []):
+            self._cmb_keyplan_template.Items.Add(name)
+        for name in (fill_type_names or []):
+            self._cmb_fill_type.Items.Add(name)
+
+        # Set selected items by value match, fallback to index 0
+        def _find_index(combo, value):
+            if value:
+                for i in range(combo.Items.Count):
+                    if str(combo.Items[i]) == str(value):
+                        return i
+            return 0
+
+        if self._cmb_sheet_number.Items.Count > 0:
+            self._cmb_sheet_number.SelectedIndex = _find_index(
+                self._cmb_sheet_number, sheet_number_param)
+        if self._cmb_sheet_name.Items.Count > 0:
+            self._cmb_sheet_name.SelectedIndex = _find_index(
+                self._cmb_sheet_name, sheet_name_param)
+        if self._cmb_template.Items.Count > 0:
+            self._cmb_template.SelectedIndex = min(
+                template_index, self._cmb_template.Items.Count - 1)
+        if self._cmb_titleblock.Items.Count > 0:
+            self._cmb_titleblock.SelectedIndex = min(
+                titleblock_index, self._cmb_titleblock.Items.Count - 1)
+        if self._cmb_keyplan_template.Items.Count > 0:
+            self._cmb_keyplan_template.SelectedIndex = min(
+                keyplan_template_index, self._cmb_keyplan_template.Items.Count - 1)
+        if self._cmb_fill_type.Items.Count > 0:
+            self._cmb_fill_type.SelectedIndex = min(
+                fill_type_index, self._cmb_fill_type.Items.Count - 1)
+
+        self._chk_overwrite.IsChecked = bool(overwrite_existing)
+        self._chk_keyplan.IsChecked = bool(keyplan_enabled)
+        self._update_keyplan_enabled(bool(keyplan_enabled))
+
+    def _update_keyplan_enabled(self, enabled):
+        self._cmb_keyplan_template.IsEnabled = enabled
+        self._cmb_fill_type.IsEnabled = enabled
+
+    def _on_keyplan_changed(self, sender, args):
+        self._update_keyplan_enabled(bool(self._chk_keyplan.IsChecked))
+
+    def _on_ok(self, sender, args):
+        sheet_num_item = self._cmb_sheet_number.SelectedItem
+        sheet_name_item = self._cmb_sheet_name.SelectedItem
+        self.result = {
+            "sheet_number_param": str(sheet_num_item) if sheet_num_item is not None else "",
+            "sheet_name_param": str(sheet_name_item) if sheet_name_item is not None else "",
+            "template_index": max(0, self._cmb_template.SelectedIndex),
+            "titleblock_index": max(0, self._cmb_titleblock.SelectedIndex),
+            "keyplan_enabled": bool(self._chk_keyplan.IsChecked),
+            "keyplan_template_index": max(0, self._cmb_keyplan_template.SelectedIndex),
+            "fill_type_index": max(0, self._cmb_fill_type.SelectedIndex),
+            "overwrite_existing": bool(self._chk_overwrite.IsChecked),
+        }
+        self.window.Close()
+
+    def _on_cancel(self, sender, args):
+        self.result = None
+        self.window.Close()
+
+    def show(self):
+        self.window.ShowDialog()
+        return self.result
 
 
 def main():
@@ -554,7 +700,10 @@ def main():
     templates = [
         v for v in DB.FilteredElementCollector(doc).OfClass(DB.View) if v.IsTemplate
     ]
-    templates_sorted = sorted(templates, key=lambda v: v.Name)
+    templates_sorted = sorted(
+        templates,
+        key=lambda v: (get_element_name(v, "").lower(), element_id_value(v.Id) or 0),
+    )
     keyplan_templates_sorted = list(templates_sorted)
 
     titleblocks = (
@@ -563,7 +712,14 @@ def main():
         .WhereElementIsElementType()
         .ToElements()
     )
-    titleblocks_sorted = sorted(titleblocks, key=lambda t: "{}: {}".format(t.FamilyName, t.Name))
+    titleblocks_sorted = sorted(
+        titleblocks,
+        key=lambda t: (
+            (getattr(t, "FamilyName", "") or "").lower(),
+            get_element_name(t, "").lower(),
+            element_id_value(t.Id) or 0,
+        ),
+    )
 
     fill_types = (
         DB.FilteredElementCollector(doc)
@@ -571,7 +727,10 @@ def main():
         .WhereElementIsElementType()
         .ToElements()
     )
-    fill_types_sorted = sorted(fill_types, key=lambda f: f.Name)
+    fill_types_sorted = sorted(
+        fill_types,
+        key=lambda f: (get_element_name(f, "").lower(), element_id_value(f.Id) or 0),
+    )
 
     if not templates_sorted:
         uiutils.uiUtils_alert("No view templates found for this view type.", title="Make Marketing View")
@@ -601,44 +760,44 @@ def main():
 
     last_area_id = getattr(config, CONFIG_LAST_AREA_ID, None)
     if last_area_id:
-        area_elem = doc.GetElement(DB.ElementId(int(last_area_id)))
+        area_elem = doc.GetElement(DB.ElementId(Int64(int(last_area_id))))
         if element_is_category(area_elem, DB.BuiltInCategory.OST_Areas):
             state["area"] = area_elem
             state["areas"] = [area_elem]
-            state["area_label"] = area_elem.Name or area_elem.Id.IntegerValue
+            state["area_label"] = get_element_name(area_elem) or _elem_id_int(area_elem.Id)
 
     last_door_id = getattr(config, CONFIG_LAST_DOOR_ID, None)
     if last_door_id:
-        door_elem = doc.GetElement(DB.ElementId(int(last_door_id)))
+        door_elem = doc.GetElement(DB.ElementId(Int64(int(last_door_id))))
         if element_is_category(door_elem, DB.BuiltInCategory.OST_Doors):
             state["door"] = door_elem
-            state["door_label"] = door_elem.Name or door_elem.Id.IntegerValue
+            state["door_label"] = get_element_name(door_elem) or _elem_id_int(door_elem.Id)
 
     last_template_id = getattr(config, CONFIG_LAST_TEMPLATE_ID, None)
     if last_template_id:
         for idx, template in enumerate(templates_sorted):
-            if template.Id.IntegerValue == int(last_template_id):
+            if _elem_id_int(template.Id) == int(last_template_id):
                 state["template_index"] = idx
                 break
 
     last_titleblock_id = getattr(config, CONFIG_LAST_TITLEBLOCK_ID, None)
     if last_titleblock_id:
         for idx, titleblock in enumerate(titleblocks_sorted):
-            if titleblock.Id.IntegerValue == int(last_titleblock_id):
+            if _elem_id_int(titleblock.Id) == int(last_titleblock_id):
                 state["titleblock_index"] = idx
                 break
 
     last_keyplan_template_id = getattr(config, CONFIG_LAST_KEYPLAN_TEMPLATE_ID, None)
     if last_keyplan_template_id:
         for idx, template in enumerate(keyplan_templates_sorted):
-            if template.Id.IntegerValue == int(last_keyplan_template_id):
+            if _elem_id_int(template.Id) == int(last_keyplan_template_id):
                 state["keyplan_template_index"] = idx
                 break
 
     last_fill_type_id = getattr(config, CONFIG_LAST_FILL_TYPE_ID, None)
     if last_fill_type_id:
         for idx, fill_type in enumerate(fill_types_sorted):
-            if fill_type.Id.IntegerValue == int(last_fill_type_id):
+            if _elem_id_int(fill_type.Id) == int(last_fill_type_id):
                 state["fill_type_index"] = idx
                 break
 
@@ -667,11 +826,11 @@ def main():
     state["area_label"] = (
         "{} areas selected".format(len(areas))
         if len(areas) > 1
-        else (area.Name or area.Id.IntegerValue)
+        else (get_element_name(area) or _elem_id_int(area.Id))
     )
     door = find_entry_door_in_area(area, base_view) if area else None
     state["door"] = door
-    state["door_label"] = door.Name if door else "(not selected)"
+    state["door_label"] = get_element_name(door) if door else "(not selected)"
 
     sheet_param_label = "(Use Area Number/Name)"
     sheet_params = [sheet_param_label]
@@ -687,13 +846,12 @@ def main():
     if sheet_name_param and sheet_name_param not in sheet_params:
         sheet_params.append(sheet_name_param)
 
-    result = uiutils.uiUtils_marketing_view_options(
+    dlg = MarketingViewOptionsDialog(
         sheet_params,
-        [t.Name for t in templates_sorted],
-        ["{}: {}".format(t.FamilyName, t.Name) for t in titleblocks_sorted],
-        [t.Name for t in keyplan_templates_sorted],
-        [t.Name for t in fill_types_sorted],
-        title="Make Marketing View",
+        [get_element_name(t, "<unnamed template>") for t in templates_sorted],
+        ["{}: {}".format(getattr(t, "FamilyName", "") or "", get_element_name(t, "<unnamed titleblock>")) for t in titleblocks_sorted],
+        [get_element_name(t, "<unnamed template>") for t in keyplan_templates_sorted],
+        [get_element_name(t, "<unnamed fill type>") for t in fill_types_sorted],
         area_label=state.get("area_label") or "(not selected)",
         door_label=state.get("door_label") or "",
         keyplan_enabled=state.get("keyplan_enabled", False),
@@ -704,9 +862,8 @@ def main():
         fill_type_index=state.get("fill_type_index", 0),
         sheet_number_param=sheet_number_param or sheet_param_label,
         sheet_name_param=sheet_name_param or sheet_param_label,
-        width=720,
-        height=660,
     )
+    result = dlg.show()
     if result is None:
         return
 
@@ -769,9 +926,9 @@ def main():
                 sheet_number = getattr(area, "Number", "") or ""
             sheet_name = get_param_value(area, sheet_name_param)
             if not sheet_name:
-                sheet_name = area.Name or "Marketing Sheet"
+                sheet_name = get_element_name(area) or "Marketing Sheet"
 
-            base_label = sheet_name or area.Name or getattr(area, "Number", "") or "Marketing"
+            base_label = sheet_name or get_element_name(area) or getattr(area, "Number", "") or "Marketing"
             view_name_base = "Marketing - {}".format(base_label)
             view_name = unique_view_name(view_name_base)
 

@@ -32,6 +32,13 @@ from System.Collections.Generic import List
 from WWP_compat import io_open
 
 
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
+
 HEADER_ALIASES = {
     "x": set([
         "x",
@@ -94,7 +101,7 @@ def _element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -113,7 +120,7 @@ def _is_floor(element):
         pass
     try:
         category = element.Category
-        return category is not None and category.Id.IntegerValue == int(DB.BuiltInCategory.OST_Floors)
+        return category is not None and _elem_id_int(category.Id) == int(DB.BuiltInCategory.OST_Floors)
     except Exception:
         return False
 

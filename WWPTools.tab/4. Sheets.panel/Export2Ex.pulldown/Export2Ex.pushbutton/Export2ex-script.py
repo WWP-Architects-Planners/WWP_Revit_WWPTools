@@ -39,6 +39,14 @@ LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def sanitize_sheet_name(name):
     invalid = r"[:\\/?*\[\]]"
     safe = re.sub(invalid, "_", name)
@@ -319,7 +327,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return -1
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:

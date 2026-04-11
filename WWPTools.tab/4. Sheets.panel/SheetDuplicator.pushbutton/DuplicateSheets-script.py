@@ -12,10 +12,10 @@ clr.AddReference("PresentationCore")
 clr.AddReference("WindowsBase")
 
 from pyrevit import DB, revit
-from pyrevit.framework import EventHandler
+
 from System.IO import File
-from System.Windows import CornerRadius, FontWeights, TextAlignment, TextWrapping, Thickness
-from System.Windows.Controls import Border, StackPanel, TextBlock, TextBox, TextChangedEventHandler
+from System.Windows import CornerRadius, FontWeights, RoutedEventHandler, TextAlignment, TextWrapping, Thickness
+from System.Windows.Controls import Border, SelectionChangedEventHandler, StackPanel, TextBlock, TextBox, TextChangedEventHandler
 from System.Windows.Interop import WindowInteropHelper
 from System.Windows.Markup import XamlReader
 from System.Windows.Media import Brushes
@@ -113,7 +113,7 @@ def _element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -213,7 +213,7 @@ def _can_duplicate_view(view, option_key):
 def _sheet_display_name(sheet, current_sheet_id):
     prefix = ""
     try:
-        if current_sheet_id is not None and sheet.Id.IntegerValue == current_sheet_id:
+        if current_sheet_id is not None and _elem_id_int(sheet.Id) == current_sheet_id:
             prefix = "[Current Sheet] "
     except Exception:
         prefix = ""
@@ -227,7 +227,7 @@ def _collect_source_sheets():
     try:
         active_view = uidoc.ActiveView
         if isinstance(active_view, DB.ViewSheet):
-            current_sheet_id = active_view.Id.IntegerValue
+            current_sheet_id = _elem_id_int(active_view.Id)
     except Exception:
         current_sheet_id = None
     if current_sheet_id is not None:
@@ -400,11 +400,11 @@ class SheetDuplicatorDialog(object):
         self._populate_source_sheets()
         self._populate_duplicate_options()
 
-        self._cmb_source_sheet.SelectionChanged += EventHandler(self._on_source_sheet_changed)
-        self._cmb_duplicate_option.SelectionChanged += EventHandler(self._on_duplicate_option_changed)
-        self._btn_reset_names.Click += EventHandler(self._on_reset_names)
-        self._btn_cancel.Click += EventHandler(self._on_cancel)
-        self._btn_create.Click += EventHandler(self._on_create)
+        self._cmb_source_sheet.SelectionChanged += SelectionChangedEventHandler(self._on_source_sheet_changed)
+        self._cmb_duplicate_option.SelectionChanged += SelectionChangedEventHandler(self._on_duplicate_option_changed)
+        self._btn_reset_names.Click += RoutedEventHandler(self._on_reset_names)
+        self._btn_cancel.Click += RoutedEventHandler(self._on_cancel)
+        self._btn_create.Click += RoutedEventHandler(self._on_create)
         self._preview_host.SizeChanged += self._on_preview_size_changed
 
         self._loading = False
@@ -579,6 +579,13 @@ class SheetDuplicatorDialog(object):
         self._preview_state = {"origin_x": origin_x, "origin_y": origin_y, "scale": scale}
 
         from System.Windows.Controls import Canvas
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
         sheet_border = Border()
         sheet_border.Background = Brushes.WhiteSmoke

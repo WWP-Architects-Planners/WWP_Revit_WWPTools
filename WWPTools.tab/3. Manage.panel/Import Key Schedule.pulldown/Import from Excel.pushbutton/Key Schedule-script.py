@@ -1,10 +1,10 @@
-﻿#!python3
+#!python3
 import os
 import re
 import sys
 from difflib import SequenceMatcher
 
-from pyrevit import DB, revit, script
+from pyrevit import DB
 from WWP_settings import get_tool_settings
 
 
@@ -16,21 +16,49 @@ DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
 
 
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
+
 def _get_config():
     global _CONFIG_CACHE
     if _CONFIG_CACHE is not None:
         return _CONFIG_CACHE
-    legacy_sources = []
-    try:
-        legacy_sources.append(script.get_config())
-    except Exception:
-        pass
     _CONFIG_CACHE, _ = get_tool_settings(
         "ImportAreaKeySchedule",
-        doc=revit.doc,
-        legacy_sources=legacy_sources,
+        doc=get_revit_doc(),
     )
     return _CONFIG_CACHE
+
+
+def get_revit_doc():
+    uidoc = getattr(__revit__, "ActiveUIDocument", None)
+    if uidoc is None:
+        return None
+    return getattr(uidoc, "Document", None)
+
+
+class RevitTransaction(object):
+    def __init__(self, doc, name):
+        self._transaction = DB.Transaction(doc, name)
+
+    def __enter__(self):
+        self._transaction.Start()
+        return self._transaction
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self._transaction.Commit()
+        else:
+            try:
+                self._transaction.RollBack()
+            except Exception:
+                pass
+        return False
 
 
 def _safe_config_get(config, key, default=None):
@@ -124,7 +152,7 @@ def _is_bic_value(cat_id, bic):
     if not cat_id:
         return False
     try:
-        return cat_id.IntegerValue == int(bic)
+        return _elem_id_int(cat_id) == int(bic)
     except Exception:
         return False
 
@@ -164,7 +192,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return None
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -182,48 +210,110 @@ def get_category_parameter_options(doc, category_bic):
         .ToElements()
     )
     sample = elements[0] if elements else None
-    if not sample:
-        return [], {}
+    if sample:
+        for param in sample.Parameters:
+            if not param:
+                continue
+            try:
+                if param.IsReadOnly:
+                    continue
+            except Exception:
+                pass
+            try:
+                storage_type = param.StorageType
+                none_type = getattr(DB.StorageType, "None")
+                if storage_type == none_type:
+                    continue
+                if storage_type == DB.StorageType.ElementId:
+                    continue
+            except Exception:
+                continue
+            try:
+                name = param.Definition.Name
+            except Exception:
+                continue
+            if not name:
+                continue
+            param_id = param.Id
+            if name in params and params[name] != param_id:
+                existing_id = params.get(name)
+                if existing_id is not None:
+                    existing_display = "{} (Id {})".format(name, element_id_value(existing_id))
+                    if existing_display not in params:
+                        params[existing_display] = existing_id
+                    if name in params:
+                        params.pop(name, None)
+                display_name = "{} (Id {})".format(name, element_id_value(param_id))
+            else:
+                display_name = name
+            params[display_name] = param_id
 
-    for param in sample.Parameters:
-        if not param:
-            continue
-        try:
-            if param.IsReadOnly:
-                continue
-        except Exception:
-            pass
-        try:
-            storage_type = param.StorageType
-            none_type = getattr(DB.StorageType, "None")
-            if storage_type == none_type:
-                continue
-            if storage_type == DB.StorageType.ElementId:
-                continue
-        except Exception:
-            continue
-        try:
-            name = param.Definition.Name
-        except Exception:
-            continue
-        if not name:
-            continue
-        param_id = param.Id
-        if name in params and params[name] != param_id:
-            existing_id = params.get(name)
-            if existing_id is not None:
-                existing_display = "{} (Id {})".format(name, element_id_value(existing_id))
-                if existing_display not in params:
-                    params[existing_display] = existing_id
-                if name in params:
-                    params.pop(name, None)
-            display_name = "{} (Id {})".format(name, element_id_value(param_id))
-        else:
-            display_name = name
-        params[display_name] = param_id
+    if not params:
+        params = _get_schedulable_parameter_options(doc, category_bic)
 
     display_names = sorted(params.keys())
     return display_names, params
+
+
+def _get_schedulable_parameter_options(doc, category_bic):
+    params = {}
+    transaction = DB.Transaction(doc, TITLE + " Parameter Probe")
+    try:
+        transaction.Start()
+        schedule, _ = create_key_schedule(doc, "__WWP_TEMP_KEY_SCHEDULE__", category_bic, "Temporary")
+        if schedule is None or not schedule.Definition:
+            return {}
+
+        definition = schedule.Definition
+        try:
+            schedulable_fields = list(definition.GetSchedulableFields())
+        except Exception:
+            schedulable_fields = []
+
+        for schedulable_field in schedulable_fields:
+            try:
+                field = definition.AddField(schedulable_field)
+            except Exception:
+                continue
+            if not field:
+                continue
+            try:
+                name = field.GetName() or ""
+            except Exception:
+                name = ""
+            name = name.strip()
+            if not name or _normalize_name(name) in ("key", "key name", "keyname"):
+                continue
+            try:
+                param_id = field.ParameterId
+            except Exception:
+                param_id = None
+            if not param_id:
+                continue
+
+            if name in params and params[name] != param_id:
+                existing_id = params.get(name)
+                if existing_id is not None:
+                    existing_display = "{} (Id {})".format(name, element_id_value(existing_id))
+                    if existing_display not in params:
+                        params[existing_display] = existing_id
+                    params.pop(name, None)
+                display_name = "{} (Id {})".format(name, element_id_value(param_id))
+            else:
+                display_name = name
+            params[display_name] = param_id
+    except Exception:
+        params = {}
+    finally:
+        try:
+            if transaction.HasStarted():
+                transaction.RollBack()
+        except Exception:
+            try:
+                transaction.RollBack()
+            except Exception:
+                pass
+    return params
 
 
 def read_workbook(path, ui):
@@ -952,7 +1042,9 @@ def create_single_key_element(schedule):
 
 
 def main():
-    doc = revit.doc
+    doc = get_revit_doc()
+    if doc is None:
+        raise Exception("Active Revit document is not available.")
     ui = load_uiutils()
     config = _get_config()
     selected_target_type = _safe_config_get(config, "area_key_import_target", "") or TARGET_OPTIONS[0]
@@ -1146,7 +1238,7 @@ def main():
         errors = []
         warnings = []
 
-        with revit.Transaction(TITLE):
+        with RevitTransaction(doc, TITLE):
             schedule = find_key_schedule_by_name(doc, category_bic, schedule_name)
             if schedule is None:
                 schedule, err = create_key_schedule(doc, schedule_name, category_bic, category_label)

@@ -1,3 +1,4 @@
+from System import Int64
 import clr
 import traceback
 
@@ -73,7 +74,7 @@ def _set_param_value(param, value):
                 param.Set(value)
                 return True
             if isinstance(value, int):
-                param.Set(ElementId(value))
+                param.Set(ElementId(Int64(value)))
                 return True
     except Exception:
         return False

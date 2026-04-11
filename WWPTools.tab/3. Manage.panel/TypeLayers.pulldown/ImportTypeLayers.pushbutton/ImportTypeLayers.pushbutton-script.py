@@ -5,8 +5,9 @@ import re
 import sys
 import System
 import traceback
+from contextlib import contextmanager
 
-from pyrevit import DB, revit, script
+from pyrevit import DB, HOST_APP, script
 
 
 output = None
@@ -18,6 +19,14 @@ OVERWRITE_MODE_SKIP = "skip_all"
 MISSING_MATERIALS_ABORT = "abort"
 MISSING_MATERIALS_IGNORE = "ignore"
 
+
+
+
+def _elem_id_int(eid):
+    try:
+        return int(eid.Value)      # Revit 2024+
+    except AttributeError:
+        return int(eid.Value)  # Revit 2023-
 
 def add_lib_path():
     script_dir = os.path.dirname(__file__)
@@ -38,6 +47,26 @@ def init_output():
         output = script.get_output()
     except Exception:
         output = None
+
+
+def get_doc():
+    doc = HOST_APP.doc
+    if doc is None:
+        raise Exception("No active Revit document.")
+    return doc
+
+
+@contextmanager
+def revit_transaction(doc, name):
+    transaction = DB.Transaction(doc, name)
+    transaction.Start()
+    try:
+        yield transaction
+        transaction.Commit()
+    except Exception:
+        if transaction.HasStarted():
+            transaction.RollBack()
+        raise
 
 
 def log_info(message):
@@ -133,7 +162,7 @@ def element_id_value(elem_id):
     if elem_id is None:
         return -1
     if hasattr(elem_id, "IntegerValue"):
-        return elem_id.IntegerValue
+        return _elem_id_int(elem_id)
     if hasattr(elem_id, "Value"):
         return elem_id.Value
     try:
@@ -876,7 +905,7 @@ def collect_missing_materials(doc, category_data):
 
 
 def main():
-    doc = revit.doc
+    doc = get_doc()
     init_output()
     ui = load_uiutils()
     log_section("Start")
@@ -950,7 +979,7 @@ def main():
     missing_types_summary = []
     overwrite_skipped = 0
 
-    with revit.Transaction("Import Type Layers"):
+    with revit_transaction(doc, "Import Type Layers"):
         for label, type_class, rows in category_data:
             log_section(label)
             types, by_unique, by_id, by_name = collect_types_by_category(doc, type_class)
@@ -1128,7 +1157,7 @@ def main():
         )
         if confirm:
             log_section("Delete Missing Types")
-            with revit.Transaction("Delete Types Not In Excel"):
+            with revit_transaction(doc, "Delete Types Not In Excel"):
                 for label, names in missing_types_summary:
                     items, _, _, by_name = collect_types_by_category(
                         doc,

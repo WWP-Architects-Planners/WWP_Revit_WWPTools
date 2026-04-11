@@ -10,6 +10,7 @@ _DLL_LOADED = False
 _DIALOGS = None
 _LAST_ERROR = None
 _LAST_PATH = None
+_THEME_LOADED = False
 
 
 def _revit_version_number():
@@ -139,9 +140,94 @@ def _to_net_int_list(items):
 	return net_list
 
 
+# ---------------------------------------------------------------------------
+# Helpers for XAML-file-based dialogs (no compiled DLL required)
+# ---------------------------------------------------------------------------
+
+def _get_lib_dir():
+	return os.path.dirname(os.path.abspath(__file__))
+
+
+def _ensure_application():
+	clr.AddReference("PresentationFramework")
+	clr.AddReference("PresentationCore")
+	clr.AddReference("WindowsBase")
+	from System.Windows import Application, ShutdownMode
+	if Application.Current is None:
+		app = Application()
+		app.ShutdownMode = ShutdownMode.OnExplicitShutdown
+
+
+def _ensure_theme():
+	global _THEME_LOADED
+	if _THEME_LOADED:
+		return
+	_ensure_application()
+	from System.Windows import Application
+	from System.Windows.Markup import XamlReader
+	try:
+		if Application.Current.Resources.Contains("PanelBrush"):
+			_THEME_LOADED = True
+			return
+	except Exception:
+		pass
+	theme_path = os.path.join(_get_lib_dir(), "FlatTheme.xaml")
+	if not os.path.isfile(theme_path):
+		return
+	with open(theme_path, "r", encoding="utf-8") as f:
+		content = f.read()
+	theme_dict = XamlReader.Parse(content)
+	Application.Current.Resources.MergedDictionaries.Add(theme_dict)
+	_THEME_LOADED = True
+
+
+def _load_window_xaml(xaml_filename):
+	from System.Windows.Markup import XamlReader
+	xaml_path = os.path.join(_get_lib_dir(), xaml_filename)
+	with open(xaml_path, "r", encoding="utf-8") as f:
+		content = f.read()
+	return XamlReader.Parse(content)
+
+
+def _get_owner_handle():
+	try:
+		from System.Diagnostics import Process
+		return Process.GetCurrentProcess().MainWindowHandle
+	except Exception:
+		from System import IntPtr
+		return IntPtr.Zero
+
+
+def _find_first_visual_child(parent, target_type):
+	from System.Windows.Media import VisualTreeHelper
+	count = VisualTreeHelper.GetChildrenCount(parent)
+	for i in range(count):
+		child = VisualTreeHelper.GetChild(parent, i)
+		if isinstance(child, target_type):
+			return child
+		found = _find_first_visual_child(child, target_type)
+		if found is not None:
+			return found
+	return None
+
+
 def uiUtils_alert(message, title="Message"):
-	_ensure_wpf()
-	_DIALOGS.Alert(message, title)
+	text = "" if message is None else str(message)
+	caption = "" if title is None else str(title)
+	try:
+		_ensure_wpf()
+		if _DIALOGS is not None and hasattr(_DIALOGS, "Alert"):
+			_DIALOGS.Alert(text, caption)
+			return
+	except Exception:
+		pass
+
+	try:
+		clr.AddReference("RevitAPIUI")
+		from Autodesk.Revit import UI
+		UI.TaskDialog.Show(caption or "Message", text)
+	except Exception:
+		raise Exception(text)
 
 
 def uiUtils_confirm(message, title="Confirm"):
@@ -668,26 +754,153 @@ def uiUtils_area_keyplan_import(
 	width=980,
 	height=720,
 ):
-	_ensure_wpf()
-	result = _DIALOGS.AreaKeyplanImport(
-		title,
-		file_path or "",
-		_to_net_string_list(column_names) or List[String](),
-		_to_net_string_list(target_types) or List[String](),
-		selected_target_type or "",
-		_to_net_string_list(parameter_options) or List[String](),
-		_to_net_string_list(default_selections) or List[String](),
-		int(width),
-		int(height),
-	)
-	if result is None:
+	_ensure_application()
+	_ensure_theme()
+
+	from System.Windows.Interop import WindowInteropHelper
+	from System.Windows.Controls import DataGridComboBoxColumn, ComboBox as WpfComboBox
+	from System.Collections.Generic import List as NetList
+
+	window = _load_window_xaml("AreaKeyplanImportWindow.xaml")
+	window.Title = title or "Import Area Key Schedule"
+	if width > 0:
+		window.Width = width
+	if height > 0:
+		window.Height = height
+
+	owner = _get_owner_handle()
+	try:
+		from System import IntPtr
+		if owner != IntPtr.Zero:
+			WindowInteropHelper(window).Owner = owner
+	except Exception:
+		pass
+
+	file_path_box   = window.FindName("FilePathBox")
+	browse_button   = window.FindName("BrowseButton")
+	load_button     = window.FindName("LoadButton")
+	target_combo    = window.FindName("TargetTypeCombo")
+	mapping_grid    = window.FindName("MappingGrid")
+	ok_button       = window.FindName("OkButton")
+	cancel_button   = window.FindName("CancelButton")
+	logo_image      = window.FindName("LogoImage")
+
+	if file_path_box is not None:
+		file_path_box.Text = file_path or ""
+
+	types_list = [str(t) for t in target_types] if target_types else []
+	if target_combo is not None:
+		for t in types_list:
+			target_combo.Items.Add(t)
+		if selected_target_type and selected_target_type in types_list:
+			target_combo.SelectedItem = selected_target_type
+		elif target_combo.Items.Count > 0:
+			target_combo.SelectedIndex = 0
+
+	options = [str(o) for o in parameter_options] if parameter_options else []
+	columns = [str(c) for c in column_names] if column_names else []
+	defaults = [str(d) for d in default_selections] if default_selections else []
+
+	class _ColumnMapping(object):
+		def __init__(self, col, sel):
+			self.ColumnName = col
+			self.SelectedOption = sel
+
+	mappings = []
+	for i, col in enumerate(columns):
+		sel = defaults[i] if i < len(defaults) else ""
+		if not sel or sel not in options:
+			sel = options[0] if options else ""
+		mappings.append(_ColumnMapping(col, sel))
+
+	if mapping_grid is not None:
+		for col in mapping_grid.Columns:
+			if isinstance(col, DataGridComboBoxColumn):
+				col.ItemsSource = options
+				break
+		net_items = NetList[object]()
+		for m in mappings:
+			net_items.Add(m)
+		mapping_grid.ItemsSource = net_items
+		has_data = len(mappings) > 0
+		mapping_grid.IsEnabled = has_data
+		if ok_button is not None:
+			ok_button.IsEnabled = has_data
+
+	if logo_image is not None:
+		try:
+			from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
+			from System import Uri
+			logo_path = os.path.join(_get_lib_dir(), "WWPtools-logo.png")
+			if os.path.isfile(logo_path):
+				bmp = BitmapImage()
+				bmp.BeginInit()
+				bmp.CacheOption = BitmapCacheOption.OnLoad
+				bmp.UriSource = Uri(logo_path)
+				bmp.EndInit()
+				logo_image.Source = bmp
+		except Exception:
+			pass
+
+	result_state = {"load_requested": False}
+
+	def on_browse(sender, e):
+		from Microsoft.Win32 import OpenFileDialog
+		dlg = OpenFileDialog()
+		dlg.Title = "Select Excel File"
+		dlg.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
+		dlg.CheckFileExists = True
+		if dlg.ShowDialog() == True:
+			file_path_box.Text = dlg.FileName or ""
+
+	def on_ok(sender, e):
+		result_state["load_requested"] = False
+		window.DialogResult = True
+
+	def on_load(sender, e):
+		result_state["load_requested"] = True
+		window.DialogResult = True
+
+	def on_cancel(sender, e):
+		window.DialogResult = False
+
+	if browse_button is not None:
+		browse_button.Click += on_browse
+	if ok_button is not None:
+		ok_button.Click += on_ok
+	if load_button is not None:
+		load_button.Click += on_load
+	if cancel_button is not None:
+		cancel_button.Click += on_cancel
+
+	if window.ShowDialog() != True:
 		return None
+
+	result_file_path = str(file_path_box.Text or "") if file_path_box is not None else ""
+	result_target_type = str(target_combo.SelectedItem or "") if target_combo is not None else ""
+
+	col_names_out = []
+	selected_options_out = []
+
+	if mapping_grid is not None:
+		mapping_grid.UpdateLayout()
+		for i in range(mapping_grid.Items.Count):
+			item = mapping_grid.Items[i]
+			col_names_out.append(str(getattr(item, "ColumnName", "") or ""))
+			row = mapping_grid.ItemContainerGenerator.ContainerFromIndex(i)
+			if row is not None:
+				combo = _find_first_visual_child(row, WpfComboBox)
+				sel = str(combo.SelectedItem or "") if combo is not None else str(getattr(item, "SelectedOption", "") or "")
+			else:
+				sel = str(getattr(item, "SelectedOption", "") or "")
+			selected_options_out.append(sel)
+
 	return {
-		"load_requested": bool(result.LoadRequested),
-		"selected_target_type": result.SelectedTargetType or "",
-		"file_path": result.FilePath or "",
-		"column_names": list(result.ColumnNames or []),
-		"selected_options": list(result.SelectedOptions or []),
+		"load_requested": result_state["load_requested"],
+		"selected_target_type": result_target_type,
+		"file_path": result_file_path,
+		"column_names": col_names_out,
+		"selected_options": selected_options_out,
 	}
 
 
