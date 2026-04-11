@@ -71,20 +71,27 @@ else:
         "Purge {} unused DirectShape type(s)?\n\nThis cannot be undone.".format(len(selected)),
         TITLE
     ):
-        removed = []
+        ids = List[DB.ElementId]([t.Id for t in selected])
         failed = []
+        purged_count = 0
 
-        for t in selected:
-            with revit.Transaction("Purge Data Exchange Geometry"):
-                try:
-                    doc.Delete(t.Id)
-                    removed.append(t)
-                except Exception as e:
-                    failed.append((_type_display(t), str(e)))
+        with revit.Transaction("Purge Data Exchange Geometry"):
+            try:
+                # Delete all at once — single API call, single transaction
+                doc.Delete(ids)
+                purged_count = len(selected)
+            except Exception:
+                # Batch failed; retry individually to identify which elements fail
+                for t in selected:
+                    try:
+                        doc.Delete(t.Id)
+                        purged_count += 1
+                    except Exception as e:
+                        failed.append((_type_display(t), str(e)))
 
         if failed:
-            msg = "Purged {}. Failed {}:\n\n".format(len(removed), len(failed))
+            msg = "Purged {}. Failed {}:\n\n".format(purged_count, len(failed))
             msg += "\n".join("- {} | {}".format(n, err) for n, err in failed[:20])
             uiUtils_alert(msg, TITLE)
         else:
-            uiUtils_alert("Purged {} DirectShape type(s).".format(len(removed)), TITLE)
+            uiUtils_alert("Purged {} DirectShape type(s).".format(purged_count), TITLE)
