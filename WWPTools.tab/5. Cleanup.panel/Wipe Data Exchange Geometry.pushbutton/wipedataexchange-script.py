@@ -77,7 +77,7 @@ else:
 
         with revit.Transaction("Purge Data Exchange Geometry"):
             try:
-                # Delete all at once — single API call, single transaction
+                # Delete all at once - single API call, single transaction
                 doc.Delete(ids)
                 purged_count = len(selected)
             except Exception:
