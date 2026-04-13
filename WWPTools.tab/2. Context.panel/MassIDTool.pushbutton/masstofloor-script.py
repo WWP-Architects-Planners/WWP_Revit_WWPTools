@@ -13,9 +13,6 @@ from Autodesk.Revit.DB import (
 from Autodesk.Revit import UI
 
 
-MASS_FAMILY_PARAM = "Mass: Family"
-
-
 def _get_doc():
     try:
         uidoc = __revit__.ActiveUIDocument
@@ -103,26 +100,34 @@ def _iter_instance_params(element):
         yield param
 
 
-def _get_mass_family_name(mass):
+def _get_parent_mass_id(mass_floor):
+    """Return the ElementId of the mass that owns this mass floor.
+
+    OST_MassFloor elements are MassLevelData instances in Revit 2024-2027.
+    OwningMassId is the primary API (stable since Revit 2014).
+    Falls back to the HOST_ID_PARAM built-in for any version where the
+    property name differs.
+    """
+    # Primary: MassLevelData.OwningMassId (Revit 2014+)
     try:
-        symbol = mass.Symbol
-        if symbol and symbol.Family:
-            return symbol.Family.Name
+        eid = mass_floor.OwningMassId
+        if eid is not None and eid != ElementId.InvalidElementId:
+            return eid
     except Exception:
         pass
 
+    # Fallback: HOST_ID_PARAM built-in parameter
     try:
-        param = mass.LookupParameter("Family")
-        value = _get_param_value(param)
-        if value:
-            return value
+        from Autodesk.Revit.DB import BuiltInParameter
+        p = mass_floor.get_Parameter(BuiltInParameter.HOST_ID_PARAM)
+        if p is not None:
+            eid = p.AsElementId()
+            if eid is not None and eid != ElementId.InvalidElementId:
+                return eid
     except Exception:
         pass
 
-    try:
-        return mass.Name
-    except Exception:
-        return None
+    return None
 
 
 def main():
@@ -141,19 +146,14 @@ def main():
         UI.TaskDialog.Show("Sync Mass Tool", "No Mass Floors found.")
         return
 
-    mass_name_to_index = {}
-    mass_names = []
-    for idx, mass in enumerate(masses):
-        name = _get_mass_family_name(mass)
-        mass_names.append(name)
-        if name and name not in mass_name_to_index:
-            mass_name_to_index[name] = idx
+    mass_id_to_mass = {mass.Id: mass for mass in masses}
 
     updated = 0
     skipped = 0
     no_match = 0
     missing_params = 0
     type_mismatch = 0
+    synced_param_counts = {}  # param name -> number of floors it was written to
 
     t = Transaction(doc, "Sync Mass Floor Parameters")
     started = False
@@ -162,18 +162,16 @@ def main():
         started = True
 
         for mass_floor in mass_floors:
-            mf_param = mass_floor.LookupParameter(MASS_FAMILY_PARAM)
-            mf_name = _get_param_value(mf_param)
-            if not mf_name:
+            parent_mass_id = _get_parent_mass_id(mass_floor)
+            if parent_mass_id is None:
                 skipped += 1
                 continue
 
-            mass_index = mass_name_to_index.get(mf_name)
-            if mass_index is None:
+            mass = mass_id_to_mass.get(parent_mass_id)
+            if mass is None:
                 no_match += 1
                 continue
 
-            mass = masses[mass_index]
             mass_floor_params = _build_param_map(mass_floor)
 
             wrote_any = False
@@ -190,6 +188,7 @@ def main():
                 value = _get_param_value(src_param)
                 if _set_param_value(target_param, value):
                     wrote_any = True
+                    synced_param_counts[name] = synced_param_counts.get(name, 0) + 1
 
             if wrote_any:
                 updated += 1
@@ -211,11 +210,18 @@ def main():
 
     msg_lines = [
         "Updated: {}".format(updated),
-        "Skipped (no Mass: Family value): {}".format(skipped),
-        "Skipped (no matching Mass family): {}".format(no_match),
+        "Skipped (no parent mass link): {}".format(skipped),
+        "Skipped (parent mass not in model): {}".format(no_match),
         "Skipped (missing/read-only params): {}".format(missing_params),
         "Skipped (storage type mismatch): {}".format(type_mismatch),
+        "",
+        "Parameters synced (name: floors written):",
     ]
+    if synced_param_counts:
+        for name in sorted(synced_param_counts):
+            msg_lines.append("  {}: {}".format(name, synced_param_counts[name]))
+    else:
+        msg_lines.append("  (none)")
     UI.TaskDialog.Show("Sync Mass Tool", "\n".join(msg_lines))
 
 
