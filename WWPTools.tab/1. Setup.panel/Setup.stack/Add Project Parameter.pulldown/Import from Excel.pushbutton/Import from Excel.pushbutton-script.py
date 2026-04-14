@@ -11,6 +11,7 @@ import WWP_uiUtils as ui
 
 clr.AddReference('System')
 from System import Enum
+from System import Array, Object
 
 doc = __revit__.ActiveUIDocument.Document
 app = doc.Application
@@ -112,23 +113,58 @@ def _iter_excel_rows(path, worksheet_name=None):
 
     _BASE_FLAGS = BindingFlags.Public | BindingFlags.Instance | BindingFlags.OptionalParamBinding
 
+    def _to_object_array(args):
+        if not args:
+            return Array[Object]([])
+        return Array[Object](tuple(args))
+
     def _com_get(obj, name):
         try:
             return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.GetProperty, None, obj, None)
         except Exception:
-            return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, [])
+            return obj.GetType().InvokeMember(
+                name,
+                _BASE_FLAGS | BindingFlags.InvokeMethod,
+                None,
+                obj,
+                _to_object_array(()),
+            )
 
     def _com_set(obj, name, value):
         try:
-            obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.SetProperty, None, obj, [value])
+            obj.GetType().InvokeMember(
+                name,
+                _BASE_FLAGS | BindingFlags.SetProperty,
+                None,
+                obj,
+                _to_object_array((value,)),
+            )
         except Exception:
-            obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, [value])
+            obj.GetType().InvokeMember(
+                name,
+                _BASE_FLAGS | BindingFlags.InvokeMethod,
+                None,
+                obj,
+                _to_object_array((value,)),
+            )
 
     def _com_call(obj, name, *args):
         try:
-            return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.InvokeMethod, None, obj, list(args))
+            return obj.GetType().InvokeMember(
+                name,
+                _BASE_FLAGS | BindingFlags.InvokeMethod,
+                None,
+                obj,
+                _to_object_array(args),
+            )
         except Exception:
-            return obj.GetType().InvokeMember(name, _BASE_FLAGS | BindingFlags.GetProperty, None, obj, list(args))
+            return obj.GetType().InvokeMember(
+                name,
+                _BASE_FLAGS | BindingFlags.GetProperty,
+                None,
+                obj,
+                _to_object_array(args),
+            )
 
     excel_app = None
     workbook = None

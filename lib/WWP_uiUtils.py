@@ -189,6 +189,13 @@ def _load_window_xaml(xaml_filename):
 	return XamlReader.Parse(content)
 
 
+def _load_window_xaml_path(xaml_path):
+	from System.Windows.Markup import XamlReader
+	with open(xaml_path, "r", encoding="utf-8") as f:
+		content = f.read()
+	return XamlReader.Parse(content)
+
+
 def _get_owner_handle():
 	try:
 		from System.Diagnostics import Process
@@ -758,10 +765,23 @@ def uiUtils_area_keyplan_import(
 	_ensure_theme()
 
 	from System.Windows.Interop import WindowInteropHelper
-	from System.Windows.Controls import DataGridComboBoxColumn, ComboBox as WpfComboBox
+	from System.Windows.Controls import ComboBox as WpfComboBox
+	from System.Collections import ArrayList
 	from System.Collections.Generic import List as NetList
 
-	window = _load_window_xaml("AreaKeyplanImportWindow.xaml")
+	extension_dir = os.path.dirname(_get_lib_dir())
+	script_xaml_path = os.path.join(
+		extension_dir,
+		"WWPTools.tab",
+		"3. Manage.panel",
+		"Import Key Schedule.pulldown",
+		"Import from Excel.pushbutton",
+		"AreaKeyplanImportWindow.xaml",
+	)
+	if os.path.isfile(script_xaml_path):
+		window = _load_window_xaml_path(script_xaml_path)
+	else:
+		window = _load_window_xaml("AreaKeyplanImportWindow.xaml")
 	window.Title = title or "Import Area Key Schedule"
 	if width > 0:
 		window.Width = width
@@ -800,6 +820,9 @@ def uiUtils_area_keyplan_import(
 	options = [str(o) for o in parameter_options] if parameter_options else []
 	columns = [str(c) for c in column_names] if column_names else []
 	defaults = [str(d) for d in default_selections] if default_selections else []
+	net_options = NetList[String]()
+	for option in options:
+		net_options.Add(option)
 
 	class _ColumnMapping(object):
 		def __init__(self, col, sel):
@@ -814,11 +837,8 @@ def uiUtils_area_keyplan_import(
 		mappings.append(_ColumnMapping(col, sel))
 
 	if mapping_grid is not None:
-		for col in mapping_grid.Columns:
-			if isinstance(col, DataGridComboBoxColumn):
-				col.ItemsSource = options
-				break
-		net_items = NetList[object]()
+		mapping_grid.Tag = net_options
+		net_items = ArrayList()
 		for m in mappings:
 			net_items.Add(m)
 		mapping_grid.ItemsSource = net_items

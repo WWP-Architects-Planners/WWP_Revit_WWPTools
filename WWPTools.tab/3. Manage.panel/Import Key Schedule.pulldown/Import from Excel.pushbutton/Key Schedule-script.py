@@ -1,4 +1,5 @@
 #!python3
+import clr
 import os
 import re
 import sys
@@ -14,6 +15,171 @@ KEY_NAME_OPTION = "Key Name"
 TARGET_OPTIONS = ["Area Key Schedule", "Room Key Schedule"]
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
+
+
+def _load_local_window_xaml(xaml_name):
+    clr.AddReference("PresentationFramework")
+    clr.AddReference("PresentationCore")
+    clr.AddReference("WindowsBase")
+    from System.Windows.Markup import XamlReader
+    from System.IO import StringReader
+    from System.Xml import XmlReader
+
+    xaml_path = os.path.join(os.path.dirname(__file__), xaml_name)
+    if not os.path.isfile(xaml_path):
+        raise Exception("Missing dialog XAML: {}".format(xaml_path))
+    with open(xaml_path, "r") as f:
+        xaml_text = f.read()
+    reader = XmlReader.Create(StringReader(xaml_text))
+    return XamlReader.Load(reader)
+
+
+def _get_owner_handle():
+    try:
+        clr.AddReference("System")
+        from System.Diagnostics import Process
+        return Process.GetCurrentProcess().MainWindowHandle
+    except Exception:
+        try:
+            from System import IntPtr
+            return IntPtr.Zero
+        except Exception:
+            return None
+
+
+def _show_area_keyplan_import_dialog(
+    title="Import Area Key Schedule",
+    file_path="",
+    column_names=None,
+    target_types=None,
+    selected_target_type="",
+    parameter_options=None,
+    default_selections=None,
+    auto_map_selections=None,
+    width=980,
+    height=720,
+):
+    from System import String
+    from System.Collections import ArrayList
+    from System.Collections.Generic import List
+    from System.Windows.Interop import WindowInteropHelper
+
+    window = _load_local_window_xaml("AreaKeyplanImportWindow.xaml")
+    window.Title = title or "Import Area Key Schedule"
+    if width > 0:
+        window.Width = width
+    if height > 0:
+        window.Height = height
+
+    try:
+        from System import IntPtr
+        owner = _get_owner_handle()
+        if owner and owner != IntPtr.Zero:
+            WindowInteropHelper(window).Owner = owner
+    except Exception:
+        pass
+
+    file_path_box = window.FindName("FilePathBox")
+    browse_button = window.FindName("BrowseButton")
+    load_button = window.FindName("LoadButton")
+    target_combo = window.FindName("TargetTypeCombo")
+    mapping_grid = window.FindName("MappingGrid")
+    ok_button = window.FindName("OkButton")
+    cancel_button = window.FindName("CancelButton")
+
+    if file_path_box is not None:
+        file_path_box.Text = file_path or ""
+
+    target_types = [str(t) for t in (target_types or [])]
+    if target_combo is not None:
+        for item in target_types:
+            target_combo.Items.Add(item)
+        if selected_target_type and selected_target_type in target_types:
+            target_combo.SelectedItem = selected_target_type
+        elif target_combo.Items.Count > 0:
+            target_combo.SelectedIndex = 0
+
+    options = [str(o) for o in (parameter_options or [])]
+    columns = [str(c) for c in (column_names or [])]
+    defaults = [str(d) for d in (default_selections or [])]
+    net_options = List[String]()
+    for option in options:
+        net_options.Add(option)
+
+    class _ColumnMapping(object):
+        def __init__(self, col, sel):
+            self.ColumnName = col
+            self.SelectedOption = sel
+
+    def _normalize_mapped_selection(index, selections):
+        sel = selections[index] if index < len(selections) else ""
+        if not sel or sel not in options:
+            sel = options[0] if options else ""
+        return sel
+
+    mappings = ArrayList()
+    for i, col in enumerate(columns):
+        mappings.Add(_ColumnMapping(col, _normalize_mapped_selection(i, defaults)))
+
+    if mapping_grid is not None:
+        mapping_grid.Tag = net_options
+        mapping_grid.ItemsSource = mappings
+        has_data = mappings.Count > 0
+        mapping_grid.IsEnabled = has_data
+        if ok_button is not None:
+            ok_button.IsEnabled = has_data
+
+    result_state = {"load_requested": False}
+
+    def on_browse(sender, e):
+        from Microsoft.Win32 import OpenFileDialog
+        dlg = OpenFileDialog()
+        dlg.Title = "Select Excel File"
+        dlg.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
+        dlg.CheckFileExists = True
+        if dlg.ShowDialog() == True:
+            file_path_box.Text = dlg.FileName or ""
+
+    def on_ok(sender, e):
+        result_state["load_requested"] = False
+        window.DialogResult = True
+
+    def on_load(sender, e):
+        result_state["load_requested"] = True
+        window.DialogResult = True
+
+    def on_cancel(sender, e):
+        window.DialogResult = False
+
+    if browse_button is not None:
+        browse_button.Click += on_browse
+    if ok_button is not None:
+        ok_button.Click += on_ok
+    if load_button is not None:
+        load_button.Click += on_load
+    if cancel_button is not None:
+        cancel_button.Click += on_cancel
+
+    if window.ShowDialog() != True:
+        return None
+
+    result_target_type = str(target_combo.SelectedItem or "") if target_combo is not None else ""
+    result_file_path = str(file_path_box.Text or "") if file_path_box is not None else ""
+    selected_options = []
+    column_names_out = []
+
+    if mapping_grid is not None and mapping_grid.ItemsSource is not None:
+        for item in mapping_grid.ItemsSource:
+            column_names_out.append(str(getattr(item, "ColumnName", "") or ""))
+            selected_options.append(str(getattr(item, "SelectedOption", "") or ""))
+
+    return {
+        "load_requested": result_state["load_requested"],
+        "selected_target_type": result_target_type,
+        "file_path": result_file_path,
+        "column_names": column_names_out,
+        "selected_options": selected_options,
+    }
 
 
 
@@ -128,11 +294,16 @@ def _sanitize_selections(selections, column_count, parameter_options):
         return None
     valid = set(parameter_options)
     cleaned = []
+    useful_count = 0
     for item in selections:
         if item in valid:
             cleaned.append(item)
+            if item != SKIP_OPTION:
+                useful_count += 1
         else:
             cleaned.append(SKIP_OPTION)
+    if useful_count == 0:
+        return None
     return cleaned
 
 
@@ -620,9 +791,11 @@ def _fuzzy_match_parameter(header, param_display_names):
 
     if best_score >= 0.96:
         return best_name
+    if best_score >= 0.90 and (best_score - second_score) >= 0.02:
+        return best_name
     if best_score >= 0.82 and (best_score - second_score) >= 0.03:
         return best_name
-    if best_score >= 0.72 and (best_score - second_score) >= 0.08:
+    if best_score >= 0.72 and (best_score - second_score) >= 0.05:
         return best_name
     return None
 
@@ -1064,6 +1237,7 @@ def main():
         "column_labels": [],
         "rows": [],
         "defaults": [],
+        "auto_defaults": [],
         "schedule_name": "",
         "selected_target_type": selected_target_type,
     }
@@ -1075,6 +1249,7 @@ def main():
             headers, column_labels, rows = extract_excel_data(workbook)
             if column_labels:
                 signature = _header_signature(headers)
+                auto_defaults = build_default_selections(headers, param_names)
                 defaults = _load_saved_mapping(
                     config,
                     category_key,
@@ -1083,13 +1258,14 @@ def main():
                     parameter_options,
                 )
                 if defaults is None:
-                    defaults = build_default_selections(headers, param_names)
+                    defaults = list(auto_defaults)
                 state.update(
                     {
                         "headers": headers,
                         "column_labels": column_labels,
                         "rows": rows,
                         "defaults": defaults,
+                        "auto_defaults": auto_defaults,
                     }
                 )
 
@@ -1101,7 +1277,7 @@ def main():
         ) or _default_schedule_name(state["file_path"], category_label)
 
     while True:
-        result = ui.uiUtils_area_keyplan_import(
+        result = _show_area_keyplan_import_dialog(
             title=TITLE,
             file_path=state["file_path"],
             column_names=state["column_labels"],
@@ -1109,6 +1285,7 @@ def main():
             selected_target_type=state.get("selected_target_type", TARGET_OPTIONS[0]),
             parameter_options=parameter_options,
             default_selections=state["defaults"],
+            auto_map_selections=state.get("auto_defaults", []),
             width=980,
             height=720,
         )
@@ -1129,6 +1306,7 @@ def main():
             param_names, param_map = get_category_parameter_options(doc, category_bic)
             parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
             state["defaults"] = []
+            state["auto_defaults"] = []
             state["schedule_name"] = _safe_config_get(
                 config,
                 "area_key_import_schedule_name_{}".format(category_key),
@@ -1137,9 +1315,20 @@ def main():
 
         file_path = result.get("file_path") or ""
         state["file_path"] = file_path
+        state["selected_target_type"] = selected_target_type
+
+        current_selections = result.get("selected_options") or []
+        if state["column_labels"] and len(current_selections) == len(state["column_labels"]):
+            state["defaults"] = list(current_selections)
+            _safe_config_set(config, "area_key_import_headers_signature", _header_signature(state.get("headers", [])))
+            _safe_config_set(config, "area_key_import_selected_options", current_selections)
+            _safe_config_set(config, _mapping_signature_key(category_key), _header_signature(state.get("headers", [])))
+            _safe_config_set(config, _mapping_selection_key(category_key), current_selections)
+        _safe_config_set(config, "area_key_import_target", selected_target_type)
+        _safe_config_set(config, "area_key_import_file_path", file_path)
+        _save_config()
 
         if result.get("load_requested"):
-            state["selected_target_type"] = selected_target_type
             if not file_path:
                 ui.uiUtils_alert("Please select an Excel file.", title=TITLE)
                 continue
@@ -1157,6 +1346,7 @@ def main():
                 ui.uiUtils_alert("No data found in the Excel file.", title=TITLE)
                 continue
             signature = _header_signature(headers)
+            auto_defaults = build_default_selections(headers, param_names)
             defaults = _load_saved_mapping(
                 config,
                 category_key,
@@ -1165,13 +1355,14 @@ def main():
                 parameter_options,
             )
             if defaults is None:
-                defaults = build_default_selections(headers, param_names)
+                defaults = list(auto_defaults)
             state.update(
                 {
                     "headers": headers,
                     "column_labels": column_labels,
                     "rows": rows,
                     "defaults": defaults,
+                    "auto_defaults": auto_defaults,
                 }
             )
             saved_name = _safe_config_get(
@@ -1180,6 +1371,11 @@ def main():
                 "",
             ) or ""
             state["schedule_name"] = saved_name or _default_schedule_name(state["file_path"], category_label)
+            _safe_config_set(config, "area_key_import_headers_signature", signature)
+            _safe_config_set(config, "area_key_import_selected_options", defaults)
+            _safe_config_set(config, _mapping_signature_key(category_key), signature)
+            _safe_config_set(config, _mapping_selection_key(category_key), defaults)
+            _save_config()
             continue
 
         if target_changed:

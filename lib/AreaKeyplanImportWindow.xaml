@@ -87,9 +87,15 @@
                                             Binding="{Binding ColumnName}"
                                             IsReadOnly="True"
                                             Width="2*" />
-                        <DataGridComboBoxColumn Header="Map To"
-                                                SelectedItemBinding="{Binding SelectedOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                Width="3*" />
+                        <DataGridTemplateColumn Header="Map To"
+                                                Width="3*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox ItemsSource="{Binding Options}"
+                                              SelectedItem="{Binding SelectedOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
 
