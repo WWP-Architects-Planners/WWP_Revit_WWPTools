@@ -47,6 +47,31 @@ def _get_owner_handle():
             return None
 
 
+def _find_first_visual_child(parent, target_type):
+    from System.Windows.Media import VisualTreeHelper
+
+    if parent is None:
+        return None
+    try:
+        count = VisualTreeHelper.GetChildrenCount(parent)
+    except Exception:
+        return None
+    for i in range(count):
+        try:
+            child = VisualTreeHelper.GetChild(parent, i)
+        except Exception:
+            continue
+        try:
+            if isinstance(child, target_type):
+                return child
+        except Exception:
+            pass
+        result = _find_first_visual_child(child, target_type)
+        if result is not None:
+            return result
+    return None
+
+
 def _show_area_keyplan_import_dialog(
     title="Import Area Key Schedule",
     file_path="",
@@ -62,6 +87,7 @@ def _show_area_keyplan_import_dialog(
     from System import String
     from System.Collections import ArrayList
     from System.Collections.Generic import List
+    from System.Windows.Controls import ComboBox as WpfComboBox
     from System.Windows.Interop import WindowInteropHelper
 
     window = _load_local_window_xaml("AreaKeyplanImportWindow.xaml")
@@ -131,6 +157,46 @@ def _show_area_keyplan_import_dialog(
 
     result_state = {"load_requested": False}
 
+    def _sync_mapping_grid_combos():
+        if mapping_grid is None or mapping_grid.ItemsSource is None:
+            return
+        try:
+            mapping_grid.UpdateLayout()
+        except Exception:
+            pass
+        for i in range(mapping_grid.Items.Count):
+            try:
+                item = mapping_grid.Items[i]
+            except Exception:
+                continue
+            try:
+                row = mapping_grid.ItemContainerGenerator.ContainerFromIndex(i)
+            except Exception:
+                row = None
+            if row is None:
+                continue
+            combo = _find_first_visual_child(row, WpfComboBox)
+            if combo is None:
+                continue
+            try:
+                combo.ItemsSource = net_options
+            except Exception:
+                pass
+            selected_value = str(getattr(item, "SelectedOption", "") or "")
+            try:
+                combo.SelectedItem = selected_value
+            except Exception:
+                pass
+            if (not str(combo.SelectedItem or "")) and options:
+                try:
+                    combo.SelectedIndex = 0
+                except Exception:
+                    pass
+            try:
+                item.SelectedOption = str(combo.SelectedItem or "")
+            except Exception:
+                pass
+
     def on_browse(sender, e):
         from Microsoft.Win32 import OpenFileDialog
         dlg = OpenFileDialog()
@@ -151,6 +217,9 @@ def _show_area_keyplan_import_dialog(
     def on_cancel(sender, e):
         window.DialogResult = False
 
+    def on_content_rendered(sender, e):
+        _sync_mapping_grid_combos()
+
     if browse_button is not None:
         browse_button.Click += on_browse
     if ok_button is not None:
@@ -159,6 +228,7 @@ def _show_area_keyplan_import_dialog(
         load_button.Click += on_load
     if cancel_button is not None:
         cancel_button.Click += on_cancel
+    window.ContentRendered += on_content_rendered
 
     if window.ShowDialog() != True:
         return None
@@ -169,9 +239,24 @@ def _show_area_keyplan_import_dialog(
     column_names_out = []
 
     if mapping_grid is not None and mapping_grid.ItemsSource is not None:
-        for item in mapping_grid.ItemsSource:
+        _sync_mapping_grid_combos()
+        for i in range(mapping_grid.Items.Count):
+            item = mapping_grid.Items[i]
             column_names_out.append(str(getattr(item, "ColumnName", "") or ""))
-            selected_options.append(str(getattr(item, "SelectedOption", "") or ""))
+            sel = str(getattr(item, "SelectedOption", "") or "")
+            try:
+                row = mapping_grid.ItemContainerGenerator.ContainerFromIndex(i)
+            except Exception:
+                row = None
+            if row is not None:
+                combo = _find_first_visual_child(row, WpfComboBox)
+                if combo is not None:
+                    sel = str(combo.SelectedItem or "")
+                    try:
+                        item.SelectedOption = sel
+                    except Exception:
+                        pass
+            selected_options.append(sel)
 
     return {
         "load_requested": result_state["load_requested"],
