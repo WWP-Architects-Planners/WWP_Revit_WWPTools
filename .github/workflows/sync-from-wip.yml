@@ -1,0 +1,43 @@
+name: Sync from WIP Repo
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [sync-extension]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout company repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout WIP repo
+        uses: actions/checkout@v4
+        with:
+          repository: jason-svn/WWPTools_WIP
+          token: ${{ secrets.WIP_READ_TOKEN }}
+          fetch-depth: 1
+          path: wip-source
+
+      - name: Sync WWPTools.extension from WIP
+        run: |
+          rsync -av --delete wip-source/WWPTools.extension/ WWPTools.extension/
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add WWPTools.extension/
+          if git diff --staged --quiet; then
+            echo "No changes to sync"
+            exit 0
+          fi
+          git commit -m "sync: update WWPTools.extension from WIP"
+          git push
