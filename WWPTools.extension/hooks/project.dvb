@@ -1,0 +1,52 @@
+Sub BLText()
+    Dim MyObj As AcadBlockReference
+    Dim minPt As Variant
+    Dim maxPt As Variant
+    
+    ' Create a new selection set or use an existing one
+    Dim SelectBlockText As AcadSelectionSet
+    If ThisDrawing.SelectionSets.Count = 0 Then
+        Set SelectBlockText = ThisDrawing.SelectionSets.Add("BlockText")
+    Else
+        Set SelectBlockText = ThisDrawing.SelectionSets.Item(0)
+    End If
+    
+    SelectBlockText.Clear ' Clear the selection set
+    
+    ' Loop through all objects in ModelSpace
+    For Each MyObj In ThisDrawing.ModelSpace
+        If TypeOf MyObj Is AcadBlockReference Then
+            MyObj.GetBoundingBox minPt, maxPt
+            
+            ' Select the block references based on the bounding box
+            SelectBlockText.Select acSelectionSetWindow, minPt, maxPt
+            
+            ' Loop through selected objects in the selection set
+            For Each SelectedItem In SelectBlockText
+                If TypeOf SelectedItem Is AcadBlockReference Then
+                    Dim BlockRef As AcadBlockReference
+                    Set BlockRef = SelectedItem
+                    
+                    ' Check if the block reference has an "contents" attribute
+                    If BlockRef.HasAttributes Then
+                        Dim attrib As AcadAttribute
+                        For Each attrib In BlockRef.GetAttributes
+                            If attrib.TagString = "contents" Then
+                                ' Get the value of the "contents" attribute
+                                Dim ContentsValue As String
+                                ContentsValue = attrib.TextString
+                                
+                                ' Set the "Position Z" attribute with the "contents" value
+                                BlockRef.SetAttributes ContentsValue, "Position Z"
+                            End If
+                        Next attrib
+                    End If
+                End If
+            Next SelectedItem
+        End If
+    Next MyObj
+    
+    ' Clear the selection set
+    SelectBlockText.Clear
+End Sub
+
