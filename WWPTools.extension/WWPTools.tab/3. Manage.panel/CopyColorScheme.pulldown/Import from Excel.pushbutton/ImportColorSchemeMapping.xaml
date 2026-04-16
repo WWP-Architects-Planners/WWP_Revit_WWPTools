@@ -101,9 +101,9 @@
                                   Margin="0,6,0,0"
                                   Content="Use the cell fill color first, then fall back to the cell text (supports RGB / hex text)." />
                         <CheckBox x:Name="ColorOverrideCheck"
-                                  IsChecked="True"
+                                  IsChecked="False"
                                   Margin="0,12,0,0"
-                                  Content="Color override only — match existing entries by value and update colors only (preserves fill pattern, visibility, and captions)." />
+                                  Content="Color override only — update existing entries only. Leave off to merge Excel rows into the scheme and create missing entries." />
                     </StackPanel>
                 </Grid>
                 <TextBlock x:Name="ValidationText"
