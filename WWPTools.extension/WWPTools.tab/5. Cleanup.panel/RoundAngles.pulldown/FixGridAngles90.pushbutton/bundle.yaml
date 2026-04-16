@@ -1,3 +1,0 @@
-title: "Fix Grid\nAngles"
-tooltip: "Rounds all linear grid world angles to 2 decimals and snaps near-perpendicular pairs to exact 90 degrees."
-author: "Jason Tian"
