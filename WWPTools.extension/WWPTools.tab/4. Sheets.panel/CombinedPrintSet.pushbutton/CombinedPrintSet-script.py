@@ -465,6 +465,116 @@ def _configure_print_manager(print_manager, printer_name, output_path):
     print_manager.Apply()
 
 
+def _try_native_pdf_export(current_doc, sheet, output_path):
+    """
+    Export using Revit's built-in PDF API (Revit 2022+).
+    Uses .NET reflection to bypass IronPython overload-resolution type mismatches.
+    Returns False only when the API does not exist (pre-2022 Revit).
+    Returns True on success.
+    Raises Exception with a descriptive message on any other failure.
+    """
+    import System
+    from System.Collections.Generic import List as NetList
+
+    # Use .GetType() (a .NET instance method) to get the true CLR System.Type.
+    # type() in IronPython returns the IronPython wrapper which has no .Assembly.
+    doc_clr_type = current_doc.GetType()
+    pdf_opts_type = doc_clr_type.Assembly.GetType("Autodesk.Revit.DB.PDFExportOptions")
+    if pdf_opts_type is None:
+        return False  # Pre-Revit 2022 — fall through to virtual printer
+
+    # Find the PDF export overload with the expected 3-parameter signature:
+    # Export(string folder, IList<ElementId> viewIds, PDFExportOptions options)
+    export_method = None
+    export_overloads_found = []
+    for m in doc_clr_type.GetMethods():
+        if m.Name != "Export":
+            continue
+        params = m.GetParameters()
+        param_names = []
+        for p in params:
+            try:
+                param_names.append(p.ParameterType.Name)
+            except Exception:
+                param_names.append("?")
+        export_overloads_found.append("Export({})".format(", ".join(param_names)))
+        if len(params) != 3:
+            continue
+        try:
+            if params[0].ParameterType.FullName != "System.String":
+                continue
+            if "IList" not in params[1].ParameterType.Name:
+                continue
+            if "PDFExportOptions" not in params[2].ParameterType.FullName:
+                continue
+        except Exception:
+            continue
+        export_method = m
+        break
+    if export_method is None:
+        raise Exception(
+            "PDF export method not found. Available Export overloads on {}:\n{}".format(
+                doc_clr_type.Name,
+                "\n".join(export_overloads_found) if export_overloads_found else "(none)"
+            )
+        )
+
+    # Create options via Activator so the instance comes from the same assembly
+    options = System.Activator.CreateInstance(pdf_opts_type)
+    combine_prop = pdf_opts_type.GetProperty("Combine")
+    if combine_prop is not None:
+        combine_prop.SetValue(options, False)
+    file_name_prop = pdf_opts_type.GetProperty("FileName")
+    if file_name_prop is not None:
+        file_name_prop.SetValue(options, _sanitize_file_name("{}_{}".format(sheet.SheetNumber, sheet.Name)))
+
+    # Build List<ElementId> — use DB.ElementId directly (simpler, no type-identity issue here)
+    id_list = NetList[DB.ElementId]()
+    id_list.Add(sheet.Id)
+
+    temp_export_dir = tempfile.mkdtemp(prefix="WWPTools_NativePDF_")
+    try:
+        before = set(os.listdir(temp_export_dir))
+
+        # Invoke via MethodInfo.Invoke — bypasses IronPython type-system entirely
+        invoke_args = System.Array[System.Object]([temp_export_dir, id_list, options])
+        result = export_method.Invoke(current_doc, invoke_args)
+
+        # Return type is IList<string> (Revit 2022) or bool (some later versions)
+        if result is None:
+            raise Exception("Revit's built-in PDF export returned None.")
+        try:
+            if hasattr(result, "Count") and result.Count == 0:
+                raise Exception("Revit's built-in PDF export returned an empty file list.")
+        except AttributeError:
+            if not result:
+                raise Exception("Revit's built-in PDF export returned False.")
+
+        new_pdfs = [
+            f for f in os.listdir(temp_export_dir)
+            if f not in before and f.lower().endswith(".pdf")
+        ]
+        if not new_pdfs:
+            raise Exception(
+                "Revit's built-in PDF export reported success but created no PDF file.\n"
+                "Temp folder: {}".format(temp_export_dir)
+            )
+
+        exported = os.path.join(temp_export_dir, new_pdfs[0])
+        if not _is_valid_pdf_file(exported):
+            raise Exception(
+                "Revit's built-in PDF export produced an invalid PDF:\n{}".format(exported)
+            )
+
+        dest_folder = os.path.dirname(output_path)
+        if dest_folder and not os.path.isdir(dest_folder):
+            os.makedirs(dest_folder)
+        shutil.move(exported, output_path)
+        return True
+    finally:
+        shutil.rmtree(temp_export_dir, ignore_errors=True)
+
+
 def _print_sheet_to_pdf(current_doc, sheet, printer_name, output_path):
     if os.path.isfile(output_path):
         try:
@@ -472,6 +582,16 @@ def _print_sheet_to_pdf(current_doc, sheet, printer_name, output_path):
         except Exception:
             pass
 
+    # Try Revit's built-in PDF export (Revit 2022+, no external printer needed).
+    # Returns False only on pre-2022 Revit; raises with a clear message on any failure.
+    try:
+        if _try_native_pdf_export(current_doc, sheet, output_path):
+            return
+    except Exception as exc:
+        raise Exception("Failed to print '{}': {}".format(
+            _sheet_display(sheet.SheetNumber, sheet.Name), exc))
+
+    # Pre-2022 Revit only: fall back to virtual PDF printer
     last_error = None
     for _ in range(2):
         try:
