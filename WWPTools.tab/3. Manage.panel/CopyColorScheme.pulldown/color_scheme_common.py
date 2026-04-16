@@ -954,6 +954,7 @@ def build_payload_from_mapped_excel(path, mapping, target_snapshot):
     elementid_lookup = _elementid_entry_lookup(target_scheme) if storage_type == "ElementId" and target_scheme is not None else {}
 
     seen_values = set()
+    skipped_no_color_rows = []
     for row_idx in range(2, int(getattr(ws, "max_row", 0) or 0) + 1):
         value_cell = ws.cell(row=row_idx, column=value_index + 1)
         raw_value = value_cell.value
@@ -995,7 +996,8 @@ def build_payload_from_mapped_excel(path, mapping, target_snapshot):
             if rgb is None:
                 rgb = _parse_color_text(color_cell.value)
         if rgb is None:
-            raise Exception("No usable color was found for row {}.".format(row_idx))
+            skipped_no_color_rows.append(row_idx)
+            continue
 
         payload["entries"].append({
             "caption": caption,
@@ -1009,7 +1011,13 @@ def build_payload_from_mapped_excel(path, mapping, target_snapshot):
         })
 
     if not payload["entries"]:
-        raise Exception("No mapped rows with both value and color data were found.")
+        detail = ""
+        if skipped_no_color_rows:
+            preview = ", ".join([str(i) for i in skipped_no_color_rows[:10]])
+            if len(skipped_no_color_rows) > 10:
+                preview += ", ..."
+            detail = " Rows without usable colors: {}.".format(preview)
+        raise Exception("No mapped rows with both value and color data were found." + detail)
     return payload
 
 
