@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Sync WWPTools to ACCDocs",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"$src = 'c:\\Users\\ja8on\\AppData\\Roaming\\pyRevit\\Extensions\\WWPTools.extension'; $dest = 'E:\\Autodesk Docs\\ACCDocs\\SvN Architects + Planners\\SvN_BIM_WIP\\Project Files\\Library\\WWPTools\\WWPTools.extension'; robocopy $src $dest /MIR /Z /R:2 /W:2 /FFT /COPY:DAT /DCOPY:DAT /XJ /XD .git __pycache__ .pytest_cache .vs .vscode archive build dist /NFL /NDL /NP /TEE; $notesPath = Join-Path $src 'SUBCHANGELOG.md'; $accNotes = 'E:\\Autodesk Docs\\ACCDocs\\SvN Architects + Planners\\SvN_BIM_WIP\\Project Files\\Library\\WWPTools\\SUBCHANGELOG.md'; if (Test-Path $notesPath) { $notes = (Get-Content $notesPath -Raw).Trim(); if ($notes) { $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm'; Add-Content -Path $accNotes -Value (\"## $stamp`r`n$notes`r`n\"); } }"
+			],
+			"problemMatcher": [],
+			"group": "none"
+		}
+	]
+}
