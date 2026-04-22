@@ -17,8 +17,8 @@ import WWP_uiUtils as ui
 
 TITLE = "Update WWPTools"
 RELEASES_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest"
-TARGET_BRANCH = "pyrevit"
-TARGET_REMOTE_BRANCH = "origin/pyrevit"
+TARGET_BRANCH = "main"
+TARGET_REMOTE_BRANCH = "origin/main"
 
 
 def _extension_root():
@@ -161,7 +161,7 @@ def _open_latest_release():
 
 def _show_not_repo_message():
     open_release = ui.uiUtils_confirm(
-        "This installation is not a Git clone, so pyRevit can not update it with built-in Git.\n\n"
+        "This installation is not a Git clone, so WWPTools can not update it with built-in Git.\n\n"
         "Open the latest GitHub release instead?",
         TITLE,
     )
@@ -193,7 +193,7 @@ def _update_repo(repo_info, repo_root):
         "Remote: {}\n"
         "Current commit: {}\n"
         "Incoming commits: {}\n\n"
-        "Update now using pyRevit's built-in Git support?".format(
+        "Update now using Git support from this installed clone?".format(
             repo_info.branch,
             TARGET_REMOTE_BRANCH,
             repo_info.last_commit_hash[:7],
