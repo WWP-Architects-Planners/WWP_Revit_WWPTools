@@ -304,6 +304,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     source_list = window.FindName("SourceList")
     parameter_search_box = window.FindName("ParameterSearchBox")
     parameter_list = window.FindName("ParameterList")
+    selected_parameter_list = window.FindName("SelectedParameterList")
+    add_parameter_button = window.FindName("AddParameterButton")
+    remove_parameter_button = window.FindName("RemoveParameterButton")
+    move_parameter_up_button = window.FindName("MoveParameterUpButton")
+    move_parameter_down_button = window.FindName("MoveParameterDownButton")
     excel_path = window.FindName("ExcelPath")
     browse_excel = window.FindName("BrowseExcel")
     ok_button = window.FindName("OkButton")
@@ -316,7 +321,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     parameter_cache = {}
     selected_params_by_category = {}
     if initial_category_id not in (None, "") and initial_param_names:
-        selected_params_by_category[int(initial_category_id)] = set(initial_param_names)
+        selected_params_by_category[int(initial_category_id)] = list(initial_param_names)
 
     def _current_mode():
         try:
@@ -348,21 +353,38 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             parameter_cache[category_id] = get_parameter_names_for_category(doc, DB.ElementId(category_id))
         return parameter_cache[category_id]
 
+    def _get_selected_parameter_names(category_id):
+        if category_id is None:
+            return []
+        selected = selected_params_by_category.get(category_id)
+        if selected is None:
+            selected = []
+            selected_params_by_category[category_id] = selected
+        return selected
+
+    def _refresh_selected_parameter_list(category_id, preserve_selection=None):
+        selected_names = _get_selected_parameter_names(category_id)
+        selected_parameter_list.ItemsSource = _to_net_list(selected_names)
+        preserve = list(preserve_selection or [])
+        try:
+            selected_parameter_list.SelectedItems.Clear()
+            for item in selected_parameter_list.Items:
+                if str(item) in preserve:
+                    selected_parameter_list.SelectedItems.Add(item)
+        except Exception:
+            pass
+
     def _refresh_parameter_list():
         selected_item = source_list.SelectedItem
         category_id = _resolve_category_id(selected_item)
         all_names = _get_parameter_names(category_id)
+        selected_names = set(_get_selected_parameter_names(category_id))
         text = (parameter_search_box.Text or "").strip().lower()
-        filtered = all_names if not text else [name for name in all_names if text in name.lower()]
+        filtered = [name for name in all_names if name not in selected_names]
+        if text:
+            filtered = [name for name in filtered if text in name.lower()]
         parameter_list.ItemsSource = _to_net_list(filtered)
-        selected_names = selected_params_by_category.setdefault(category_id, set()) if category_id is not None else set()
-        try:
-            parameter_list.SelectedItems.Clear()
-            for item in parameter_list.Items:
-                if str(item) in selected_names:
-                    parameter_list.SelectedItems.Add(item)
-        except Exception:
-            pass
+        _refresh_selected_parameter_list(category_id)
 
     def _refresh_source_list():
         mode = _current_mode()
@@ -387,16 +409,57 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _source_selection_changed(_sender, _args):
         _refresh_parameter_list()
 
-    def _parameter_selection_changed(_sender, _args):
+    def _add_parameters(_sender=None, _args=None):
         selected_item = source_list.SelectedItem
         category_id = _resolve_category_id(selected_item)
         if category_id is None:
             return
-        selected_names = selected_params_by_category.setdefault(category_id, set())
-        visible_names = set(str(item) for item in parameter_list.Items)
-        selected_names.difference_update(visible_names)
+        selected_names = _get_selected_parameter_names(category_id)
         for item in parameter_list.SelectedItems:
-            selected_names.add(str(item))
+            name = str(item)
+            if name not in selected_names:
+                selected_names.append(name)
+        _refresh_parameter_list()
+
+    def _remove_parameters(_sender=None, _args=None):
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        if category_id is None:
+            return
+        selected_names = _get_selected_parameter_names(category_id)
+        removed = set(str(item) for item in selected_parameter_list.SelectedItems)
+        if not removed:
+            return
+        selected_params_by_category[category_id] = [name for name in selected_names if name not in removed]
+        _refresh_parameter_list()
+
+    def _move_selected_parameters(direction):
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        if category_id is None:
+            return
+        selected_names = _get_selected_parameter_names(category_id)
+        selected_now = [str(item) for item in selected_parameter_list.SelectedItems]
+        if not selected_now:
+            return
+        indices = [idx for idx, name in enumerate(selected_names) if name in selected_now]
+        if direction < 0:
+            for idx in indices:
+                if idx <= 0:
+                    continue
+                selected_names[idx - 1], selected_names[idx] = selected_names[idx], selected_names[idx - 1]
+        else:
+            for idx in reversed(indices):
+                if idx >= len(selected_names) - 1:
+                    continue
+                selected_names[idx + 1], selected_names[idx] = selected_names[idx], selected_names[idx + 1]
+        _refresh_selected_parameter_list(category_id, preserve_selection=selected_now)
+
+    def _move_up(_sender=None, _args=None):
+        _move_selected_parameters(-1)
+
+    def _move_down(_sender=None, _args=None):
+        _move_selected_parameters(1)
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
@@ -457,7 +520,10 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     source_search_box.TextChanged += lambda _sender, _args: _refresh_source_list()
     source_list.SelectionChanged += _source_selection_changed
     parameter_search_box.TextChanged += lambda _sender, _args: _refresh_parameter_list()
-    parameter_list.SelectionChanged += _parameter_selection_changed
+    add_parameter_button.Click += _add_parameters
+    remove_parameter_button.Click += _remove_parameters
+    move_parameter_up_button.Click += _move_up
+    move_parameter_down_button.Click += _move_down
     browse_excel.Click += _browse_excel
     ok_button.Click += _ok
     cancel_button.Click += _cancel
@@ -482,7 +548,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "source_id": source_id,
         "source_name": source_name,
         "category_id": category_id,
-        "selected_param_names": sorted(selected_params_by_category.get(category_id, set()), key=lambda item: item.lower()),
+        "selected_param_names": list(selected_params_by_category.get(category_id, [])),
         "excel_path": excel_path.Text or "",
     }
 
