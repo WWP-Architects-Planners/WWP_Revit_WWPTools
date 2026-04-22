@@ -9,6 +9,7 @@ import traceback
 
 import clr
 from System import String
+from System import Object
 from System.Collections.Generic import List
 from System.IO import File
 
@@ -274,6 +275,13 @@ def _to_net_list(values):
     return result
 
 
+def _to_net_object_list(values):
+    result = List[Object]()
+    for value in values:
+        result.Add(value)
+    return result
+
+
 def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -361,7 +369,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         items = _get_source_items()
         text = (source_search_box.Text or "").strip().lower()
         filtered = items if not text else [item for item in items if text in item.display_name.lower()]
-        source_list.ItemsSource = filtered
+        source_list.ItemsSource = _to_net_object_list(filtered)
         source_label.Text = "Search categories" if mode == MODE_BY_CATEGORY else "Search schedules"
         source_list_label.Text = "Categories" if mode == MODE_BY_CATEGORY else "Schedules"
         target_id = int(initial_source_id) if initial_source_id not in (None, "") else None
