@@ -123,11 +123,11 @@
                                         Margin="8,0"
                                         VerticalAlignment="Center">
                                 <Button Name="AddParameterButton"
-                                        Content="Add →"
+                                        Content="Add >"
                                         Margin="0,0,0,8"
                                         Style="{StaticResource SecondaryButtonStyle}"/>
                                 <Button Name="RemoveParameterButton"
-                                        Content="← Remove"
+                                        Content="< Remove"
                                         Margin="0,0,0,20"
                                         Style="{StaticResource SecondaryButtonStyle}"/>
                                 <Button Name="MoveParameterUpButton"

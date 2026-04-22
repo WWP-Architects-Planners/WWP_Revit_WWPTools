@@ -12,6 +12,8 @@ from System import String
 from System import Object
 from System.Collections.Generic import List
 from System.IO import File
+from System.Windows.Media import Brushes
+from System.Windows.Controls import ListBoxItem
 
 from pyrevit import DB
 from WWP_settings import get_tool_settings
@@ -227,14 +229,32 @@ def iter_parameter_names(element):
             yield name
 
 
-def get_parameter_names_for_category(doc, category_id, sample_limit=400):
-    names = set()
+def _iter_element_parameters(element):
+    if element is None:
+        return
+    for param in getattr(element, "Parameters", []):
+        try:
+            definition = param.Definition
+            name = definition.Name if definition else None
+        except Exception:
+            name = None
+        if name:
+            yield name, param
+
+
+def get_parameter_options_for_category(doc, category_id, sample_limit=400):
+    options = {}
     seen_types = set()
     for index, element in enumerate(get_elements_by_category(doc, category_id)):
         if index >= sample_limit:
             break
-        for name in iter_parameter_names(element):
-            names.add(name)
+        for name, param in _iter_element_parameters(element):
+            record = options.setdefault(name, {"name": name, "editable": False})
+            try:
+                if param is not None and not param.IsReadOnly:
+                    record["editable"] = True
+            except Exception:
+                pass
         elem_type = get_element_type(doc, element)
         if elem_type is None:
             continue
@@ -242,9 +262,16 @@ def get_parameter_names_for_category(doc, category_id, sample_limit=400):
         if type_id in seen_types:
             continue
         seen_types.add(type_id)
-        for name in iter_parameter_names(elem_type):
-            names.add(name)
-    return sorted(names, key=lambda item: item.lower())
+        for name, param in _iter_element_parameters(elem_type):
+            record = options.setdefault(name, {"name": name, "editable": False})
+            try:
+                if param is not None and not param.IsReadOnly:
+                    record["editable"] = True
+            except Exception:
+                pass
+    result = list(options.values())
+    result.sort(key=lambda item: item["name"].lower())
+    return result
 
 
 class ScheduleItem(object):
@@ -280,6 +307,34 @@ def _to_net_object_list(values):
     for value in values:
         result.Add(value)
     return result
+
+
+def _parameter_label(option):
+    if option.get("editable", False):
+        return option.get("name", "")
+    return "{} (read-only)".format(option.get("name", ""))
+
+
+def _make_parameter_list_item(option):
+    item = ListBoxItem()
+    item.Content = _parameter_label(option)
+    item.Tag = option
+    if not option.get("editable", False):
+        item.Foreground = Brushes.Gray
+        item.ToolTip = "This parameter is read-only in the sampled category elements/types."
+    return item
+
+
+def _get_parameter_name_from_item(item):
+    if item is None:
+        return ""
+    try:
+        tag = item.Tag
+    except Exception:
+        tag = None
+    if isinstance(tag, dict):
+        return tag.get("name", "")
+    return str(item)
 
 
 def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names):
@@ -350,7 +405,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if category_id is None:
             return []
         if category_id not in parameter_cache:
-            parameter_cache[category_id] = get_parameter_names_for_category(doc, DB.ElementId(category_id))
+            parameter_cache[category_id] = get_parameter_options_for_category(doc, DB.ElementId(category_id))
         return parameter_cache[category_id]
 
     def _get_selected_parameter_names(category_id):
@@ -364,12 +419,16 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
 
     def _refresh_selected_parameter_list(category_id, preserve_selection=None):
         selected_names = _get_selected_parameter_names(category_id)
-        selected_parameter_list.ItemsSource = _to_net_list(selected_names)
+        selected_parameter_list.Items.Clear()
+        option_map = dict((option["name"], option) for option in _get_parameter_names(category_id))
+        for name in selected_names:
+            option = option_map.get(name, {"name": name, "editable": True})
+            selected_parameter_list.Items.Add(_make_parameter_list_item(option))
         preserve = list(preserve_selection or [])
         try:
             selected_parameter_list.SelectedItems.Clear()
             for item in selected_parameter_list.Items:
-                if str(item) in preserve:
+                if _get_parameter_name_from_item(item) in preserve:
                     selected_parameter_list.SelectedItems.Add(item)
         except Exception:
             pass
@@ -377,13 +436,15 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     def _refresh_parameter_list():
         selected_item = source_list.SelectedItem
         category_id = _resolve_category_id(selected_item)
-        all_names = _get_parameter_names(category_id)
+        all_options = _get_parameter_names(category_id)
         selected_names = set(_get_selected_parameter_names(category_id))
         text = (parameter_search_box.Text or "").strip().lower()
-        filtered = [name for name in all_names if name not in selected_names]
+        filtered = [option for option in all_options if option["name"] not in selected_names]
         if text:
-            filtered = [name for name in filtered if text in name.lower()]
-        parameter_list.ItemsSource = _to_net_list(filtered)
+            filtered = [option for option in filtered if text in option["name"].lower()]
+        parameter_list.Items.Clear()
+        for option in filtered:
+            parameter_list.Items.Add(_make_parameter_list_item(option))
         _refresh_selected_parameter_list(category_id)
 
     def _refresh_source_list():
@@ -416,7 +477,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             return
         selected_names = _get_selected_parameter_names(category_id)
         for item in parameter_list.SelectedItems:
-            name = str(item)
+            name = _get_parameter_name_from_item(item)
             if name not in selected_names:
                 selected_names.append(name)
         _refresh_parameter_list()
@@ -427,7 +488,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if category_id is None:
             return
         selected_names = _get_selected_parameter_names(category_id)
-        removed = set(str(item) for item in selected_parameter_list.SelectedItems)
+        removed = set(_get_parameter_name_from_item(item) for item in selected_parameter_list.SelectedItems)
         if not removed:
             return
         selected_params_by_category[category_id] = [name for name in selected_names if name not in removed]
@@ -439,7 +500,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if category_id is None:
             return
         selected_names = _get_selected_parameter_names(category_id)
-        selected_now = [str(item) for item in selected_parameter_list.SelectedItems]
+        selected_now = [_get_parameter_name_from_item(item) for item in selected_parameter_list.SelectedItems]
         if not selected_now:
             return
         indices = [idx for idx, name in enumerate(selected_names) if name in selected_now]
