@@ -18,9 +18,14 @@ from WWP_versioning import apply_window_title
 
 
 CONFIG_LAST_EXCEL_PATH = "last_excel_path"
-CONFIG_LAST_SCHEDULE_IDS = "last_schedule_ids"
+CONFIG_LAST_MODE = "last_mode"
+CONFIG_LAST_SCHEDULE_ID = "last_schedule_id"
+CONFIG_LAST_CATEGORY_ID = "last_category_id"
+CONFIG_LAST_PARAM_NAMES = "last_param_names"
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
+MODE_FROM_SCHEDULE = "schedule"
+MODE_BY_CATEGORY = "category"
 
 
 
@@ -154,10 +159,112 @@ def collect_schedules(doc):
     return schedules
 
 
+def collect_category_records(doc):
+    records = {}
+    collector = DB.FilteredElementCollector(doc).WhereElementIsNotElementType()
+    for element in collector:
+        try:
+            category = element.Category
+        except Exception:
+            category = None
+        if category is None:
+            continue
+        name = (category.Name or "").strip()
+        if not name:
+            continue
+        category_id = element_id_value(category.Id)
+        if category_id == -1:
+            continue
+        record = records.get(category_id)
+        if record is None:
+            record = {
+                "id": category.Id,
+                "id_value": category_id,
+                "name": name,
+                "count": 0,
+            }
+            records[category_id] = record
+        record["count"] += 1
+    result = list(records.values())
+    result.sort(key=lambda item: item["name"].lower())
+    return result
+
+
+def get_elements_by_category(doc, category_id):
+    try:
+        collector = (
+            DB.FilteredElementCollector(doc)
+            .WherePasses(DB.ElementCategoryFilter(category_id))
+            .WhereElementIsNotElementType()
+        )
+        elements = list(collector.ToElements())
+    except Exception:
+        elements = []
+    return [elem for elem in elements if elem is not None]
+
+
+def get_schedule_category_id(schedule):
+    try:
+        category_id = schedule.Definition.CategoryId
+    except Exception:
+        category_id = None
+    if category_id is None or element_id_value(category_id) == -1:
+        return None
+    return category_id
+
+
+def iter_parameter_names(element):
+    if element is None:
+        return
+    for param in getattr(element, "Parameters", []):
+        try:
+            definition = param.Definition
+            name = definition.Name if definition else None
+        except Exception:
+            name = None
+        if name:
+            yield name
+
+
+def get_parameter_names_for_category(doc, category_id, sample_limit=400):
+    names = set()
+    seen_types = set()
+    for index, element in enumerate(get_elements_by_category(doc, category_id)):
+        if index >= sample_limit:
+            break
+        for name in iter_parameter_names(element):
+            names.add(name)
+        elem_type = get_element_type(doc, element)
+        if elem_type is None:
+            continue
+        type_id = element_id_value(elem_type.Id)
+        if type_id in seen_types:
+            continue
+        seen_types.add(type_id)
+        for name in iter_parameter_names(elem_type):
+            names.add(name)
+    return sorted(names, key=lambda item: item.lower())
+
+
 class ScheduleItem(object):
     def __init__(self, view):
         self.view = view
-        self.display_name = "{} [id:{}]".format(view.Name, element_id_value(view.Id)).replace("_", "__")
+        self.id_value = element_id_value(view.Id)
+        self.category_id = get_schedule_category_id(view)
+        self.display_name = "{} [id:{}]".format(view.Name, self.id_value).replace("_", "__")
+
+    def __str__(self):
+        return self.display_name
+
+
+class CategoryItem(object):
+    def __init__(self, record):
+        self.record = record
+        self.id_value = record["id_value"]
+        self.display_name = "{} ({})".format(record["name"], record["count"]).replace("_", "__")
+
+    def __str__(self):
+        return self.display_name
 
 
 def _to_net_list(values):
@@ -167,7 +274,7 @@ def _to_net_list(values):
     return result
 
 
-def show_export_form(ui, items, prechecked_indices, init_excel_path):
+def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
@@ -182,49 +289,117 @@ def show_export_form(ui, items, prechecked_indices, init_excel_path):
     window = XamlReader.Load(reader)
     apply_window_title(window, "Export2Ex Beta")
 
-    search_box = window.FindName("SearchBox")
-    schedule_list = window.FindName("ScheduleList")
+    mode_box = window.FindName("ModeBox")
+    source_search_box = window.FindName("SourceSearchBox")
+    source_label = window.FindName("SourceLabel")
+    source_list_label = window.FindName("SourceListLabel")
+    source_list = window.FindName("SourceList")
+    parameter_search_box = window.FindName("ParameterSearchBox")
+    parameter_list = window.FindName("ParameterList")
     excel_path = window.FindName("ExcelPath")
     browse_excel = window.FindName("BrowseExcel")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
 
-    schedule_list.ItemsSource = _to_net_list(items)
     excel_path.Text = init_excel_path or ""
+    schedule_items = schedules or []
+    category_items = categories or []
+    parameter_cache = {}
+    selected_params_by_category = {}
+    if initial_category_id not in (None, "") and initial_param_names:
+        selected_params_by_category[int(initial_category_id)] = set(initial_param_names)
 
-    selected_names = set()
-    for idx in prechecked_indices or []:
-        if 0 <= idx < len(items):
-            selected_names.add(items[idx])
+    def _current_mode():
+        try:
+            return MODE_BY_CATEGORY if mode_box.SelectedIndex == 1 else MODE_FROM_SCHEDULE
+        except Exception:
+            return MODE_FROM_SCHEDULE
 
-    def _apply_selection():
-        schedule_list.SelectedItems.Clear()
-        for item in schedule_list.Items:
-            if str(item) in selected_names:
-                schedule_list.SelectedItems.Add(item)
+    if initial_mode == MODE_BY_CATEGORY:
+        mode_box.SelectedIndex = 1
+    else:
+        mode_box.SelectedIndex = 0
 
-    def _filter_list(_sender=None, _args=None):
-        text = (search_box.Text or "").strip().lower()
-        filtered = items if not text else [item for item in items if text in item.lower()]
-        schedule_list.ItemsSource = _to_net_list(filtered)
-        _apply_selection()
+    def _get_source_items():
+        return category_items if _current_mode() == MODE_BY_CATEGORY else schedule_items
 
-    def _selection_changed(_sender, _args):
-        selected_names.clear()
-        for item in schedule_list.SelectedItems:
+    def _resolve_category_id(item):
+        if item is None:
+            return None
+        if _current_mode() == MODE_BY_CATEGORY:
+            return item.id_value
+        if item.category_id is None:
+            return None
+        return element_id_value(item.category_id)
+
+    def _get_parameter_names(category_id):
+        if category_id is None:
+            return []
+        if category_id not in parameter_cache:
+            parameter_cache[category_id] = get_parameter_names_for_category(doc, DB.ElementId(category_id))
+        return parameter_cache[category_id]
+
+    def _refresh_parameter_list():
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        all_names = _get_parameter_names(category_id)
+        text = (parameter_search_box.Text or "").strip().lower()
+        filtered = all_names if not text else [name for name in all_names if text in name.lower()]
+        parameter_list.ItemsSource = _to_net_list(filtered)
+        selected_names = selected_params_by_category.setdefault(category_id, set()) if category_id is not None else set()
+        try:
+            parameter_list.SelectedItems.Clear()
+            for item in parameter_list.Items:
+                if str(item) in selected_names:
+                    parameter_list.SelectedItems.Add(item)
+        except Exception:
+            pass
+
+    def _refresh_source_list():
+        mode = _current_mode()
+        items = _get_source_items()
+        text = (source_search_box.Text or "").strip().lower()
+        filtered = items if not text else [item for item in items if text in item.display_name.lower()]
+        source_list.ItemsSource = filtered
+        source_label.Text = "Search categories" if mode == MODE_BY_CATEGORY else "Search schedules"
+        source_list_label.Text = "Categories" if mode == MODE_BY_CATEGORY else "Schedules"
+        target_id = int(initial_source_id) if initial_source_id not in (None, "") else None
+        selected = None
+        for item in filtered:
+            item_id = item.id_value if mode == MODE_BY_CATEGORY else item.id_value
+            if target_id is not None and item_id == target_id:
+                selected = item
+                break
+        if selected is None and filtered:
+            selected = filtered[0]
+        source_list.SelectedItem = selected
+        _refresh_parameter_list()
+
+    def _source_selection_changed(_sender, _args):
+        _refresh_parameter_list()
+
+    def _parameter_selection_changed(_sender, _args):
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        if category_id is None:
+            return
+        selected_names = selected_params_by_category.setdefault(category_id, set())
+        visible_names = set(str(item) for item in parameter_list.Items)
+        selected_names.difference_update(visible_names)
+        for item in parameter_list.SelectedItems:
             selected_names.add(str(item))
 
     def _browse_excel(_sender, _args):
         current = excel_path.Text or ""
-        file_name = os.path.basename(current) if current else "Schedules.xlsx"
+        file_name = os.path.basename(current) if current else "CategoryExport.xlsx"
         initial_directory = ensure_existing_dir(
             os.path.dirname(current) if current else "",
             os.path.dirname(init_excel_path) if init_excel_path else get_default_dir(get_active_doc()),
         )
         try:
             file_path = ui.uiUtils_save_file_dialog(
-                title="Export Schedules to Excel",
+                title="Export Category Data to Excel",
                 filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                 default_extension="xlsx",
                 initial_directory=initial_directory,
@@ -234,7 +409,7 @@ def show_export_form(ui, items, prechecked_indices, init_excel_path):
             log_exception("Browse Excel dialog failed", exc)
             try:
                 file_path = ui.uiUtils_save_file_dialog(
-                    title="Export Schedules to Excel",
+                    title="Export Category Data to Excel",
                     filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                     default_extension="xlsx",
                     initial_directory="",
@@ -270,18 +445,36 @@ def show_export_form(ui, items, prechecked_indices, init_excel_path):
     except Exception:
         pass
 
-    search_box.TextChanged += _filter_list
-    schedule_list.SelectionChanged += _selection_changed
+    mode_box.SelectionChanged += lambda _sender, _args: _refresh_source_list()
+    source_search_box.TextChanged += lambda _sender, _args: _refresh_source_list()
+    source_list.SelectionChanged += _source_selection_changed
+    parameter_search_box.TextChanged += lambda _sender, _args: _refresh_parameter_list()
+    parameter_list.SelectionChanged += _parameter_selection_changed
     browse_excel.Click += _browse_excel
     ok_button.Click += _ok
     cancel_button.Click += _cancel
-    _apply_selection()
+    _refresh_source_list()
 
     if not window.ShowDialog():
         return None
 
+    selected_item = source_list.SelectedItem
+    category_id = _resolve_category_id(selected_item)
+    source_id = None
+    source_name = ""
+    if selected_item is not None:
+        if _current_mode() == MODE_BY_CATEGORY:
+            source_id = selected_item.id_value
+            source_name = selected_item.record["name"]
+        else:
+            source_id = selected_item.id_value
+            source_name = selected_item.view.Name
     return {
-        "selected_indices": [idx for idx, item in enumerate(items) if item in selected_names],
+        "mode": _current_mode(),
+        "source_id": source_id,
+        "source_name": source_name,
+        "category_id": category_id,
+        "selected_param_names": sorted(selected_params_by_category.get(category_id, set()), key=lambda item: item.lower()),
         "excel_path": excel_path.Text or "",
     }
 
@@ -469,6 +662,79 @@ def parameter_to_text(doc, param):
     except Exception:
         pass
     return ""
+
+
+def get_parameter_by_name(doc, element, param_name):
+    if element is None or not param_name:
+        return None
+    try:
+        param = element.LookupParameter(param_name)
+    except Exception:
+        param = None
+    if param:
+        return param
+    elem_type = get_element_type(doc, element)
+    if elem_type is None:
+        return None
+    try:
+        return elem_type.LookupParameter(param_name)
+    except Exception:
+        return None
+
+
+def parameter_to_export_value(doc, param):
+    if not param:
+        return ""
+    try:
+        storage = param.StorageType
+    except Exception:
+        storage = None
+    try:
+        if storage == DB.StorageType.String:
+            return param.AsString() or ""
+        if storage == DB.StorageType.Double:
+            return param.AsDouble()
+        if storage == DB.StorageType.Integer:
+            value_string = param.AsValueString()
+            if value_string not in (None, "") and value_string not in ("0", "1"):
+                return value_string
+            return param.AsInteger()
+        if storage == DB.StorageType.ElementId:
+            ref_id = param.AsElementId()
+            ref_value = element_id_value(ref_id)
+            if ref_value == -1:
+                return ""
+            ref_elem = doc.GetElement(ref_id)
+            if ref_elem is not None:
+                try:
+                    name = getattr(ref_elem, "Name", None)
+                    if name:
+                        return name
+                except Exception:
+                    pass
+            return str(ref_value)
+    except Exception:
+        pass
+    try:
+        value = param.AsValueString()
+        if value not in (None, ""):
+            return value
+    except Exception:
+        pass
+    return ""
+
+
+def build_category_export_rows(doc, category_id, param_names):
+    elements = get_elements_by_category(doc, category_id)
+    elements.sort(key=lambda item: element_id_value(item.Id))
+    headers = ["Id"] + list(param_names or [])
+    rows = []
+    for element in elements:
+        row = [element_id_value(element.Id)]
+        for param_name in param_names or []:
+            row.append(parameter_to_export_value(doc, get_parameter_by_name(doc, element, param_name)))
+        rows.append(row)
+    return headers, rows, len(elements)
 
 
 def build_schedule_body_rows(schedule):
@@ -682,7 +948,7 @@ def make_unique_name(base, used):
         idx += 1
 
 
-def export_to_excel(doc, schedules, file_path, ui):
+def export_to_excel(doc, category_name, category_id, param_names, file_path, ui):
     add_lib_path()
     try:
         import openpyxl
@@ -699,36 +965,33 @@ def export_to_excel(doc, schedules, file_path, ui):
     else:
         workbook = openpyxl.Workbook()
 
-    used_sheet_names = set()
-    for schedule in schedules:
-        log_message("Exporting schedule '{}' ({})".format(schedule.Name, element_id_value(schedule.Id)))
-        base_name = sanitize_sheet_name(schedule.Name)
-        sheet_name = make_unique_name(base_name, used_sheet_names)
-        if sheet_name in workbook.sheetnames:
-            existing = workbook[sheet_name]
-            sheet_index = workbook.worksheets.index(existing)
-            workbook.remove(existing)
-            sheet = workbook.create_sheet(title=sheet_name, index=sheet_index)
-        else:
-            sheet = workbook.create_sheet(title=sheet_name)
+    base_name = sanitize_sheet_name(category_name)
+    sheet_name = base_name
+    if sheet_name in workbook.sheetnames:
+        existing = workbook[sheet_name]
+        sheet_index = workbook.worksheets.index(existing)
+        workbook.remove(existing)
+        sheet = workbook.create_sheet(title=sheet_name, index=sheet_index)
+    else:
+        sheet = workbook.create_sheet(title=sheet_name)
 
-        headers, rows, elem_count = build_schedule_export_rows(doc, schedule)
-        log_message(
-            "Schedule '{}' resolved {} elements and {} visible fields".format(
-                schedule.Name, elem_count, len(headers)
-            )
+    headers, rows, elem_count = build_category_export_rows(doc, category_id, param_names)
+    log_message(
+        "Category '{}' resolved {} elements and {} export columns".format(
+            category_name, elem_count, len(headers)
         )
+    )
 
-        for col_index, header in enumerate(headers, start=1):
-            cell = sheet.cell(row=1, column=col_index, value=header)
-            cell.font = Font(bold=True)
-        for row_index, row in enumerate(rows, start=2):
-            for col_index, value in enumerate(row, start=1):
-                sheet.cell(row=row_index, column=col_index, value="" if value is None else str(value))
+    for col_index, header in enumerate(headers, start=1):
+        cell = sheet.cell(row=1, column=col_index, value=header)
+        cell.font = Font(bold=True)
+    for row_index, row in enumerate(rows, start=2):
+        for col_index, value in enumerate(row, start=1):
+            sheet.cell(row=row_index, column=col_index, value=value)
 
-        if headers:
-            sheet.freeze_panes = "A2"
-        auto_fit_columns(sheet)
+    if headers:
+        sheet.freeze_panes = "A2"
+    auto_fit_columns(sheet)
 
     if "Sheet" in workbook.sheetnames and len(workbook.sheetnames) > 1:
         workbook.remove(workbook["Sheet"])
@@ -753,38 +1016,46 @@ def main():
         ui.uiUtils_alert("No active Revit document found.", title="Export2Ex Beta")
         return
 
-    schedules = collect_schedules(doc)
-    if not schedules:
-        ui.uiUtils_alert("No schedules found.", title="Export2Ex Beta")
+    schedules = [ScheduleItem(view) for view in collect_schedules(doc)]
+    categories = [CategoryItem(record) for record in collect_category_records(doc)]
+    if not schedules and not categories:
+        ui.uiUtils_alert("No schedules or categories with elements were found.", title="Export2Ex Beta")
         return
 
     config, save_config = get_config_and_saver()
-    items = [ScheduleItem(view) for view in schedules]
-    last_ids = config_get(config, CONFIG_LAST_SCHEDULE_IDS, [])
-    try:
-        prechecked_ids = set(int(value) for value in last_ids)
-    except Exception:
-        prechecked_ids = set()
-    prechecked_indices = [
-        idx for idx, item in enumerate(items)
-        if element_id_value(item.view.Id) in prechecked_ids
-    ]
-
     default_dir = get_default_dir(doc)
     last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
-    init_excel_path = last_excel_path or os.path.join(default_dir, "Schedules.xlsx")
+    init_excel_path = last_excel_path or os.path.join(default_dir, "CategoryExport.xlsx")
+    last_mode = config_get(config, CONFIG_LAST_MODE, MODE_FROM_SCHEDULE) or MODE_FROM_SCHEDULE
+    last_source_id = config_get(
+        config,
+        CONFIG_LAST_CATEGORY_ID if last_mode == MODE_BY_CATEGORY else CONFIG_LAST_SCHEDULE_ID,
+        None,
+    )
+    last_category_id = config_get(config, CONFIG_LAST_CATEGORY_ID, None)
+    last_param_names = config_get(config, CONFIG_LAST_PARAM_NAMES, []) or []
     result = show_export_form(
         ui,
-        [item.display_name for item in items],
-        prechecked_indices,
+        doc,
+        schedules,
+        categories,
         init_excel_path,
+        last_mode,
+        last_source_id,
+        last_category_id,
+        last_param_names,
     )
     if not result:
         return
 
-    selected_indices = result.get("selected_indices") or []
-    if not selected_indices:
-        ui.uiUtils_alert("Select at least one schedule.", title="Export2Ex Beta")
+    category_id_value = result.get("category_id")
+    if category_id_value in (None, -1):
+        ui.uiUtils_alert("Select a schedule or category with a valid category.", title="Export2Ex Beta")
+        return
+
+    selected_param_names = result.get("selected_param_names") or []
+    if not selected_param_names:
+        ui.uiUtils_alert("Select at least one parameter to export.", title="Export2Ex Beta")
         return
 
     file_path = normalize_excel_output_path(result.get("excel_path"))
@@ -795,11 +1066,20 @@ def main():
         )
         return
 
-    selected_views = [items[idx].view for idx in selected_indices]
-    if not export_to_excel(doc, selected_views, file_path, ui):
+    category_record = None
+    for item in categories:
+        if item.id_value == int(category_id_value):
+            category_record = item.record
+            break
+    category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
+
+    if not export_to_excel(doc, category_name, DB.ElementId(int(category_id_value)), selected_param_names, file_path, ui):
         return
 
-    config.last_schedule_ids = [element_id_value(view.Id) for view in selected_views]
+    config.last_mode = result.get("mode") or MODE_FROM_SCHEDULE
+    config.last_schedule_id = result.get("source_id") if config.last_mode == MODE_FROM_SCHEDULE else None
+    config.last_category_id = int(category_id_value)
+    config.last_param_names = list(selected_param_names)
     config.last_excel_path = file_path
     save_config()
 

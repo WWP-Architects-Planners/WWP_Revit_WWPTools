@@ -51,20 +51,59 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                    <TextBlock Text="Search schedules"
+                    <TextBlock Text="Source mode"
                                Margin="0,0,0,6"
                                Foreground="#6B7280"
                                FontWeight="SemiBold"/>
-                    <TextBox Name="SearchBox"/>
+                    <ComboBox Name="ModeBox" SelectedIndex="0">
+                        <ComboBoxItem Content="From Schedule"/>
+                        <ComboBoxItem Content="By Category"/>
+                    </ComboBox>
                 </StackPanel>
                 <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="16"/>
-                        <ColumnDefinition Width="330"/>
+                        <ColumnDefinition Width="360"/>
                     </Grid.ColumnDefinitions>
-                    <ListBox Name="ScheduleList" Grid.Column="0" SelectionMode="Extended"/>
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Name="SourceLabel"
+                                   Text="Search schedules"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <TextBox Name="SourceSearchBox" Grid.Row="1" Margin="0,0,0,8"/>
+                        <TextBlock Name="SourceListLabel"
+                                   Grid.Row="2"
+                                   Text="Schedules"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Top"/>
+                        <ListBox Name="SourceList"
+                                 Grid.Row="3"
+                                 SelectionMode="Single"/>
+                    </Grid>
                     <StackPanel Grid.Column="2">
+                        <TextBlock Text="Search parameters"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <TextBox Name="ParameterSearchBox" Margin="0,0,0,8"/>
+                        <TextBlock Text="Parameters to export"
+                                   Margin="0,0,0,6"
+                                   Foreground="#6B7280"
+                                   FontWeight="SemiBold"/>
+                        <ListBox Name="ParameterList"
+                                 Height="300"
+                                 Margin="0,0,0,12"
+                                 SelectionMode="Extended"/>
                         <TextBlock Text="Excel output"
                                    Margin="0,0,0,6"
                                    Foreground="#6B7280"
@@ -88,7 +127,7 @@
                                            Margin="0,0,0,8"/>
                                 <TextBlock TextWrapping="Wrap"
                                            Foreground="#475569"
-                                           Text="Exports to Excel only. Each selected schedule becomes its own worksheet. The exporter resolves the elements from the schedule view, uses the schedule's visible field order, and keeps renamed column headings."/>
+                                           Text="The exporter resolves the category either from the chosen schedule or directly from the chosen category. It then exports real model elements, writes Id as the first column, and adds the selected type/instance/shared/project parameters after it."/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
