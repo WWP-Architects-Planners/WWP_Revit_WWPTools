@@ -32,10 +32,10 @@ MODE_BY_CATEGORY = "category"
 EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Export2Ex Beta"
-        Height="760"
-        Width="1080"
-        MinHeight="700"
-        MinWidth="980"
+        Height="820"
+        Width="1100"
+        MinHeight="640"
+        MinWidth="900"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
@@ -60,17 +60,14 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,7"/>
-            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="MinHeight" Value="28"/>
         </Style>
         <Style TargetType="ListBox">
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="4"/>
-        </Style>
-        <Style TargetType="Border">
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="2"/>
         </Style>
     </Window.Resources>
     <Grid Margin="16">
@@ -80,123 +77,145 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 Padding="20">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                    <TextBlock Text="Source mode"
-                               Margin="0,0,0,6"
-                               Foreground="#6B7280"
-                               FontWeight="SemiBold"/>
-                    <ComboBox Name="ModeBox" SelectedIndex="0" Width="220" HorizontalAlignment="Left">
-                        <ComboBoxItem Content="From Schedule"/>
-                        <ComboBoxItem Content="By Category"/>
-                    </ComboBox>
-                </StackPanel>
-                <Border Grid.Row="1"
-                        Background="#F8FAFC"
-                        BorderBrush="#E2E8F0"
-                        BorderThickness="1"
-                        Padding="14"
-                        Margin="0,0,0,14">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="360"/>
-                            <ColumnDefinition Width="16"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Name="SourceLabel"
-                                       Text="Search schedules"
-                                       Margin="0,0,0,6"
-                                       Foreground="#6B7280"
-                                       FontWeight="SemiBold"/>
-                            <TextBox Name="SourceSearchBox" Margin="0,0,0,8"/>
-                            <TextBlock Name="SourceListLabel"
-                                       Text="Schedules"
-                                       Margin="0,0,0,6"
-                                       Foreground="#6B7280"
-                                       FontWeight="SemiBold"/>
-                            <ListBox Name="SourceList"
-                                     Height="170"
-                                     SelectionMode="Single"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Beta behavior"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,8"/>
-                            <TextBlock TextWrapping="Wrap"
-                                       Foreground="#475569"
-                                       Margin="0,0,0,8"
-                                       Text="Pick one schedule or category first. The exporter resolves the category, then writes real model elements to Excel with Id as the first column."/>
-                            <TextBlock TextWrapping="Wrap"
-                                       Foreground="#475569"
-                                       Text="Use the parameter lists below to choose exactly which instance, type, shared, or project parameters should be exported."/>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-                <Grid Grid.Row="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Search parameters"
-                               Margin="0,0,0,6"
-                               Foreground="#6B7280"
-                               FontWeight="SemiBold"/>
-                    <TextBox Name="ParameterSearchBox" Grid.Row="0" Margin="160,0,0,8"/>
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="90"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+
+                <!-- Main 3-column area -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340"/>
+                        <ColumnDefinition Width="130"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- LEFT: Available properties (stretches) + source selector at bottom -->
+                    <Grid Grid.Column="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Available parameters"
-                                   Margin="0,0,0,6"
-                                   Foreground="#6B7280"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="2"
-                                   Text="Selected export order"
-                                   Margin="0,0,0,6"
-                                   Foreground="#6B7280"
-                                   FontWeight="SemiBold"/>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="Available properties:"
+                                   Foreground="#374151"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
                         <ListBox Name="ParameterList"
                                  Grid.Row="1"
-                                 SelectionMode="Extended"/>
-                        <StackPanel Grid.Column="1"
-                                    Grid.Row="1"
-                                    Margin="10,24,10,0"
-                                    VerticalAlignment="Top">
-                            <Button Name="AddParameterButton"
-                                    Content="Add >"
-                                    Margin="0,0,0,8"
-                                    Style="{StaticResource SecondaryButtonStyle}"/>
-                            <Button Name="RemoveParameterButton"
-                                    Content="&lt; Remove"
-                                    Margin="0,0,0,20"
-                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                                 SelectionMode="Extended"
+                                 MinHeight="80"/>
+
+                        <Border Grid.Row="2"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="0,1,0,0"
+                                Margin="0,10,0,0"
+                                Padding="0,8,0,0">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="Select from:"
+                                               Foreground="#6B7280"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0"/>
+                                    <ComboBox Name="ModeBox" SelectedIndex="0">
+                                        <ComboBoxItem Content="From Schedule"/>
+                                        <ComboBoxItem Content="By Category"/>
+                                    </ComboBox>
+                                </DockPanel>
+                                <TextBlock Name="SourceLabel"
+                                           Text="Search schedules:"
+                                           Foreground="#6B7280"
+                                           FontSize="12"
+                                           Margin="0,0,0,2"/>
+                                <TextBox Name="SourceSearchBox" Margin="0,0,0,4"/>
+                                <TextBlock Name="SourceListLabel"
+                                           Text="Schedules"
+                                           Foreground="#6B7280"
+                                           FontSize="12"
+                                           Margin="0,0,0,2"/>
+                                <ListBox Name="SourceList"
+                                         Height="140"
+                                         SelectionMode="Single"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- MIDDLE: Add/Remove + Display filters + Search -->
+                    <StackPanel Grid.Column="1"
+                                Margin="10,28,10,0"
+                                VerticalAlignment="Top">
+                        <Button Name="AddParameterButton"
+                                Content="Add -->"
+                                Margin="0,0,0,6"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+                        <Button Name="RemoveParameterButton"
+                                Content="&lt;-- Remove"
+                                Style="{StaticResource SecondaryButtonStyle}"/>
+
+                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,14,0,10"/>
+
+                        <TextBlock Text="Display filters"
+                                   Foreground="#6B7280"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+                        <CheckBox Name="ShowReadOnlyFilter"
+                                  Content="Read-only"
+                                  IsChecked="True"
+                                  FontSize="12"
+                                  Foreground="#374151"/>
+
+                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,12,0,10"/>
+
+                        <TextBlock Text="Search:"
+                                   Foreground="#6B7280"
+                                   FontSize="12"
+                                   Margin="0,0,0,4"/>
+                        <TextBox Name="ParameterSearchBox"/>
+                    </StackPanel>
+
+                    <!-- RIGHT: Linked properties (stretches) + Move buttons at bottom -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="Linked properties:"
+                                   Foreground="#374151"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,4"/>
+
+                        <ListBox Name="SelectedParameterList"
+                                 Grid.Row="1"
+                                 SelectionMode="Extended"
+                                 MinHeight="80"/>
+
+                        <StackPanel Grid.Row="2"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0">
                             <Button Name="MoveParameterUpButton"
                                     Content="Move Up"
-                                    Margin="0,0,0,8"
+                                    Width="110"
                                     Style="{StaticResource SecondaryButtonStyle}"/>
                             <Button Name="MoveParameterDownButton"
                                     Content="Move Down"
+                                    Width="110"
+                                    Margin="8,0,0,0"
                                     Style="{StaticResource SecondaryButtonStyle}"/>
                         </StackPanel>
-                        <ListBox Name="SelectedParameterList"
-                                 Grid.Column="2"
-                                 Grid.Row="1"
-                                 SelectionMode="Extended"/>
                     </Grid>
                 </Grid>
-                <Grid Grid.Row="3" Margin="0,14,0,0">
+
+                <!-- Excel path + Browse -->
+                <Grid Grid.Row="1" Margin="0,14,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="90"/>
@@ -207,7 +226,9 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                             Content="Browse"
                             Style="{StaticResource SecondaryButtonStyle}"/>
                 </Grid>
-                <DockPanel Grid.Row="4" Margin="0,16,0,0">
+
+                <!-- Footer: logo + Export + Cancel -->
+                <DockPanel Grid.Row="2" Margin="0,16,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="56"
@@ -215,9 +236,18 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                            VerticalAlignment="Bottom"
                            HorizontalAlignment="Left"
                            IsHitTestVisible="False"/>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Name="OkButton" Style="{StaticResource PrimaryButtonStyle}" Width="150" Margin="0,0,8,0" Content="Export"/>
-                        <Button Name="CancelButton" Style="{StaticResource SecondaryButtonStyle}" Width="150" Content="Cancel"/>
+                    <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Name="OkButton"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Content="Export"/>
+                        <Button Name="CancelButton"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Width="150"
+                                Content="Cancel"/>
                     </StackPanel>
                 </DockPanel>
             </Grid>
@@ -642,6 +672,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
+    show_read_only_filter = window.FindName("ShowReadOnlyFilter")
 
     excel_path.Text = init_excel_path or ""
     schedule_items = schedules or []
@@ -716,6 +747,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         selected_names = set(_get_selected_parameter_names(category_id))
         text = (parameter_search_box.Text or "").strip().lower()
         filtered = [option for option in all_options if option["name"] not in selected_names]
+        try:
+            if not show_read_only_filter.IsChecked:
+                filtered = [option for option in filtered if option.get("editable", False)]
+        except Exception:
+            pass
         if text:
             filtered = [option for option in filtered if text in option["name"].lower()]
         parameter_list.Items.Clear()
@@ -857,6 +893,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     source_search_box.TextChanged += lambda _sender, _args: _refresh_source_list()
     source_list.SelectionChanged += _source_selection_changed
     parameter_search_box.TextChanged += lambda _sender, _args: _refresh_parameter_list()
+    show_read_only_filter.Checked += lambda _sender, _args: _refresh_parameter_list()
+    show_read_only_filter.Unchecked += lambda _sender, _args: _refresh_parameter_list()
     add_parameter_button.Click += _add_parameters
     remove_parameter_button.Click += _remove_parameters
     move_parameter_up_button.Click += _move_up
