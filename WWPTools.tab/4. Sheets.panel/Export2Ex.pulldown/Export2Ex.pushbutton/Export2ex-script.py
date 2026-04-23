@@ -74,6 +74,40 @@ def normalize_excel_output_path(path, default_ext=".xlsx"):
     return ""
 
 
+def _pick_save_file(title, filter_text, default_extension, initial_directory, file_name):
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import SaveFileDialog
+
+    dialog = SaveFileDialog()
+    dialog.Title = title or "Save File"
+    dialog.Filter = filter_text or "All files (*.*)|*.*"
+    if default_extension:
+        dialog.DefaultExt = default_extension
+        dialog.AddExtension = True
+    if initial_directory and os.path.isdir(initial_directory):
+        dialog.InitialDirectory = initial_directory
+    if file_name:
+        dialog.FileName = file_name
+    result = dialog.ShowDialog()
+    if result:
+        return dialog.FileName
+    return None
+
+
+def _pick_folder(title, initial_directory):
+    clr.AddReference("System.Windows.Forms")
+    from System.Windows.Forms import FolderBrowserDialog, DialogResult
+
+    dialog = FolderBrowserDialog()
+    dialog.Description = title or "Select Folder"
+    if initial_directory and os.path.isdir(initial_directory):
+        dialog.SelectedPath = initial_directory
+    result = dialog.ShowDialog()
+    if result == DialogResult.OK:
+        return dialog.SelectedPath
+    return None
+
+
 def get_active_doc():
     """Resolve current document without importing pyrevit.revit (CPython 6.1 safety)."""
     try:
@@ -527,7 +561,7 @@ def _show_export_form(
             os.path.dirname(init_excel_path) if init_excel_path else "",
         )
         try:
-            file_path = ui.uiUtils_save_file_dialog(
+            file_path = _pick_save_file(
                 title="Export Schedules",
                 filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                 default_extension="xlsx",
@@ -535,9 +569,9 @@ def _show_export_form(
                 file_name=file_name,
             )
         except Exception as exc:
-            log_exception("Browse Excel dialog failed", exc)
+            log_exception("Native browse Excel dialog failed", exc)
             try:
-                file_path = ui.uiUtils_save_file_dialog(
+                file_path = _pick_save_file(
                     title="Export Schedules",
                     filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                     default_extension="xlsx",
@@ -545,7 +579,7 @@ def _show_export_form(
                     file_name=file_name,
                 )
             except Exception as retry_exc:
-                log_exception("Browse Excel dialog retry failed", retry_exc)
+                log_exception("Native browse Excel dialog retry failed", retry_exc)
                 ui.uiUtils_alert(
                     "Could not open the Excel save dialog. Check the suggested path and try again.",
                     title="Multiple Schedules Exporter",
@@ -556,7 +590,7 @@ def _show_export_form(
 
     def _browse_csv(_sender, _args):
         init_dir = ensure_existing_dir(csv_folder.Text or "", init_csv_dir)
-        folder = ui.uiUtils_select_folder_dialog(
+        folder = _pick_folder(
             title="Select CSV Folder",
             initial_directory=init_dir,
         )
@@ -1363,7 +1397,7 @@ def main():
         init_dir = ensure_existing_dir(last_excel_dir, default_dir)
         file_name = os.path.basename(last_excel_path) if last_excel_path else "Schedules.xlsx"
         try:
-            file_path = ui.uiUtils_save_file_dialog(
+            file_path = _pick_save_file(
                 title="Export Schedules",
                 filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                 default_extension="xlsx",
@@ -1371,9 +1405,9 @@ def main():
                 file_name=file_name,
             )
         except Exception as exc:
-            log_exception("Legacy save dialog failed", exc)
+            log_exception("Legacy native save dialog failed", exc)
             try:
-                file_path = ui.uiUtils_save_file_dialog(
+                file_path = _pick_save_file(
                     title="Export Schedules",
                     filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                     default_extension="xlsx",
@@ -1381,7 +1415,7 @@ def main():
                     file_name=file_name,
                 )
             except Exception as retry_exc:
-                log_exception("Legacy save dialog retry failed", retry_exc)
+                log_exception("Legacy native save dialog retry failed", retry_exc)
                 ui.uiUtils_alert(
                     "Could not open the Excel save dialog. Check the suggested path and try again.",
                     title="Multiple Schedules Exporter",
@@ -1410,7 +1444,7 @@ def main():
         csv_delim = select_csv_delimiter(ui, default_delimiter=last_csv_delim)
         if csv_delim is None:
             return
-        folder = ui.uiUtils_select_folder_dialog(
+        folder = _pick_folder(
             title="Select CSV Folder",
             initial_directory=init_dir,
         )

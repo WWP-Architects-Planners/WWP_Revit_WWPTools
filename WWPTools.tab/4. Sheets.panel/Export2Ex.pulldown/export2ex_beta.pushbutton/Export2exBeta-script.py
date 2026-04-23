@@ -33,9 +33,9 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Export2Ex Beta"
         Height="760"
-        Width="980"
+        Width="1080"
         MinHeight="700"
-        MinWidth="860"
+        MinWidth="980"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
@@ -69,6 +69,9 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="4"/>
         </Style>
+        <Style TargetType="Border">
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
     </Window.Resources>
     <Grid Margin="16">
         <Border Background="#FFFFFF"
@@ -78,7 +81,9 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0" Margin="0,0,0,12">
@@ -86,123 +91,123 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                                Margin="0,0,0,6"
                                Foreground="#6B7280"
                                FontWeight="SemiBold"/>
-                    <ComboBox Name="ModeBox" SelectedIndex="0">
+                    <ComboBox Name="ModeBox" SelectedIndex="0" Width="220" HorizontalAlignment="Left">
                         <ComboBoxItem Content="From Schedule"/>
                         <ComboBoxItem Content="By Category"/>
                     </ComboBox>
                 </StackPanel>
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="16"/>
-                        <ColumnDefinition Width="360"/>
-                    </Grid.ColumnDefinitions>
-                    <Grid Grid.Column="0">
+                <Border Grid.Row="1"
+                        Background="#F8FAFC"
+                        BorderBrush="#E2E8F0"
+                        BorderThickness="1"
+                        Padding="14"
+                        Margin="0,0,0,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="360"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Name="SourceLabel"
+                                       Text="Search schedules"
+                                       Margin="0,0,0,6"
+                                       Foreground="#6B7280"
+                                       FontWeight="SemiBold"/>
+                            <TextBox Name="SourceSearchBox" Margin="0,0,0,8"/>
+                            <TextBlock Name="SourceListLabel"
+                                       Text="Schedules"
+                                       Margin="0,0,0,6"
+                                       Foreground="#6B7280"
+                                       FontWeight="SemiBold"/>
+                            <ListBox Name="SourceList"
+                                     Height="170"
+                                     SelectionMode="Single"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Beta behavior"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,8"/>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#475569"
+                                       Margin="0,0,0,8"
+                                       Text="Pick one schedule or category first. The exporter resolves the category, then writes real model elements to Excel with Id as the first column."/>
+                            <TextBlock TextWrapping="Wrap"
+                                       Foreground="#475569"
+                                       Text="Use the parameter lists below to choose exactly which instance, type, shared, or project parameters should be exported."/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Search parameters"
+                               Margin="0,0,0,6"
+                               Foreground="#6B7280"
+                               FontWeight="SemiBold"/>
+                    <TextBox Name="ParameterSearchBox" Grid.Row="0" Margin="160,0,0,8"/>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Name="SourceLabel"
-                                   Text="Search schedules"
+                        <TextBlock Text="Available parameters"
                                    Margin="0,0,0,6"
                                    Foreground="#6B7280"
                                    FontWeight="SemiBold"/>
-                        <TextBox Name="SourceSearchBox" Grid.Row="1" Margin="0,0,0,8"/>
-                        <TextBlock Name="SourceListLabel"
-                                   Grid.Row="2"
-                                   Text="Schedules"
-                                   Margin="0,0,0,6"
-                                   Foreground="#6B7280"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Top"/>
-                        <ListBox Name="SourceList"
-                                 Grid.Row="3"
-                                 SelectionMode="Single"/>
-                    </Grid>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Search parameters"
+                        <TextBlock Grid.Column="2"
+                                   Text="Selected export order"
                                    Margin="0,0,0,6"
                                    Foreground="#6B7280"
                                    FontWeight="SemiBold"/>
-                        <TextBox Name="ParameterSearchBox" Margin="0,0,0,8"/>
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="76"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="260"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Available"
-                                       Margin="0,0,0,6"
-                                       Foreground="#6B7280"
-                                       FontWeight="SemiBold"/>
-                            <TextBlock Grid.Column="2"
-                                       Text="Selected order"
-                                       Margin="0,0,0,6"
-                                       Foreground="#6B7280"
-                                       FontWeight="SemiBold"/>
-                            <ListBox Name="ParameterList"
-                                     Grid.Row="1"
-                                     SelectionMode="Extended"/>
-                            <StackPanel Grid.Column="1"
-                                        Grid.Row="1"
-                                        Margin="8,0"
-                                        VerticalAlignment="Center">
-                                <Button Name="AddParameterButton"
-                                        Content="Add >"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource SecondaryButtonStyle}"/>
-                                <Button Name="RemoveParameterButton"
-                                        Content="&lt; Remove"
-                                        Margin="0,0,0,20"
-                                        Style="{StaticResource SecondaryButtonStyle}"/>
-                                <Button Name="MoveParameterUpButton"
-                                        Content="Move Up"
-                                        Margin="0,0,0,8"
-                                        Style="{StaticResource SecondaryButtonStyle}"/>
-                                <Button Name="MoveParameterDownButton"
-                                        Content="Move Down"
-                                        Style="{StaticResource SecondaryButtonStyle}"/>
-                            </StackPanel>
-                            <ListBox Name="SelectedParameterList"
-                                     Grid.Column="2"
-                                     Grid.Row="1"
-                                     SelectionMode="Extended"/>
-                        </Grid>
-                        <TextBlock Text="Excel output"
-                                   Margin="0,0,0,6"
-                                   Foreground="#6B7280"
-                                   FontWeight="SemiBold"/>
-                        <DockPanel Margin="0,0,0,12" LastChildFill="True">
-                            <Button Name="BrowseExcel"
-                                    Content="Browse"
-                                    Width="90"
-                                    DockPanel.Dock="Right"
+                        <ListBox Name="ParameterList"
+                                 Grid.Row="1"
+                                 SelectionMode="Extended"/>
+                        <StackPanel Grid.Column="1"
+                                    Grid.Row="1"
+                                    Margin="10,24,10,0"
+                                    VerticalAlignment="Top">
+                            <Button Name="AddParameterButton"
+                                    Content="Add >"
+                                    Margin="0,0,0,8"
                                     Style="{StaticResource SecondaryButtonStyle}"/>
-                            <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
-                        </DockPanel>
-                        <Border Background="#F8FAFC"
-                                BorderBrush="#E2E8F0"
-                                BorderThickness="1"
-                                Padding="14"
-                                CornerRadius="4">
-                            <StackPanel>
-                                <TextBlock Text="Beta behavior"
-                                           FontWeight="SemiBold"
-                                           Margin="0,0,0,8"/>
-                                <TextBlock TextWrapping="Wrap"
-                                           Foreground="#475569"
-                                           Text="The exporter resolves the category either from the chosen schedule or directly from the chosen category. It then exports real model elements, writes Id as the first column, and adds the selected type/instance/shared/project parameters after it."/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                            <Button Name="RemoveParameterButton"
+                                    Content="&lt; Remove"
+                                    Margin="0,0,0,20"
+                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                            <Button Name="MoveParameterUpButton"
+                                    Content="Move Up"
+                                    Margin="0,0,0,8"
+                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                            <Button Name="MoveParameterDownButton"
+                                    Content="Move Down"
+                                    Style="{StaticResource SecondaryButtonStyle}"/>
+                        </StackPanel>
+                        <ListBox Name="SelectedParameterList"
+                                 Grid.Column="2"
+                                 Grid.Row="1"
+                                 SelectionMode="Extended"/>
+                    </Grid>
                 </Grid>
-                <DockPanel Grid.Row="2" Margin="0,16,0,0">
+                <Grid Grid.Row="3" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="90"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
+                    <Button Name="BrowseExcel"
+                            Grid.Column="1"
+                            Content="Browse"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                </Grid>
+                <DockPanel Grid.Row="4" Margin="0,16,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="56"
@@ -319,6 +324,64 @@ def config_get(config, name, default=None):
     except Exception:
         return default
     return default if value is None else value
+
+
+def _coerce_int(value, default=None):
+    if value is None:
+        return default
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            coerced = _coerce_int(item, None)
+            if coerced is not None:
+                return coerced
+        return default
+    try:
+        return int(value)
+    except Exception:
+        pass
+    text = str(value).strip()
+    if not text:
+        return default
+    match = re.search(r"-?\d+", text)
+    if not match:
+        return default
+    try:
+        return int(match.group(0))
+    except Exception:
+        return default
+
+
+def _coerce_string_list(value):
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if str(item).strip()]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def _normalize_mode(value):
+    return MODE_BY_CATEGORY if value == MODE_BY_CATEGORY else MODE_FROM_SCHEDULE
+
+
+def _pick_save_file(title, filter_text, default_extension, initial_directory, file_name):
+    clr.AddReference("PresentationFramework")
+    from Microsoft.Win32 import SaveFileDialog
+
+    dialog = SaveFileDialog()
+    dialog.Title = title or "Save File"
+    dialog.Filter = filter_text or "All files (*.*)|*.*"
+    if default_extension:
+        dialog.DefaultExt = default_extension
+        dialog.AddExtension = True
+    if initial_directory and os.path.isdir(initial_directory):
+        dialog.InitialDirectory = initial_directory
+    if file_name:
+        dialog.FileName = file_name
+    result = dialog.ShowDialog()
+    if result:
+        return dialog.FileName
+    return None
 
 
 def get_default_dir(doc):
@@ -585,8 +648,11 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     category_items = categories or []
     parameter_cache = {}
     selected_params_by_category = {}
-    if initial_category_id not in (None, "") and initial_param_names:
-        selected_params_by_category[int(initial_category_id)] = list(initial_param_names)
+    initial_category_id = _coerce_int(initial_category_id, None)
+    initial_source_id = _coerce_int(initial_source_id, None)
+    initial_param_names = _coerce_string_list(initial_param_names)
+    if initial_category_id is not None and initial_param_names:
+        selected_params_by_category[initial_category_id] = list(initial_param_names)
 
     def _current_mode():
         try:
@@ -665,7 +731,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         source_list.ItemsSource = _to_net_object_list(filtered)
         source_label.Text = "Search categories" if mode == MODE_BY_CATEGORY else "Search schedules"
         source_list_label.Text = "Categories" if mode == MODE_BY_CATEGORY else "Schedules"
-        target_id = int(initial_source_id) if initial_source_id not in (None, "") else None
+        target_id = initial_source_id
         selected = None
         for item in filtered:
             item_id = item.id_value if mode == MODE_BY_CATEGORY else item.id_value
@@ -740,7 +806,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             os.path.dirname(init_excel_path) if init_excel_path else get_default_dir(get_active_doc()),
         )
         try:
-            file_path = ui.uiUtils_save_file_dialog(
+            file_path = _pick_save_file(
                 title="Export Category Data to Excel",
                 filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                 default_extension="xlsx",
@@ -748,9 +814,9 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
                 file_name=file_name,
             )
         except Exception as exc:
-            log_exception("Browse Excel dialog failed", exc)
+            log_exception("Native browse Excel dialog failed", exc)
             try:
-                file_path = ui.uiUtils_save_file_dialog(
+                file_path = _pick_save_file(
                     title="Export Category Data to Excel",
                     filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
                     default_extension="xlsx",
@@ -758,7 +824,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
                     file_name=file_name,
                 )
             except Exception as retry_exc:
-                log_exception("Browse Excel dialog retry failed", retry_exc)
+                log_exception("Native browse Excel dialog retry failed", retry_exc)
                 ui.uiUtils_alert(
                     "Could not open the Excel save dialog. Check the suggested path and try again.",
                     title="Export2Ex Beta",
@@ -1371,14 +1437,14 @@ def main():
     default_dir = get_default_dir(doc)
     last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
     init_excel_path = last_excel_path or os.path.join(default_dir, "CategoryExport.xlsx")
-    last_mode = config_get(config, CONFIG_LAST_MODE, MODE_FROM_SCHEDULE) or MODE_FROM_SCHEDULE
+    last_mode = _normalize_mode(config_get(config, CONFIG_LAST_MODE, MODE_FROM_SCHEDULE))
     last_source_id = config_get(
         config,
         CONFIG_LAST_CATEGORY_ID if last_mode == MODE_BY_CATEGORY else CONFIG_LAST_SCHEDULE_ID,
         None,
     )
-    last_category_id = config_get(config, CONFIG_LAST_CATEGORY_ID, None)
-    last_param_names = config_get(config, CONFIG_LAST_PARAM_NAMES, []) or []
+    last_category_id = _coerce_int(config_get(config, CONFIG_LAST_CATEGORY_ID, None), None)
+    last_param_names = _coerce_string_list(config_get(config, CONFIG_LAST_PARAM_NAMES, []))
     result = show_export_form(
         ui,
         doc,
@@ -1393,7 +1459,7 @@ def main():
     if not result:
         return
 
-    category_id_value = result.get("category_id")
+    category_id_value = _coerce_int(result.get("category_id"), None)
     if category_id_value in (None, -1):
         ui.uiUtils_alert("Select a schedule or category with a valid category.", title="Export2Ex Beta")
         return
@@ -1413,17 +1479,17 @@ def main():
 
     category_record = None
     for item in categories:
-        if item.id_value == int(category_id_value):
+        if item.id_value == category_id_value:
             category_record = item.record
             break
     category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
 
-    if not export_to_excel(doc, category_name, DB.ElementId(int(category_id_value)), selected_param_names, file_path, ui):
+    if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui):
         return
 
-    config.last_mode = result.get("mode") or MODE_FROM_SCHEDULE
+    config.last_mode = _normalize_mode(result.get("mode"))
     config.last_schedule_id = result.get("source_id") if config.last_mode == MODE_FROM_SCHEDULE else None
-    config.last_category_id = int(category_id_value)
+    config.last_category_id = category_id_value
     config.last_param_names = list(selected_param_names)
     config.last_excel_path = file_path
     save_config()
