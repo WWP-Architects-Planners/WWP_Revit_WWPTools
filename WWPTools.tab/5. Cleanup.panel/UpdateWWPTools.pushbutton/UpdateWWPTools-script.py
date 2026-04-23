@@ -150,9 +150,27 @@ def _ensure_target_branch(repo_info, repo_root):
     return pygit.get_repo(repo_root)
 
 
-def _history_divergence(repo_info):
-    pygit.git_fetch(repo_info)
-    return pygit.compare_branch_heads(repo_info)
+class _DivergenceResult(object):
+    def __init__(self, behind, ahead):
+        self.BehindBy = behind
+        self.AheadBy = ahead
+
+
+def _history_divergence(repo_info, repo_root):
+    try:
+        pygit.git_fetch(repo_info)
+        return pygit.compare_branch_heads(repo_info)
+    except Exception:
+        pass
+    if not _git_cli_available():
+        return None
+    try:
+        _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
+        behind = int(_git_output(repo_root, ["rev-list", "--count", "HEAD..origin/{}".format(TARGET_BRANCH)]).strip())
+        ahead = int(_git_output(repo_root, ["rev-list", "--count", "origin/{}..HEAD".format(TARGET_BRANCH)]).strip())
+        return _DivergenceResult(behind, ahead)
+    except Exception:
+        return None
 
 
 def _open_latest_release():
@@ -173,7 +191,7 @@ def _update_repo(repo_info, repo_root):
     repo_info = _ensure_target_branch(repo_info, repo_root)
     if repo_info is None:
         return
-    divergence = _history_divergence(repo_info)
+    divergence = _history_divergence(repo_info, repo_root)
     behind = int(divergence.BehindBy) if divergence and divergence.BehindBy is not None else 0
     ahead = int(divergence.AheadBy) if divergence and divergence.AheadBy is not None else 0
 
@@ -205,7 +223,13 @@ def _update_repo(repo_info, repo_root):
         return
 
     before_hash = repo_info.last_commit_hash[:7]
-    updated_repo = pygit.git_pull(repo_info)
+    try:
+        updated_repo = pygit.git_pull(repo_info)
+    except Exception:
+        if not _git_cli_available():
+            raise
+        _run_git(repo_root, ["pull", "--ff-only", "origin", TARGET_BRANCH])
+        updated_repo = pygit.get_repo(repo_root)
     after_hash = updated_repo.last_commit_hash[:7]
 
     ui.uiUtils_alert(
