@@ -293,7 +293,22 @@ def _update_repo(repo_info, repo_root):
     except Exception:
         if not _git_cli_available():
             raise
-        _run_git(repo_root, ["pull", "--ff-only", "origin", TARGET_BRANCH])
+        try:
+            _run_git(repo_root, ["pull", "--ff-only", "origin", TARGET_BRANCH])
+        except Exception as pull_err:
+            err_str = str(pull_err)
+            if "unable to unlink" in err_str or ("unlink" in err_str and "dll" in err_str.lower()):
+                ui.uiUtils_alert(
+                    "Update failed: a WWPTools DLL is currently loaded by Revit and cannot be replaced.\n\n"
+                    "To update successfully:\n"
+                    "  1. Close all WWPTools windows (Mass Stats, etc.)\n"
+                    "  2. Run Update WWPTools again\n\n"
+                    "If the error persists, close and reopen Revit before updating.\n\n"
+                    "Technical detail:\n" + err_str,
+                    TITLE,
+                )
+                return
+            raise
         updated_repo = pygit.get_repo(repo_root)
     after_hash = updated_repo.last_commit_hash[:7]
     new_tag = _latest_tag(repo_root)
