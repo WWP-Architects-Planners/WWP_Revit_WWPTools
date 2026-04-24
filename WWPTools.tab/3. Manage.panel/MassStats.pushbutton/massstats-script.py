@@ -3,17 +3,13 @@
 
 import clr
 import os
-import sys
 import traceback
-
-from pyrevit import revit
 
 # ── locate the compiled WPF DLL ─────────────────────────────────────────────
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 
 def _load_dll():
-    """Try net48 first (Revit 2024), fall back to net8.0-windows (Revit 2026)."""
     candidates = [
         os.path.join(lib_path, "WWPTools.WpfUI.net48.dll"),
         os.path.join(lib_path, "WWPTools.WpfUI.net8.0-windows.dll"),
@@ -39,11 +35,11 @@ def main():
     from WWPTools.WpfUI import MassStatsLauncher  # type: ignore
 
     try:
-        MassStatsLauncher.Show(revit.uiapp)
+        # __revit__ is the UIApplication injected by pyRevit into every script
+        MassStatsLauncher.Show(__revit__)  # noqa: F821
     except Exception:
         from pyrevit import forms
         forms.alert(traceback.format_exc(), title="Mass Stats Tool – Error")
 
 
-if __name__ == "__main__":
-    main()
+main()
