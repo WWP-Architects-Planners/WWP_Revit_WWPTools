@@ -3,7 +3,9 @@ import sys
 
 from pyrevit import forms, script
 from pyrevit.coreutils import git as pygit
+from System import Uri
 from System.Windows import Visibility
+from System.Windows.Media.Imaging import BitmapCacheOption, BitmapImage
 
 
 script_dir = os.path.dirname(__file__)
@@ -66,6 +68,14 @@ class AboutWindow(forms.WPFWindow):
         self.GuidebookButton.Click += self._open_guidebook
         self.GithubButton.Click += self._open_github
         self.ReleaseButton.Click += self._open_release
+
+    def make_bitmap_image(self, image_path):
+        bitmap = BitmapImage()
+        bitmap.BeginInit()
+        bitmap.CacheOption = BitmapCacheOption.OnLoad
+        bitmap.UriSource = Uri(image_path)
+        bitmap.EndInit()
+        return bitmap
 
     def _open_website(self, sender, args):
         script.open_url(WEBSITE_URL)
