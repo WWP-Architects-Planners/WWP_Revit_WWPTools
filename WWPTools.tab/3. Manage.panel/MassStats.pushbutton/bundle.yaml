@@ -1,23 +1,27 @@
 title: "Mass Stats\nTool"
 tooltip: |
-  Live back-of-house calculations from Revit mass floor areas.
+  Live dashboard of back-of-house calculations from Revit mass floor areas.
 
-  Requires a key schedule named "House Mix Key Schedule" with columns:
-    Key Name     — house style code (e.g. BTR-1B2P)
-    Mix Rate     — percentage of GIA for that style (e.g. 25%)
-    Mass ID      — building identifier value (matches selected param)
-    ! P_MASS_TypicalArea — typical unit area in sqm
+  Requires:
+    • A unit mix Excel file (wwp_unit_mix sheet) loaded on first run.
+      Sheet format:  Key Name | ST_Ratio | ST_Area | 1B2P_Ratio | 1B2P_Area | …
+    • A Project Information parameter named "! P_GIA_Ratio" (GIA/GEA ratio).
 
-  Project Information must have a parameter "! P_GIA_Ratio" (GIA/GEA ratio).
+  How it works:
+    1.  Click "Load Excel…" and select the unit mix workbook.
+    2.  Choose the "Mix param" dropdown — the mass parameter whose value
+        maps to a row in the Excel sheet (e.g. Building Type).
+    3.  Optionally add filter conditions (AND / OR) to scope the results
+        to specific buildings, sites, or phases.
+    4.  Click Refresh (or it refreshes automatically after loading Excel).
 
-  Calculates per building block:
-    • GEA = sum of mass floor areas  ·  GIA = GEA × ratio
-    • Unit mix (Studio / 1-Bed / 2-Bed / 3-Bed / 4+Bed) and NSA
+  Dashboard shows aggregated totals for all matched mass elements:
+    • GEA = sum of mass floor areas   ·   GIA = GEA × GIA ratio
+    • Studio / 1-Bed / 2-Bed / 3-Bed / 4+Bed unit counts and NSA
     • Bikes — Josta 80% / Sheffield 15% / Oversize 5%  (1 per bedroom)
-    • Bins — Recycling / Residual / Food  (GLA / London Plan 2021)
-    • Plants (units × 1.5 sqm)  ·  Cars (units × 0.13)
-    • Total Back-of-House area = Bikes + Bins + Plants
+    • Bins  — Recycling / Residual / Food  (GLA / London Plan 2021)
+    • Plants (units × 1.5 sqm)   ·   Cars (units × 0.13)
+    • Total Back-of-House = Bikes + Bins + Plants
 
-  Select the building identifier parameter from the dropdown.
   The window is modeless — click Refresh after editing the model.
 author: "Jason Tian"
