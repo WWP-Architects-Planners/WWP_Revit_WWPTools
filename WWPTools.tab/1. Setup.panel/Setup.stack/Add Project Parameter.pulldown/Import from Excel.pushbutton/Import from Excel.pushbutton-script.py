@@ -7,6 +7,7 @@ from Autodesk.Revit.UI import TaskDialog
 import os
 import datetime
 import traceback
+import sys
 import WWP_uiUtils as ui
 
 clr.AddReference('System')
@@ -71,33 +72,58 @@ def _pick_first_existing_path(paths):
     return None
 
 
-def _choose_excel_workbook(default_path):
+def _cancel_import(message):
+    TaskDialog.Show("Cancelled", message)
+    print(message)
+    sys.exit()
+
+
+def _choose_existing_file(title, filter_text, default_path):
     initial_dir = ""
     try:
         if default_path:
             initial_dir = os.path.dirname(default_path)
     except Exception:
-        pass
-    return ui.uiUtils_open_file_dialog(
+        initial_dir = ""
+
+    try:
+        try:
+            clr.AddReference('PresentationFramework')
+        except Exception:
+            pass
+        from Microsoft.Win32 import OpenFileDialog
+        dlg = OpenFileDialog()
+        dlg.Title = title
+        dlg.Filter = filter_text
+        dlg.Multiselect = False
+        dlg.CheckFileExists = True
+        if initial_dir and os.path.isdir(initial_dir):
+            dlg.InitialDirectory = initial_dir
+        if dlg.ShowDialog() == True:
+            return str(dlg.FileName or "")
+        return None
+    except Exception:
+        return ui.uiUtils_open_file_dialog(
+            title=title,
+            filter_text=filter_text,
+            multiselect=False,
+            initial_directory=initial_dir or "",
+        )
+
+
+def _choose_excel_workbook(default_path):
+    return _choose_existing_file(
         title="Select Project Parameters Excel Workbook",
         filter_text="Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|All Files (*.*)|*.*",
-        multiselect=False,
-        initial_directory=initial_dir or "",
+        default_path=default_path,
     )
 
 
 def _choose_shared_parameter_file(default_path):
-    initial_dir = ""
-    try:
-        if default_path:
-            initial_dir = os.path.dirname(default_path)
-    except Exception:
-        pass
-    return ui.uiUtils_open_file_dialog(
+    return _choose_existing_file(
         title="Select Shared Parameters File",
         filter_text="Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
-        multiselect=False,
-        initial_directory=initial_dir or "",
+        default_path=default_path,
     )
 
 
@@ -363,7 +389,9 @@ default_workbook = _pick_first_existing_path([DEFAULT_XLSX_PATH])
 selected_workbook = None
 if PROMPT_FOR_EXCEL_PATH:
     selected_workbook = _choose_excel_workbook(default_workbook or DEFAULT_XLSX_PATH)
-if not selected_workbook:
+    if not selected_workbook:
+        _cancel_import("Project parameter import cancelled. No Excel workbook was selected.")
+else:
     selected_workbook = default_workbook
 
 if not selected_workbook or not os.path.exists(selected_workbook):
@@ -378,7 +406,9 @@ default_shared = _pick_first_existing_path([DEFAULT_SHARED_PARAMETERS_PATH])
 selected_shared = None
 if PROMPT_FOR_SHARED_PARAMETERS_PATH:
     selected_shared = _choose_shared_parameter_file(default_shared or DEFAULT_SHARED_PARAMETERS_PATH)
-if not selected_shared:
+    if not selected_shared:
+        _cancel_import("Project parameter import cancelled. No Shared Parameters file was selected.")
+else:
     selected_shared = default_shared
 
 if not selected_shared or not os.path.exists(selected_shared):

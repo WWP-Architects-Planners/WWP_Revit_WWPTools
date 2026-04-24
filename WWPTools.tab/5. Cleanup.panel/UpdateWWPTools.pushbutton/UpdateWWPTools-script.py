@@ -21,8 +21,67 @@ TARGET_BRANCH = "main"
 TARGET_REMOTE_BRANCH = "origin/main"
 
 
+def _reload_pyrevit():
+    """Attempt to reload pyRevit extensions in-process."""
+    try:
+        from pyrevit.loader import sessionmgr
+        sessionmgr.reload_pyrevit()
+        return True
+    except Exception:
+        pass
+    try:
+        from pyrevit import HOST_APP
+        from pyrevit.loader import sessionmgr as sm
+        sm.reload_pyrevit()
+        return True
+    except Exception:
+        return False
+
+
 def _extension_root():
     return os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
+
+
+def _latest_tag(repo_root):
+    """Return the most recent tag reachable from HEAD, or None."""
+    if not _git_cli_available():
+        return None
+    try:
+        tag = _git_output(repo_root, ["describe", "--tags", "--abbrev=0"]).strip()
+        return tag if tag else None
+    except Exception:
+        return None
+
+
+def _remote_tag(repo_root):
+    """Return the most recent tag on origin/main, or None."""
+    if not _git_cli_available():
+        return None
+    try:
+        tag = _git_output(
+            repo_root,
+            ["describe", "--tags", "--abbrev=0", "origin/{}".format(TARGET_BRANCH)]
+        ).strip()
+        return tag if tag else None
+    except Exception:
+        return None
+
+
+def _incoming_log(repo_root, max_lines=10):
+    """Return one-line log of commits between HEAD and origin/main."""
+    if not _git_cli_available():
+        return ""
+    try:
+        log = _git_output(
+            repo_root,
+            ["log", "--oneline", "HEAD..origin/{}".format(TARGET_BRANCH)]
+        ).strip()
+        lines = log.splitlines()
+        if len(lines) > max_lines:
+            lines = lines[:max_lines] + ["... and {} more".format(len(lines) - max_lines)]
+        return "\n".join(lines)
+    except Exception:
+        return ""
 
 
 def _discover_repo(extension_root):
@@ -195,31 +254,37 @@ def _update_repo(repo_info, repo_root):
     behind = int(divergence.BehindBy) if divergence and divergence.BehindBy is not None else 0
     ahead = int(divergence.AheadBy) if divergence and divergence.AheadBy is not None else 0
 
+    current_tag = _latest_tag(repo_root)
+    current_label = "{} ({})".format(current_tag, repo_info.last_commit_hash[:7]) if current_tag \
+        else repo_info.last_commit_hash[:7]
+
     if behind <= 0:
-        msg = "WWPTools is already up to date on branch '{}'.\nCurrent commit: {}".format(
-            repo_info.branch,
-            repo_info.last_commit_hash[:7],
+        msg = "WWPTools is already up to date.\n\nVersion: {}\nBranch: {}".format(
+            current_label, repo_info.branch,
         )
         if ahead > 0:
-            msg += "\n\nLocal repo is ahead of remote by {} commit(s).".format(ahead)
+            msg += "\n\nLocal repo is {} commit(s) ahead of remote.".format(ahead)
         ui.uiUtils_alert(msg, TITLE)
         return
 
-    confirm = ui.uiUtils_confirm(
+    remote_tag = _remote_tag(repo_root)
+    remote_label = "{} ({})".format(remote_tag, "incoming") if remote_tag else "{} commit(s)".format(behind)
+    changelog = _incoming_log(repo_root)
+
+    confirm_msg = (
         "Updates are available for WWPTools.\n\n"
-        "Branch: {}\n"
-        "Remote: {}\n"
-        "Current commit: {}\n"
-        "Incoming commits: {}\n\n"
-        "Update now using Git support from this installed clone?".format(
-            repo_info.branch,
-            TARGET_REMOTE_BRANCH,
-            repo_info.last_commit_hash[:7],
-            behind,
-        ),
-        TITLE,
+        "Current version:  {}\n"
+        "New version:      {}\n"
+        "Branch:           {}\n\n"
+        "What's new:\n{}\n\n"
+        "Update now?"
+    ).format(
+        current_label,
+        remote_label,
+        repo_info.branch,
+        changelog if changelog else "  (commit log unavailable)",
     )
-    if not confirm:
+    if not ui.uiUtils_confirm(confirm_msg, TITLE):
         return
 
     before_hash = repo_info.last_commit_hash[:7]
@@ -231,19 +296,26 @@ def _update_repo(repo_info, repo_root):
         _run_git(repo_root, ["pull", "--ff-only", "origin", TARGET_BRANCH])
         updated_repo = pygit.get_repo(repo_root)
     after_hash = updated_repo.last_commit_hash[:7]
+    new_tag = _latest_tag(repo_root)
+    after_label = "{} ({})".format(new_tag, after_hash) if new_tag else after_hash
 
-    ui.uiUtils_alert(
+    reload_offered = ui.uiUtils_confirm(
         "WWPTools updated successfully.\n\n"
-        "Branch: {}\n"
-        "Previous commit: {}\n"
-        "Current commit: {}\n\n"
-        "Restart Revit or reload pyRevit to ensure all changes are picked up.".format(
-            updated_repo.branch,
-            before_hash,
-            after_hash,
+        "Previous version: {}\n"
+        "New version:      {}\n\n"
+        "Reload pyRevit now to apply the changes?\n"
+        "(Choosing No means you'll need to restart Revit manually.)".format(
+            current_label,
+            after_label,
         ),
         TITLE,
     )
+    if reload_offered:
+        if not _reload_pyrevit():
+            ui.uiUtils_alert(
+                "Could not reload pyRevit automatically.\n\nPlease restart Revit to apply the update.",
+                TITLE,
+            )
 
 
 def main():
