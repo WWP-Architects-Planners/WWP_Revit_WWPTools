@@ -136,52 +136,12 @@ def _git_output(repo_root, args):
     return (stdout or b"").decode("utf-8", "ignore")
 
 
-def _get_dirty_paths(repo_root):
-    if not _git_cli_available():
-        return []
-    output = _git_output(repo_root, ["status", "--porcelain"])
-    dirty = []
-    for line in output.splitlines():
-        if not line.strip():
-            continue
-        path = line[3:] if len(line) > 3 else line
-        dirty.append(path)
-    return dirty
-
-
-def _show_dirty_repo_message(repo_info, dirty_paths):
-    preview = dirty_paths[:12]
-    lines = [
-        "WWPTools can not auto-update this install because the local repo has uncommitted changes.",
-        "",
-        "Current branch: {}".format(repo_info.branch),
-        "Target branch: {}".format(TARGET_REMOTE_BRANCH),
-        "",
-        "Dirty files:",
-    ]
-    lines.extend(preview)
-    if len(dirty_paths) > len(preview):
-        lines.append("... and {} more".format(len(dirty_paths) - len(preview)))
-    lines.extend([
-        "",
-        "Commit or stash these changes first, then run Update WWPTools again.",
-        "",
-        "Open the latest GitHub release instead?",
-    ])
-
-    if ui.uiUtils_confirm("\n".join(lines), TITLE):
-        _open_latest_release()
-
 
 def _ensure_target_branch(repo_info, repo_root):
     if repo_info.branch == TARGET_BRANCH:
         return repo_info
 
-    dirty_paths = _get_dirty_paths(repo_root)
-    if dirty_paths:
-        _show_dirty_repo_message(repo_info, dirty_paths)
-        return None
-
+    # Don't block on dirty files — we always reset --hard so local changes are discarded anyway.
     repo = repo_info.repo
     try:
         target_branch = repo.Branches[TARGET_BRANCH]
@@ -271,7 +231,7 @@ def _schedule_update_on_revit_exit(repo_root):
         "echo Revit closed.  Pulling latest WWPTools...",
         "echo.",
         "git -C \"{root}\" fetch origin {branch}".format(root=safe_root, branch=TARGET_BRANCH),
-        "git -C \"{root}\" pull --ff-only origin {branch}".format(root=safe_root, branch=TARGET_BRANCH),
+        "git -C \"{root}\" reset --hard origin/{branch}".format(root=safe_root, branch=TARGET_BRANCH),
         "if errorlevel 1 (",
         "  echo.",
         "  echo Update failed.  Open Revit and run Update WWPTools to try again.",
@@ -353,7 +313,8 @@ def _update_repo(repo_info, repo_root):
         if not _git_cli_available():
             raise
         try:
-            _run_git(repo_root, ["pull", "--ff-only", "origin", TARGET_BRANCH])
+            _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
+            _run_git(repo_root, ["reset", "--hard", "origin/{}".format(TARGET_BRANCH)])
         except Exception as pull_err:
             err_str = str(pull_err)
             if "unable to unlink" in err_str or ("unlink" in err_str and "dll" in err_str.lower()):
