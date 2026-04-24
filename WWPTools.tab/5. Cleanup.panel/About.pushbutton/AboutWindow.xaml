@@ -82,7 +82,7 @@
 
                 <WrapPanel Margin="0,14,0,0">
                     <Border Background="#EEF4FA" CornerRadius="10" Padding="10,4" Margin="0,0,8,8">
-                        <TextBlock x:Name="VersionText" FontSize="13" FontWeight="SemiBold" Text="Version v1.2.8" />
+                        <TextBlock x:Name="VersionText" FontSize="13" FontWeight="SemiBold" Text="Version v1.3.3" />
                     </Border>
                     <Border x:Name="BranchBadge" Background="#EEF4FA" CornerRadius="10" Padding="10,4" Margin="0,0,8,8" Visibility="Collapsed">
                         <TextBlock x:Name="BranchText" FontSize="13" Text="Branch main" />
