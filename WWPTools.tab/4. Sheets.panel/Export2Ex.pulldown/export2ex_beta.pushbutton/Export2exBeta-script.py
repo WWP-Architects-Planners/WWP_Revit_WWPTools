@@ -286,6 +286,19 @@ def sanitize_sheet_name(name):
     return (safe or "Schedule")[:31]
 
 
+def _pluralize(name):
+    if not name:
+        return name
+    parts = name.rsplit(" ", 1)
+    last = parts[-1]
+    if last.lower().endswith(("s", "x", "z", "ch", "sh")):
+        last = last + "es"
+    else:
+        last = last + "s"
+    parts[-1] = last
+    return " ".join(parts)
+
+
 def normalize_excel_output_path(path, default_ext=".xlsx"):
     value = (path or "").strip()
     if not value:
@@ -929,7 +942,10 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         else:
             selected = source_list.SelectedItem
             if selected is not None:
-                auto_name = selected.record["name"] if _current_mode() == MODE_BY_CATEGORY else selected.view.Name
+                if _current_mode() == MODE_BY_CATEGORY:
+                    auto_name = _pluralize(selected.record["name"])
+                else:
+                    auto_name = selected.view.Name
                 sheet_name_box.Text = sanitize_sheet_name(auto_name)
 
     if not window.ShowDialog():
@@ -1443,7 +1459,7 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui,
     else:
         workbook = openpyxl.Workbook()
 
-    base_name = sanitize_sheet_name(sheet_name if sheet_name else category_name)
+    base_name = sanitize_sheet_name(sheet_name if sheet_name else _pluralize(category_name))
     sheet_name = base_name
     if sheet_name in workbook.sheetnames:
         existing = workbook[sheet_name]
