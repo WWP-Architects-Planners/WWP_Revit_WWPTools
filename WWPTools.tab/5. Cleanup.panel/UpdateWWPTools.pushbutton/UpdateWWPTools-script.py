@@ -151,6 +151,15 @@ def _update_needs_revit_close(changed_files):
     return False
 
 
+def _working_tree_dirty(repo_root):
+    if not _git_cli_available():
+        return False
+    try:
+        return bool(_git_output(repo_root, ["status", "--porcelain"]).strip())
+    except Exception:
+        return False
+
+
 def _discover_repo(extension_root):
     try:
         repo_path = pygit.libgit.Repository.Discover(extension_root)
@@ -201,6 +210,18 @@ def _git_output(repo_root, args):
     if completed.returncode != 0:
         raise Exception((stderr or stdout or b"Git command failed.").decode("utf-8", "ignore").strip())
     return (stdout or b"").decode("utf-8", "ignore")
+
+
+def _sync_to_github(repo_root):
+    if not _git_cli_available():
+        raise Exception(
+            "Git CLI is required to update WWPTools.\n\n"
+            "Close Revit, install Git, then run Update WWPTools again."
+        )
+    _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
+    _run_git(repo_root, ["reset", "--hard", TARGET_REMOTE_BRANCH])
+    _run_git(repo_root, ["clean", "-ffdx"])
+    return pygit.get_repo(repo_root)
 
 
 def _is_revit_locked_update_error(error):
@@ -305,7 +326,7 @@ def _schedule_update_on_revit_exit(repo_root):
     pid = os.getpid()
     safe_root = os.path.normpath(repo_root)
 
-    # Batch script: poll until all Revit processes are gone, then pull.
+    # Batch script: poll until all Revit processes are gone, then mirror origin/main.
     batch = "\r\n".join([
         "@echo off",
         "title WWPTools - waiting for Revit to close...",
@@ -317,19 +338,23 @@ def _schedule_update_on_revit_exit(repo_root):
         "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
         "title WWPTools - applying update...",
         "echo.",
-        "echo Revit closed.  Pulling latest WWPTools...",
+        "echo Revit closed.  Downloading latest WWPTools from GitHub...",
         "echo.",
         "git -C \"{root}\" fetch origin {branch}".format(root=safe_root, branch=TARGET_BRANCH),
+        "if errorlevel 1 goto failed",
         "git -C \"{root}\" reset --hard origin/{branch}".format(root=safe_root, branch=TARGET_BRANCH),
-        "if errorlevel 1 (",
-        "  echo.",
-        "  echo Update failed.  Open Revit and run Update WWPTools to try again.",
-        "  pause",
-        ") else (",
-        "  echo.",
-        "  echo WWPTools updated successfully.",
-        "  timeout /t 5 /nobreak >NUL",
-        ")",
+        "if errorlevel 1 goto failed",
+        "git -C \"{root}\" clean -ffdx".format(root=safe_root),
+        "if errorlevel 1 goto failed",
+        "echo.",
+        "echo WWPTools updated successfully.",
+        "timeout /t 5 /nobreak >NUL",
+        "exit /b 0",
+        ":failed",
+        "echo.",
+        "echo Update failed.  Open Revit and run Update WWPTools to try again.",
+        "pause",
+        "exit /b 1",
     ]) + "\r\n"
 
     batch_path = os.path.join(
@@ -386,17 +411,16 @@ def _update_repo(repo_info, repo_root):
     divergence = _history_divergence(repo_info, repo_root)
     behind = int(divergence.BehindBy) if divergence and divergence.BehindBy is not None else 0
     ahead  = int(divergence.AheadBy)  if divergence and divergence.AheadBy  is not None else 0
+    dirty = _working_tree_dirty(repo_root)
 
     current_tag = _latest_tag(repo_root)
     current_label = "{} ({})".format(current_tag, repo_info.last_commit_hash[:7]) if current_tag \
         else repo_info.last_commit_hash[:7]
 
-    if behind <= 0:
+    if behind <= 0 and ahead <= 0 and not dirty:
         msg = "WWPTools is already up to date.\n\nVersion: {}\nBranch: {}".format(
             current_label, repo_info.branch,
         )
-        if ahead > 0:
-            msg += "\n\nLocal repo is {} commit(s) ahead of remote.".format(ahead)
         _alert(msg, TITLE)
         return
 
@@ -412,6 +436,10 @@ def _update_repo(repo_info, repo_root):
         "New version:      {}\n"
         "Branch:           {}\n\n"
         "What's new:\n{}\n\n"
+        "Update behavior:\n"
+        "Local WWPTools files will be overwritten with GitHub files.\n"
+        "Local changes will not be committed or kept.\n"
+        "Files not in GitHub will be deleted locally.\n\n"
         "Update now?"
     ).format(
         current_label,
@@ -435,26 +463,14 @@ def _update_repo(repo_info, repo_root):
         )
         return
 
-    before_hash = repo_info.last_commit_hash[:7]
     dll_locked = False
     try:
-        updated_repo = pygit.git_pull(repo_info)
-    except Exception as pull_err:
-        if _is_revit_locked_update_error(pull_err):
+        updated_repo = _sync_to_github(repo_root)
+    except Exception as sync_err:
+        if _is_revit_locked_update_error(sync_err):
             dll_locked = True
-        elif not _git_cli_available():
-            raise
         else:
-            try:
-                _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
-                _run_git(repo_root, ["reset", "--hard", "origin/{}".format(TARGET_BRANCH)])
-            except Exception as reset_err:
-                if _is_revit_locked_update_error(reset_err):
-                    dll_locked = True
-                else:
-                    raise
-            if not dll_locked:
-                updated_repo = pygit.get_repo(repo_root)
+            raise
 
     if dll_locked:
         _start_standby_update(
