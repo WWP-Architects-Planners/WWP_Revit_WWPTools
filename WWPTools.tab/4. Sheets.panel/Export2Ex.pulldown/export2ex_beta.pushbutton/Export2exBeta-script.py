@@ -25,6 +25,7 @@ CONFIG_LAST_MODE = "last_mode"
 CONFIG_LAST_SCHEDULE_ID = "last_schedule_id"
 CONFIG_LAST_CATEGORY_ID = "last_category_id"
 CONFIG_LAST_PARAM_NAMES = "last_param_names"
+CONFIG_LAST_SHEET_NAME = "last_sheet_name"
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 MODE_FROM_SCHEDULE = "schedule"
@@ -78,6 +79,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -214,8 +216,23 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                     </Grid>
                 </Grid>
 
+                <!-- Sheet name -->
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Sheet name:"
+                               Foreground="#374151"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Margin="0,0,8,0"/>
+                    <TextBox Name="SheetNameBox" Grid.Column="1"/>
+                </Grid>
+
                 <!-- Excel path + Browse -->
-                <Grid Grid.Row="1" Margin="0,14,0,0">
+                <Grid Grid.Row="2" Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="90"/>
@@ -228,7 +245,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 </Grid>
 
                 <!-- Footer: logo + Export + Cancel -->
-                <DockPanel Grid.Row="2" Margin="0,16,0,0">
+                <DockPanel Grid.Row="3" Margin="0,16,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="56"
@@ -645,7 +662,7 @@ def _load_export_window():
     raise last_exc
 
 
-def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names):
+def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mode, initial_source_id, initial_category_id, initial_param_names, initial_sheet_name=""):
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
@@ -673,6 +690,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     cancel_button = window.FindName("CancelButton")
     logo_image = window.FindName("LogoImage")
     show_read_only_filter = window.FindName("ShowReadOnlyFilter")
+    sheet_name_box = window.FindName("SheetNameBox")
 
     excel_path.Text = init_excel_path or ""
     schedule_items = schedules or []
@@ -904,6 +922,16 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     cancel_button.Click += _cancel
     _refresh_source_list()
 
+    if sheet_name_box is not None:
+        initial_sheet_name_stripped = (initial_sheet_name or "").strip()
+        if initial_sheet_name_stripped:
+            sheet_name_box.Text = initial_sheet_name_stripped
+        else:
+            selected = source_list.SelectedItem
+            if selected is not None:
+                auto_name = selected.record["name"] if _current_mode() == MODE_BY_CATEGORY else selected.view.Name
+                sheet_name_box.Text = sanitize_sheet_name(auto_name)
+
     if not window.ShowDialog():
         return None
 
@@ -925,6 +953,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "category_id": category_id,
         "selected_param_names": list(selected_params_by_category.get(category_id, [])),
         "excel_path": excel_path.Text or "",
+        "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
     }
 
 
@@ -1397,7 +1426,7 @@ def make_unique_name(base, used):
         idx += 1
 
 
-def export_to_excel(doc, category_name, category_id, param_names, file_path, ui):
+def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None):
     add_lib_path()
     try:
         import openpyxl
@@ -1414,7 +1443,7 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui)
     else:
         workbook = openpyxl.Workbook()
 
-    base_name = sanitize_sheet_name(category_name)
+    base_name = sanitize_sheet_name(sheet_name if sheet_name else category_name)
     sheet_name = base_name
     if sheet_name in workbook.sheetnames:
         existing = workbook[sheet_name]
@@ -1483,6 +1512,7 @@ def main():
     )
     last_category_id = _coerce_int(config_get(config, CONFIG_LAST_CATEGORY_ID, None), None)
     last_param_names = _coerce_string_list(config_get(config, CONFIG_LAST_PARAM_NAMES, []))
+    last_sheet_name = str(config_get(config, CONFIG_LAST_SHEET_NAME, "") or "").strip()
     result = show_export_form(
         ui,
         doc,
@@ -1493,6 +1523,7 @@ def main():
         last_source_id,
         last_category_id,
         last_param_names,
+        last_sheet_name,
     )
     if not result:
         return
@@ -1522,7 +1553,8 @@ def main():
             break
     category_name = category_record["name"] if category_record else (result.get("source_name") or "Category Export")
 
-    if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui):
+    sheet_name_raw = (result.get("sheet_name") or "").strip()
+    if not export_to_excel(doc, category_name, DB.ElementId(category_id_value), selected_param_names, file_path, ui, sheet_name=sheet_name_raw):
         return
 
     config.last_mode = _normalize_mode(result.get("mode"))
@@ -1530,6 +1562,7 @@ def main():
     config.last_category_id = category_id_value
     config.last_param_names = list(selected_param_names)
     config.last_excel_path = file_path
+    config.last_sheet_name = sheet_name_raw
     save_config()
 
     try:
