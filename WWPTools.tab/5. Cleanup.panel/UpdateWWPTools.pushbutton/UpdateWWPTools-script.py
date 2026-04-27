@@ -13,8 +13,6 @@ lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
 if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 
-import WWP_uiUtils as ui
-
 
 TITLE = "Update WWPTools"
 RELEASES_URL = "https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest"
@@ -24,6 +22,54 @@ TARGET_REMOTE_BRANCH = "origin/main"
 # Windows process-creation flags (safe fallback for IronPython)
 _DETACHED_PROCESS       = getattr(subprocess, "DETACHED_PROCESS",       0x00000008)
 _CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+
+
+def _revit_ui():
+    try:
+        import clr
+        clr.AddReference("RevitAPIUI")
+        from Autodesk.Revit import UI
+        return UI
+    except Exception:
+        return None
+
+
+def _alert(message, title=TITLE):
+    text = "" if message is None else str(message)
+    caption = "" if title is None else str(title)
+    UI = _revit_ui()
+    if UI is not None:
+        try:
+            UI.TaskDialog.Show(caption or TITLE, text)
+            return
+        except Exception:
+            pass
+    try:
+        from pyrevit import forms
+        forms.alert(text, title=caption or TITLE)
+    except Exception:
+        raise Exception(text)
+
+
+def _confirm(message, title=TITLE):
+    text = "" if message is None else str(message)
+    caption = "" if title is None else str(title)
+    UI = _revit_ui()
+    if UI is not None:
+        try:
+            dialog = UI.TaskDialog(caption or TITLE)
+            dialog.MainInstruction = caption or TITLE
+            dialog.MainContent = text
+            dialog.CommonButtons = UI.TaskDialogCommonButtons.Yes | UI.TaskDialogCommonButtons.No
+            dialog.DefaultButton = UI.TaskDialogResult.Yes
+            return dialog.Show() == UI.TaskDialogResult.Yes
+        except Exception:
+            pass
+    try:
+        from pyrevit import forms
+        return bool(forms.alert(text, title=caption or TITLE, yes=True, no=True))
+    except Exception:
+        return False
 
 
 def _reload_pyrevit():
@@ -84,6 +130,27 @@ def _incoming_log(repo_root, max_lines=10):
         return ""
 
 
+def _incoming_changed_files(repo_root):
+    if not _git_cli_available():
+        return []
+    try:
+        output = _git_output(
+            repo_root,
+            ["diff", "--name-only", "HEAD..origin/{}".format(TARGET_BRANCH)]
+        ).strip()
+        return [line.strip().replace("\\", "/") for line in output.splitlines() if line.strip()]
+    except Exception:
+        return []
+
+
+def _update_needs_revit_close(changed_files):
+    for path in changed_files or []:
+        lower_path = path.lower()
+        if lower_path.endswith(".dll"):
+            return True
+    return False
+
+
 def _discover_repo(extension_root):
     try:
         repo_path = pygit.libgit.Repository.Discover(extension_root)
@@ -134,6 +201,25 @@ def _git_output(repo_root, args):
     if completed.returncode != 0:
         raise Exception((stderr or stdout or b"Git command failed.").decode("utf-8", "ignore").strip())
     return (stdout or b"").decode("utf-8", "ignore")
+
+
+def _is_revit_locked_update_error(error):
+    err = str(error or "").lower()
+    if ".dll" not in err and "wwptools.wpfui" not in err:
+        return False
+    markers = [
+        "unable to unlink",
+        "permission denied",
+        "access is denied",
+        "being used by another process",
+        "not uptodate",
+        "cannot merge",
+        "could not reset index file",
+    ]
+    for marker in markers:
+        if marker in err:
+            return True
+    return False
 
 
 
@@ -197,7 +283,7 @@ def _open_latest_release():
 
 
 def _show_not_repo_message():
-    open_release = ui.uiUtils_confirm(
+    open_release = _confirm(
         "This installation is not a Git clone, so WWPTools can not update it with built-in Git.\n\n"
         "Open the latest GitHub release instead?",
         TITLE,
@@ -212,19 +298,22 @@ def _show_not_repo_message():
 
 def _schedule_update_on_revit_exit(repo_root):
     """
-    Spawn a detached cmd process that waits until this Revit PID disappears,
-    then runs git pull so locked DLLs are no longer an obstacle.
+    Spawn a detached cmd process that waits until Revit fully closes,
+    then resets to origin/main so locked DLLs are no longer an obstacle.
     Returns True if the watcher was started successfully.
     """
     pid = os.getpid()
     safe_root = os.path.normpath(repo_root)
 
-    # Batch script: poll until the PID is gone, then pull
+    # Batch script: poll until all Revit processes are gone, then pull.
     batch = "\r\n".join([
         "@echo off",
         "title WWPTools - waiting for Revit to close...",
+        "echo WWPTools standby updater is waiting for Revit to close.",
+        "echo Close all Revit windows to continue.",
+        "echo.",
         ":wait",
-        "tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL".format(pid=pid),
+        "tasklist /FI \"IMAGENAME eq Revit.exe\" 2>NUL | find /I \"Revit.exe\" >NUL",
         "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
         "title WWPTools - applying update...",
         "echo.",
@@ -260,6 +349,32 @@ def _schedule_update_on_revit_exit(repo_root):
         return False
 
 
+def _start_standby_update(repo_root, reason):
+    if not _git_cli_available():
+        _alert(
+            "WWPTools can not finish this update while Revit is open.\n\n"
+            "{}\n\n"
+            "Git CLI is not available to run the standby updater.\n"
+            "Close Revit completely, then run Update WWPTools again.".format(reason),
+            TITLE,
+        )
+        return
+    if _schedule_update_on_revit_exit(repo_root):
+        _alert(
+            "WWPTools is ready to finish updating, but Revit is using one or more files.\n\n"
+            "{}\n\n"
+            "Close all Revit windows. The standby updater will finish automatically after Revit closes.\n"
+            "You can reopen Revit after the update finishes.".format(reason),
+            TITLE,
+        )
+    else:
+        _alert(
+            "Could not start the standby updater.\n\n"
+            "Close Revit completely, then run Update WWPTools again.",
+            TITLE,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Main update flow
 # ---------------------------------------------------------------------------
@@ -282,12 +397,14 @@ def _update_repo(repo_info, repo_root):
         )
         if ahead > 0:
             msg += "\n\nLocal repo is {} commit(s) ahead of remote.".format(ahead)
-        ui.uiUtils_alert(msg, TITLE)
+        _alert(msg, TITLE)
         return
 
     remote_tag = _remote_tag(repo_root)
     remote_label = "{} ({})".format(remote_tag, "incoming") if remote_tag else "{} commit(s)".format(behind)
     changelog = _incoming_log(repo_root)
+    changed_files = _incoming_changed_files(repo_root)
+    needs_revit_close = _update_needs_revit_close(changed_files)
 
     confirm_msg = (
         "Updates are available for WWPTools.\n\n"
@@ -302,49 +419,55 @@ def _update_repo(repo_info, repo_root):
         repo_info.branch,
         changelog if changelog else "  (commit log unavailable)",
     )
-    if not ui.uiUtils_confirm(confirm_msg, TITLE):
+    if needs_revit_close:
+        confirm_msg = (
+            confirm_msg +
+            "\n\nThis update includes DLL files that Revit may have loaded.\n"
+            "WWPTools will start a standby updater and finish after you close all Revit windows."
+        )
+    if not _confirm(confirm_msg, TITLE):
+        return
+
+    if needs_revit_close:
+        _start_standby_update(
+            repo_root,
+            "This update includes DLL files that Revit can not replace while it is running.",
+        )
         return
 
     before_hash = repo_info.last_commit_hash[:7]
     dll_locked = False
     try:
         updated_repo = pygit.git_pull(repo_info)
-    except Exception:
-        if not _git_cli_available():
+    except Exception as pull_err:
+        if _is_revit_locked_update_error(pull_err):
+            dll_locked = True
+        elif not _git_cli_available():
             raise
-        try:
-            _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
-            _run_git(repo_root, ["reset", "--hard", "origin/{}".format(TARGET_BRANCH)])
-        except Exception as pull_err:
-            err_str = str(pull_err)
-            if "unable to unlink" in err_str or ("unlink" in err_str and "dll" in err_str.lower()):
-                dll_locked = True
-            else:
-                raise
-        if not dll_locked:
-            updated_repo = pygit.get_repo(repo_root)
+        else:
+            try:
+                _run_git(repo_root, ["fetch", "origin", TARGET_BRANCH])
+                _run_git(repo_root, ["reset", "--hard", "origin/{}".format(TARGET_BRANCH)])
+            except Exception as reset_err:
+                if _is_revit_locked_update_error(reset_err):
+                    dll_locked = True
+                else:
+                    raise
+            if not dll_locked:
+                updated_repo = pygit.get_repo(repo_root)
 
     if dll_locked:
-        if _schedule_update_on_revit_exit(repo_root):
-            ui.uiUtils_alert(
-                "WWPTools will update automatically when you close Revit.\n\n"
-                "A small console window will appear after Revit exits to confirm.\n"
-                "You do not need to do anything else.",
-                TITLE,
-            )
-        else:
-            ui.uiUtils_alert(
-                "Could not schedule the background update.\n\n"
-                "To update manually: close Revit completely, then run Update WWPTools again.",
-                TITLE,
-            )
+        _start_standby_update(
+            repo_root,
+            "A WWPTools DLL is locked by Revit, so Git can not replace it yet.",
+        )
         return
 
     after_hash = updated_repo.last_commit_hash[:7]
     new_tag = _latest_tag(repo_root)
     after_label = "{} ({})".format(new_tag, after_hash) if new_tag else after_hash
 
-    reload_offered = ui.uiUtils_confirm(
+    reload_offered = _confirm(
         "WWPTools updated successfully.\n\n"
         "Previous version: {}\n"
         "New version:      {}\n\n"
@@ -357,7 +480,7 @@ def _update_repo(repo_info, repo_root):
     )
     if reload_offered:
         if not _reload_pyrevit():
-            ui.uiUtils_alert(
+            _alert(
                 "Could not reload pyRevit automatically.\n\nPlease restart Revit to apply the update.",
                 TITLE,
             )
@@ -376,4 +499,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        ui.uiUtils_alert(traceback.format_exc(), TITLE)
+        _alert(traceback.format_exc(), TITLE)
