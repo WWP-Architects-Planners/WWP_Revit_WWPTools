@@ -141,7 +141,7 @@ def _ensure_target_branch(repo_info, repo_root):
     if repo_info.branch == TARGET_BRANCH:
         return repo_info
 
-    # Don't block on dirty files — we always reset --hard so local changes are discarded anyway.
+    # Don't block on dirty files - we always reset --hard so local changes are discarded anyway.
     repo = repo_info.repo
     try:
         target_branch = repo.Branches[TARGET_BRANCH]
@@ -207,7 +207,7 @@ def _show_not_repo_message():
 
 
 # ---------------------------------------------------------------------------
-# Background updater — runs after Revit exits
+# Background updater - runs after Revit exits
 # ---------------------------------------------------------------------------
 
 def _schedule_update_on_revit_exit(repo_root):
@@ -222,11 +222,11 @@ def _schedule_update_on_revit_exit(repo_root):
     # Batch script: poll until the PID is gone, then pull
     batch = "\r\n".join([
         "@echo off",
-        "title WWPTools — waiting for Revit to close...",
+        "title WWPTools - waiting for Revit to close...",
         ":wait",
         "tasklist /FI \"PID eq {pid}\" 2>NUL | find \"{pid}\" >NUL".format(pid=pid),
         "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
-        "title WWPTools — applying update...",
+        "title WWPTools - applying update...",
         "echo.",
         "echo Revit closed.  Pulling latest WWPTools...",
         "echo.",
