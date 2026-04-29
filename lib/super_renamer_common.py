@@ -108,10 +108,14 @@ def _add_unique(targets, seen_ids, element):
 
 
 def _get_selected_targets(current_doc):
-    if uidoc is None or current_doc is None:
+    try:
+        current_uidoc = __revit__.ActiveUIDocument
+    except Exception:
+        return []
+    if current_uidoc is None or current_doc is None:
         return []
     try:
-        selected_ids = list(uidoc.Selection.GetElementIds())
+        selected_ids = list(current_uidoc.Selection.GetElementIds())
     except Exception:
         return []
 
@@ -124,6 +128,7 @@ def _get_selected_targets(current_doc):
         DB.Level,
         DB.Grid,
         DB.FilterElement,
+        DB.Family,
     )
 
     for element_id in selected_ids:
@@ -165,13 +170,16 @@ def collect_elements(current_doc, scope_key):
     if scope_key == "Materials":
         return list(fec(current_doc).OfClass(DB.Material).ToElements())
     if scope_key == "Views":
-        return [
-            v for v in fec(current_doc).OfClass(DB.View).ToElements()
-            if not v.IsTemplate
-            and v.ViewType != DB.ViewType.Schedule
-            and v.ViewType != DB.ViewType.DrawingSheet
-            and v.ViewType != DB.ViewType.Internal
-        ]
+        views = []
+        for v in fec(current_doc).OfClass(DB.View).ToElements():
+            try:
+                if not v.IsTemplate and v.ViewType not in (
+                    DB.ViewType.Schedule, DB.ViewType.DrawingSheet, DB.ViewType.Internal
+                ):
+                    views.append(v)
+            except Exception:
+                pass
+        return views
     if scope_key == "View Templates":
         return [v for v in fec(current_doc).OfClass(DB.View).ToElements() if v.IsTemplate]
     if scope_key == "Sheets":
