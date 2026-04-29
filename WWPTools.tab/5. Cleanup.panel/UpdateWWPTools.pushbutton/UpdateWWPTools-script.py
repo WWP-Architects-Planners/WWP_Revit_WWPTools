@@ -87,6 +87,18 @@ def _reload_pyrevit():
         return False
 
 
+def _powershell_message_command(title, message):
+    safe_title = (title or "").replace("'", "''")
+    safe_message = (message or "").replace("'", "''")
+    return (
+        "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden "
+        "-Command \"try { "
+        "Add-Type -AssemblyName PresentationFramework -ErrorAction Stop; "
+        "[System.Windows.MessageBox]::Show('{msg}', '{title}') | Out-Null "
+        "} catch {}\" >NUL 2>&1"
+    ).format(msg=safe_message, title=safe_title)
+
+
 def _extension_root():
     return os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
 
@@ -325,35 +337,50 @@ def _schedule_update_on_revit_exit(repo_root):
     """
     pid = os.getpid()
     safe_root = os.path.normpath(repo_root)
+    log_path = os.path.normpath(
+        os.path.join(tempfile.gettempdir(), "wwptools_update_{}.log".format(pid))
+    )
+
+    start_notice = _powershell_message_command(
+        TITLE,
+        "Revit has closed. WWPTools update is now running in the background. "
+        "You will get a completion message when it finishes.",
+    )
+    success_notice = _powershell_message_command(
+        TITLE,
+        "WWPTools update completed successfully. You can reopen Revit now.\n\n"
+        "Log file:\n{}".format(log_path),
+    )
+    failed_notice = _powershell_message_command(
+        TITLE,
+        "WWPTools update failed after Revit closed.\n\n"
+        "Check the update log for details:\n{}".format(log_path),
+    )
 
     # Batch script: poll until all Revit processes are gone, then mirror origin/main.
     batch = "\r\n".join([
         "@echo off",
-        "title WWPTools - waiting for Revit to close...",
-        "echo WWPTools standby updater is waiting for Revit to close.",
-        "echo Close all Revit windows to continue.",
-        "echo.",
+        "setlocal",
+        "set \"LOG={log}\"".format(log=log_path),
+        "echo [%%date%% %%time%%] Standby updater started. > \"%%LOG%%\"",
+        "echo [%%date%% %%time%%] Waiting for Revit.exe to close... >> \"%%LOG%%\"",
         ":wait",
         "tasklist /FI \"IMAGENAME eq Revit.exe\" 2>NUL | find /I \"Revit.exe\" >NUL",
         "if not errorlevel 1 (timeout /t 3 /nobreak >NUL & goto wait)",
-        "title WWPTools - applying update...",
-        "echo.",
-        "echo Revit closed.  Downloading latest WWPTools from GitHub...",
-        "echo.",
-        "git -C \"{root}\" fetch origin {branch}".format(root=safe_root, branch=TARGET_BRANCH),
+        "echo [%%date%% %%time%%] Revit closed. Starting Git sync... >> \"%%LOG%%\"",
+        start_notice,
+        "git -C \"{root}\" fetch origin {branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=TARGET_BRANCH),
         "if errorlevel 1 goto failed",
-        "git -C \"{root}\" reset --hard origin/{branch}".format(root=safe_root, branch=TARGET_BRANCH),
+        "git -C \"{root}\" reset --hard origin/{branch} >> \"%%LOG%%\" 2>&1".format(root=safe_root, branch=TARGET_BRANCH),
         "if errorlevel 1 goto failed",
-        "git -C \"{root}\" clean -ffdx".format(root=safe_root),
+        "git -C \"{root}\" clean -ffdx >> \"%%LOG%%\" 2>&1".format(root=safe_root),
         "if errorlevel 1 goto failed",
-        "echo.",
-        "echo WWPTools updated successfully.",
-        "timeout /t 5 /nobreak >NUL",
+        "echo [%%date%% %%time%%] Update completed successfully. >> \"%%LOG%%\"",
+        success_notice,
         "exit /b 0",
         ":failed",
-        "echo.",
-        "echo Update failed.  Open Revit and run Update WWPTools to try again.",
-        "pause",
+        "echo [%%date%% %%time%%] Update failed. >> \"%%LOG%%\"",
+        failed_notice,
         "exit /b 1",
     ]) + "\r\n"
 
