@@ -582,6 +582,18 @@ def get_parameter_options_for_category(doc, category_id, sample_limit=400):
                     record["editable"] = True
             except Exception:
                 pass
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is not None:
+            for name, param in _iter_element_parameters(proj_info):
+                record = options.setdefault(name, {"name": name, "editable": False})
+                try:
+                    if param is not None and not param.IsReadOnly:
+                        record["editable"] = True
+                except Exception:
+                    pass
+    except Exception:
+        pass
     result = list(options.values())
     result.sort(key=lambda item: item["name"].lower())
     return result
@@ -810,7 +822,33 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         source_list.SelectedItem = selected
         _refresh_parameter_list()
 
+    _initialized = [False]
+
+    def _auto_populate_schedule_fields():
+        if not _initialized[0] or _current_mode() != MODE_FROM_SCHEDULE:
+            return
+        selected_item = source_list.SelectedItem
+        if selected_item is None:
+            return
+        category_id = _resolve_category_id(selected_item)
+        if category_id is None:
+            return
+        try:
+            fields = get_visible_schedule_fields(selected_item.view)
+        except Exception:
+            return
+        names = []
+        for f in fields:
+            try:
+                name = f["field"].GetName()
+                if name and name not in names:
+                    names.append(name)
+            except Exception:
+                pass
+        selected_params_by_category[category_id] = names
+
     def _source_selection_changed(_sender, _args):
+        _auto_populate_schedule_fields()
         _refresh_parameter_list()
 
     def _add_parameters(_sender=None, _args=None):
@@ -934,6 +972,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     ok_button.Click += _ok
     cancel_button.Click += _cancel
     _refresh_source_list()
+    _initialized[0] = True
 
     if sheet_name_box is not None:
         initial_sheet_name_stripped = (initial_sheet_name or "").strip()
@@ -1168,12 +1207,20 @@ def get_parameter_by_name(doc, element, param_name):
     if param:
         return param
     elem_type = get_element_type(doc, element)
-    if elem_type is None:
-        return None
+    if elem_type is not None:
+        try:
+            param = elem_type.LookupParameter(param_name)
+        except Exception:
+            param = None
+        if param:
+            return param
     try:
-        return elem_type.LookupParameter(param_name)
+        proj_info = doc.ProjectInformation
+        if proj_info is not None:
+            return proj_info.LookupParameter(param_name)
     except Exception:
-        return None
+        pass
+    return None
 
 
 def parameter_to_export_value(doc, param):
