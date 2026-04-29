@@ -40,6 +40,22 @@ def _print_md(text):
     except Exception:
         pass
 
+def _elem_id_int(eid):
+    if eid is None:
+        return None
+    try:
+        return int(eid.Value)  # Revit 2024+
+    except Exception:
+        pass
+    try:
+        return int(eid.IntegerValue)  # Revit 2023-
+    except Exception:
+        pass
+    try:
+        return int(eid)
+    except Exception:
+        return None
+
 # wait dialog removed (lazy loading filter values)
 
 def _is_titleblock(element):
@@ -47,7 +63,7 @@ def _is_titleblock(element):
         return False
     category_id = element.Category.Id
     titleblock_builtin_id = int(DB.BuiltInCategory.OST_TitleBlocks)
-    # Try Revit 2025 method first (IntegerValue property)
+    # Compare the raw ElementId value when the API exposes it directly.
     if hasattr(category_id, 'IntegerValue'):
         return _elem_id_int(category_id) == titleblock_builtin_id
     # Revit 2026 method: convert to long for ElementId constructor
@@ -92,10 +108,14 @@ def _is_yes_no_parameter(param):
 
     return False
 
-def _is_numeric_parameter(param):
+def _is_supported_scale_parameter(param):
     try:
         return (
-            param.StorageType in (DB.StorageType.Double, DB.StorageType.Integer)
+            param.StorageType in (
+                DB.StorageType.Double,
+                DB.StorageType.Integer,
+                DB.StorageType.String,
+            )
             and not _is_yes_no_parameter(param)
         )
     except Exception:
@@ -110,7 +130,7 @@ def _get_param_entries(titleblock_instances):
             for p in tb.Parameters:
                 if not p or not p.Definition:
                     continue
-                if not _is_numeric_parameter(p):
+                if not _is_supported_scale_parameter(p):
                     continue
                 name = p.Definition.Name
                 if name and "scale" in name.lower():
@@ -124,7 +144,7 @@ def _get_param_entries(titleblock_instances):
                 for p in symbol.Parameters:
                     if not p or not p.Definition:
                         continue
-                    if not _is_numeric_parameter(p):
+                    if not _is_supported_scale_parameter(p):
                         continue
                     name = p.Definition.Name
                     if name and "scale" in name.lower():
@@ -203,13 +223,6 @@ def _show_sheet_scale_dialog(
     from System.Windows.Markup import XamlReader
     from System.Windows.Media.Imaging import BitmapImage, BitmapCacheOption
     from System.Xml import XmlReader
-
-
-def _elem_id_int(eid):
-    try:
-        return int(eid.Value)      # Revit 2024+
-    except AttributeError:
-        return int(eid.Value)  # Revit 2023-
 
     xaml_path = os.path.join(os.path.dirname(__file__), "SheetScaleUpdaterDialog.xaml")
     if not os.path.isfile(xaml_path):
