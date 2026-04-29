@@ -26,6 +26,7 @@ CONFIG_LAST_SCHEDULE_ID = "last_schedule_id"
 CONFIG_LAST_CATEGORY_ID = "last_category_id"
 CONFIG_LAST_PARAM_NAMES = "last_param_names"
 CONFIG_LAST_SHEET_NAME = "last_sheet_name"
+PARAM_SAVED_SETS = "! P_STATS_Export"
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 MODE_FROM_SCHEDULE = "schedule"
@@ -78,14 +79,53 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 Padding="20">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
+                <!-- Saved sets -->
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="Saved set:"
+                               Foreground="#374151"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Margin="0,0,8,0"/>
+                    <ComboBox Name="SavedSetBox"
+                              Grid.Column="1"
+                              IsEditable="True"
+                              Margin="0,0,8,0"/>
+                    <Button Name="LoadSetButton"
+                            Grid.Column="2"
+                            Content="Load"
+                            Width="64"
+                            Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button Name="SaveSetButton"
+                            Grid.Column="3"
+                            Content="Save"
+                            Width="64"
+                            Margin="0,0,6,0"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                    <Button Name="DeleteSetButton"
+                            Grid.Column="4"
+                            Content="Delete"
+                            Width="64"
+                            Style="{StaticResource SecondaryButtonStyle}"/>
+                </Grid>
+
                 <!-- Main 3-column area -->
-                <Grid Grid.Row="0">
+                <Grid Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="340"/>
                         <ColumnDefinition Width="130"/>
@@ -217,7 +257,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 </Grid>
 
                 <!-- Sheet name -->
-                <Grid Grid.Row="1" Margin="0,10,0,0">
+                <Grid Grid.Row="2" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -232,7 +272,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 </Grid>
 
                 <!-- Excel path + Browse -->
-                <Grid Grid.Row="2" Margin="0,8,0,0">
+                <Grid Grid.Row="3" Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="90"/>
@@ -245,7 +285,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
                 </Grid>
 
                 <!-- Footer: logo + Export + Cancel -->
-                <DockPanel Grid.Row="3" Margin="0,16,0,0">
+                <DockPanel Grid.Row="4" Margin="0,16,0,0">
                     <Image Name="LogoImage"
                            DockPanel.Dock="Left"
                            Width="56"
@@ -332,6 +372,38 @@ def get_active_doc():
     except Exception:
         pass
     return None
+
+
+def read_saved_sets(doc):
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return {}
+        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None:
+            return {}
+        raw = (param.AsString() or "").strip()
+        return json.loads(raw) if raw else {}
+    except Exception:
+        return {}
+
+
+def write_saved_sets(doc, sets_dict):
+    try:
+        proj_info = doc.ProjectInformation
+        if proj_info is None:
+            return False
+        param = proj_info.LookupParameter(PARAM_SAVED_SETS)
+        if param is None or param.IsReadOnly:
+            return False
+        t = DB.Transaction(doc, "Save Export2Ex Settings")
+        t.Start()
+        param.Set(json.dumps(sets_dict, ensure_ascii=False, indent=2))
+        t.Commit()
+        return True
+    except Exception as exc:
+        log_exception("write_saved_sets", exc)
+        return False
 
 
 def _log_file_path():
@@ -716,6 +788,10 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     logo_image = window.FindName("LogoImage")
     show_read_only_filter = window.FindName("ShowReadOnlyFilter")
     sheet_name_box = window.FindName("SheetNameBox")
+    saved_set_box = window.FindName("SavedSetBox")
+    load_set_button = window.FindName("LoadSetButton")
+    save_set_button = window.FindName("SaveSetButton")
+    delete_set_button = window.FindName("DeleteSetButton")
 
     excel_path.Text = init_excel_path or ""
     schedule_items = schedules or []
@@ -938,6 +1014,93 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         if file_path:
             excel_path.Text = file_path
 
+    saved_sets = read_saved_sets(doc)
+
+    def _refresh_saved_set_dropdown():
+        if saved_set_box is None:
+            return
+        current_text = saved_set_box.Text or ""
+        saved_set_box.Items.Clear()
+        for name in sorted(saved_sets.keys()):
+            saved_set_box.Items.Add(name)
+        saved_set_box.Text = current_text
+
+    def _get_current_set_data():
+        selected_item = source_list.SelectedItem
+        category_id = _resolve_category_id(selected_item)
+        source_id = selected_item.id_value if selected_item is not None else None
+        return {
+            "mode": _current_mode(),
+            "source_id": source_id,
+            "category_id": category_id,
+            "param_names": list(selected_params_by_category.get(category_id, [])),
+            "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
+        }
+
+    def _apply_saved_set(set_data):
+        _initialized[0] = False
+        try:
+            mode = set_data.get("mode", MODE_FROM_SCHEDULE)
+            source_id = _coerce_int(set_data.get("source_id"), None)
+            category_id = _coerce_int(set_data.get("category_id"), None)
+            param_names = set_data.get("param_names") or []
+            saved_sheet = (set_data.get("sheet_name") or "").strip()
+            if category_id is not None:
+                selected_params_by_category[category_id] = list(param_names)
+            mode_box.SelectedIndex = 1 if mode == MODE_BY_CATEGORY else 0
+            source_search_box.Text = ""
+            for item in _get_source_items():
+                if item.id_value == source_id:
+                    source_list.SelectedItem = item
+                    break
+            if sheet_name_box is not None and saved_sheet:
+                sheet_name_box.Text = saved_sheet
+            _refresh_parameter_list()
+        finally:
+            _initialized[0] = True
+
+    def _load_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name or name not in saved_sets:
+            ui.uiUtils_alert("Select a saved set from the dropdown to load.", title="Export2Ex Beta")
+            return
+        _apply_saved_set(saved_sets[name])
+
+    def _save_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name:
+            ui.uiUtils_alert("Type a name for the saved set before saving.", title="Export2Ex Beta")
+            return
+        saved_sets[name] = _get_current_set_data()
+        if not write_saved_sets(doc, saved_sets):
+            ui.uiUtils_alert(
+                "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.".format(PARAM_SAVED_SETS),
+                title="Export2Ex Beta",
+            )
+            return
+        _refresh_saved_set_dropdown()
+
+    def _delete_set(_sender=None, _args=None):
+        if saved_set_box is None:
+            return
+        name = (saved_set_box.Text or "").strip()
+        if not name or name not in saved_sets:
+            ui.uiUtils_alert("Select a saved set from the dropdown to delete.", title="Export2Ex Beta")
+            return
+        del saved_sets[name]
+        if not write_saved_sets(doc, saved_sets):
+            ui.uiUtils_alert(
+                "Could not update '{}' on Project Information.".format(PARAM_SAVED_SETS),
+                title="Export2Ex Beta",
+            )
+            return
+        saved_set_box.Text = ""
+        _refresh_saved_set_dropdown()
+
     def _ok(_sender, _args):
         window.DialogResult = True
         window.Close()
@@ -971,6 +1134,13 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
     browse_excel.Click += _browse_excel
     ok_button.Click += _ok
     cancel_button.Click += _cancel
+    if load_set_button is not None:
+        load_set_button.Click += _load_set
+    if save_set_button is not None:
+        save_set_button.Click += _save_set
+    if delete_set_button is not None:
+        delete_set_button.Click += _delete_set
+    _refresh_saved_set_dropdown()
     _refresh_source_list()
     _initialized[0] = True
 
