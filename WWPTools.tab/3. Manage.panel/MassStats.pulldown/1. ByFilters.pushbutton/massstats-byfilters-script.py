@@ -1,5 +1,5 @@
 #! python3
-"""Mass Stats Tool – live back-of-house calculations from Revit mass elements."""
+"""Mass Stats By Filters - live back-of-house calculations from Revit mass elements."""
 
 import clr
 import os
@@ -7,7 +7,7 @@ import traceback
 
 # ── locate the compiled WPF DLL ─────────────────────────────────────────────
 script_dir = os.path.dirname(__file__)
-lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "lib"))
+lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
 
 def _load_dll():
     candidates = [
@@ -29,17 +29,17 @@ def main():
         _load_dll()
     except FileNotFoundError as e:
         from pyrevit import forms
-        forms.alert(str(e), title="Mass Stats Tool")
+        forms.alert(str(e), title="Mass Stats By Filters")
         return
 
     from WWPTools.WpfUI import MassStatsLauncher  # type: ignore
 
     try:
         # __revit__ is the UIApplication injected by pyRevit into every script
-        MassStatsLauncher.Show(__revit__)  # noqa: F821
+        MassStatsLauncher.ShowByFilters(__revit__)  # noqa: F821
     except Exception:
         from pyrevit import forms
-        forms.alert(traceback.format_exc(), title="Mass Stats Tool – Error")
+        forms.alert(traceback.format_exc(), title="Mass Stats By Filters - Error")
 
 
 main()

@@ -27,6 +27,7 @@ CONFIG_LAST_CATEGORY_ID = "last_category_id"
 CONFIG_LAST_PARAM_NAMES = "last_param_names"
 CONFIG_LAST_SHEET_NAME = "last_sheet_name"
 PARAM_SAVED_SETS = "! P_STATS_Export"
+SAVED_SET_NAMESPACE = "export2ex_beta"
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 MODE_FROM_SCHEDULE = "schedule"
@@ -383,9 +384,22 @@ def read_saved_sets(doc):
         if param is None:
             return {}
         raw = (param.AsString() or "").strip()
-        return json.loads(raw) if raw else {}
+        if not raw:
+            return {}
+        data = json.loads(raw)
+        if isinstance(data, dict) and isinstance(data.get(SAVED_SET_NAMESPACE), dict):
+            return data.get(SAVED_SET_NAMESPACE) or {}
+        return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+def _looks_like_legacy_saved_sets(data):
+    if not isinstance(data, dict) or not data:
+        return False
+    if "mass_stats" in data or SAVED_SET_NAMESPACE in data:
+        return False
+    return all(isinstance(v, dict) for v in data.values())
 
 
 def write_saved_sets(doc, sets_dict):
@@ -396,9 +410,19 @@ def write_saved_sets(doc, sets_dict):
         param = proj_info.LookupParameter(PARAM_SAVED_SETS)
         if param is None or param.IsReadOnly:
             return False
+        raw = (param.AsString() or "").strip()
+        try:
+            payload = json.loads(raw) if raw else {}
+        except Exception:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        if _looks_like_legacy_saved_sets(payload):
+            payload = {SAVED_SET_NAMESPACE: payload}
+        payload[SAVED_SET_NAMESPACE] = sets_dict
         t = DB.Transaction(doc, "Save Export2Ex Settings")
         t.Start()
-        param.Set(json.dumps(sets_dict, ensure_ascii=False, indent=2))
+        param.Set(json.dumps(payload, ensure_ascii=False, indent=2))
         t.Commit()
         return True
     except Exception as exc:
