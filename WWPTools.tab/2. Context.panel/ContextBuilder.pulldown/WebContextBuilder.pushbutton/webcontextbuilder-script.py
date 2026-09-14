@@ -1279,6 +1279,23 @@ def _build_area_features(ways, relations, predicate):
     return features
 
 
+_TRUE_NORTH_ANGLE_RAD = 0.0
+
+
+def _get_true_north_angle_rad(doc):
+    """CCW angle (radians) from Project North (+Y) to True North, per
+    doc.ActiveProjectLocation. Context builders place geometry using
+    True North as the reference direction (from GPS/OSM lat-lon), so this
+    angle must be applied to align imported context with the project's
+    actual north arrow -- otherwise context lands rotated by whatever
+    Angle to True North the project (and any assigned GIS Coordinate
+    System) has set."""
+    try:
+        return doc.ActiveProjectLocation.GetProjectPosition(DB.XYZ.Zero).Angle
+    except Exception:
+        return 0.0
+
+
 def _project_latlon(lat, lon, origin_lat, origin_lon):
     earth_radius_m = 6378137.0
     lat_rad = math.radians(lat)
@@ -1287,6 +1304,11 @@ def _project_latlon(lat, lon, origin_lat, origin_lon):
     origin_lon_rad = math.radians(origin_lon)
     x_m = (lon_rad - origin_lon_rad) * math.cos(origin_lat_rad) * earth_radius_m
     y_m = (lat_rad - origin_lat_rad) * earth_radius_m
+    angle_rad = _TRUE_NORTH_ANGLE_RAD
+    if angle_rad:
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+        x_m, y_m = x_m * cos_a - y_m * sin_a, x_m * sin_a + y_m * cos_a
     return x_m, y_m
 
 
@@ -2648,10 +2670,13 @@ def _build_terrain_boundary_loop(center_lat, center_lon, radius_m, base_elevatio
 
 
 def main():
+    global _TRUE_NORTH_ANGLE_RAD
     doc = _get_doc()
     if doc is None:
         UI.TaskDialog.Show(TITLE, "No active Revit document found.")
         return
+
+    _TRUE_NORTH_ANGLE_RAD = _get_true_north_angle_rad(doc)
 
     user_inputs = _show_dialog(doc)
     if user_inputs is None:

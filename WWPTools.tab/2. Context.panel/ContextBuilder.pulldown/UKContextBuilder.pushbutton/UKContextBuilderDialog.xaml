@@ -70,6 +70,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="120"/>
@@ -144,14 +145,27 @@
                             Leave Address blank to use the project site location when available. Click the map to set a location and reverse-geocode it back into the address field.
                         </TextBlock>
 
+                        <Button x:Name="UseRevitLocationButton"
+                                Grid.Row="4"
+                                Grid.ColumnSpan="3"
+                                Margin="0,0,0,12"
+                                Height="30"
+                                HorizontalAlignment="Stretch"
+                                Background="{StaticResource WindowBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                Foreground="{StaticResource InfoBrush}"
+                                FontWeight="SemiBold"
+                                Visibility="Collapsed"
+                                Content="Use Revit Geo-Reference Location"/>
+
                         <CheckBox x:Name="FastModeCheckBox"
-                                  Grid.Row="4"
+                                  Grid.Row="5"
                                   Grid.ColumnSpan="3"
                                   Margin="0,0,0,12"
                                   IsChecked="False"
                                   Content="Fast Mode (coarse terrain only, skip DSM-DTM height fallback)"/>
 
-                        <Border Grid.Row="5"
+                        <Border Grid.Row="6"
                                 Grid.ColumnSpan="3"
                                 Margin="0,0,0,12"
                                 Padding="12"
@@ -201,7 +215,7 @@
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="6"
+                        <Border Grid.Row="7"
                                 Grid.ColumnSpan="3"
                                 Margin="0,0,0,12"
                                 Padding="12"
@@ -221,7 +235,7 @@
                         </Border>
 
                         <TextBlock x:Name="ValidationText"
-                                   Grid.Row="7"
+                                   Grid.Row="8"
                                    Grid.ColumnSpan="3"
                                    Foreground="{StaticResource DangerBrush}"
                                    FontWeight="SemiBold"
