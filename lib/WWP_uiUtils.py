@@ -1,5 +1,6 @@
 # import libraries
 import clr
+import io
 import os
 import ctypes
 import shutil
@@ -174,7 +175,7 @@ def _ensure_theme():
 	theme_path = os.path.join(_get_lib_dir(), "FlatTheme.xaml")
 	if not os.path.isfile(theme_path):
 		return
-	with open(theme_path, "r", encoding="utf-8") as f:
+	with io.open(theme_path, "r", encoding="utf-8") as f:
 		content = f.read()
 	theme_dict = XamlReader.Parse(content)
 	Application.Current.Resources.MergedDictionaries.Add(theme_dict)
@@ -215,14 +216,14 @@ def uiUtils_load_logo(image_control, logo_path=None):
 def _load_window_xaml(xaml_filename):
 	from System.Windows.Markup import XamlReader
 	xaml_path = os.path.join(_get_lib_dir(), xaml_filename)
-	with open(xaml_path, "r", encoding="utf-8") as f:
+	with io.open(xaml_path, "r", encoding="utf-8") as f:
 		content = f.read()
 	return XamlReader.Parse(content)
 
 
 def _load_window_xaml_path(xaml_path):
 	from System.Windows.Markup import XamlReader
-	with open(xaml_path, "r", encoding="utf-8") as f:
+	with io.open(xaml_path, "r", encoding="utf-8") as f:
 		content = f.read()
 	return XamlReader.Parse(content)
 

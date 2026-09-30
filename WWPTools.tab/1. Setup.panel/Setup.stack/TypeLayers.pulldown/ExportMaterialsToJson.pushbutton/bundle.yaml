@@ -1,0 +1,6 @@
+title: "Export\nMaterials JSON"
+tooltip: |
+  Export project materials (cut/surface patterns, colors, transparency, keynote) to a JSON file.
+  Run this against a standards file, then use "Import Type Layers" to pull missing materials
+  from the resulting JSON without ever opening the standards file.
+author: "Jason Tian"

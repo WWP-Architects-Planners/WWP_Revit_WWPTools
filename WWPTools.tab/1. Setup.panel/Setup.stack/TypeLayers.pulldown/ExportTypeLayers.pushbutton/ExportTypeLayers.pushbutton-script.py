@@ -132,6 +132,8 @@ def pick_export_path(doc, ui):
             initial_dir = os.path.dirname(doc.PathName)
     except Exception:
         initial_dir = ""
+    if not initial_dir or not os.path.isdir(initial_dir):
+        initial_dir = ""
     path = ui.uiUtils_save_file_dialog(
         title="Export Type Layers",
         filter_text="Excel Workbook (*.xlsx)|*.xlsx",

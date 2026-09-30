@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Titleblock Updater and Import Key Schedule dialogs threw `Provide value on 'System.Windows.StaticResourceExtension' threw an exception` on open -- their loose XAML referenced shared theme brushes/styles (`WindowBrush`, `BrandLogoFooter`, `SelectedBrush`, etc.) that weren't defined locally. Fixed by defining the missing resources directly in each dialog's own `Window.Resources`.
 - 24 more command dialogs (UK/Web Context Builder, Area Scheme Copy, Copy Color Scheme, Copy Filter x3, Door Fire Rating Wall, Door Type Duplicator, Fire Line, Fire Rating + FRR Mapping, Fire Rating FRR Views, Parking Generator, Parking to Room, Make Key Plan View, Make Views, Export2Ex x2, Sheet Duplicator, Lay Views on Sheet, Delete Unused Views, Combined Print Set, About) had the same latent bug: their scripts loaded loose XAML via `XamlReader` without first calling `WWP_uiUtils.uiUtils_ensure_theme()`, which merges the shared `FlatTheme.xaml` into `Application.Resources`. The dialogs could still open if another theme-loading tool had already run earlier in the same Revit session (masking the bug), but failed when run first. Fixed by adding the missing `uiUtils_ensure_theme()` call before each dialog's XAML load.
+- Dialogs using `uiUtils_ensure_theme()` (e.g. UK/Web Context Builder) failed with `open() got an unexpected keyword argument 'encoding'` under IronPython 2.7. `WWP_uiUtils` now reads `FlatTheme.xaml` and loose XAML files via `io.open` instead of the built-in `open`.
 
 ### Removed
 

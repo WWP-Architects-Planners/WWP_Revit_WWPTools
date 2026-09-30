@@ -1,10 +1,10 @@
 import clr
+import json
 import os
 import re
 import sys
 import System
 import traceback
-from contextlib import contextmanager
 
 from pyrevit import DB, HOST_APP, script
 
@@ -17,6 +17,7 @@ OVERWRITE_MODE_ALL = "overwrite_all"
 OVERWRITE_MODE_SKIP = "skip_all"
 MISSING_MATERIALS_ABORT = "abort"
 MISSING_MATERIALS_IGNORE = "ignore"
+MISSING_MATERIALS_IMPORT = "import_from_source"
 
 
 
@@ -67,17 +68,30 @@ def get_doc():
     return doc
 
 
-@contextmanager
-def revit_transaction(doc, name):
-    transaction = DB.Transaction(doc, name)
-    transaction.Start()
-    try:
-        yield transaction
-        transaction.Commit()
-    except Exception:
-        if transaction.HasStarted():
-            transaction.RollBack()
-        raise
+class revit_transaction(object):
+    """Class-based transaction context manager.
+
+    A generator-based @contextmanager loses the real traceback frames when a
+    .NET/CLR exception crosses the `yield` boundary in IronPython, which makes
+    failures inside the `with` block nearly impossible to diagnose. A plain
+    class avoids that: the exception propagates through __exit__ with its
+    original frames intact.
+    """
+
+    def __init__(self, doc, name):
+        self.transaction = DB.Transaction(doc, name)
+
+    def __enter__(self):
+        self.transaction.Start()
+        return self.transaction
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if exc_type is None:
+            self.transaction.Commit()
+            return False
+        if self.transaction.HasStarted():
+            self.transaction.RollBack()
+        return False
 
 
 def log_info(message):
@@ -151,8 +165,9 @@ def choose_missing_material_mode(ui, missing_materials):
     prompt_lines.append("Choose how to proceed:")
 
     options = [
+        "Import Materials From JSON File",
+        "Ignore Missing Materials (Use <By Category>)",
         "Do Not Import, Materials First",
-        "Ignore Missing Materials",
     ]
     selected = ui.uiUtils_select_indices(
         options,
@@ -165,8 +180,47 @@ def choose_missing_material_mode(ui, missing_materials):
     if not selected:
         return None
     if selected[0] == 0:
-        return MISSING_MATERIALS_ABORT
-    return MISSING_MATERIALS_IGNORE
+        return MISSING_MATERIALS_IMPORT
+    if selected[0] == 1:
+        return MISSING_MATERIALS_IGNORE
+    return MISSING_MATERIALS_ABORT
+
+
+def choose_types_to_import(ui, category_groups):
+    multi_category = len(category_groups) > 1
+    items = []
+    refs = []
+    for label, _type_class, grouped in category_groups:
+        named_groups = [
+            (key, group) for key, group in grouped.items()
+            if group.get("TypeName") or group.get("SourceTypeName")
+        ]
+        named_groups.sort(key=lambda kg: (kg[1].get("TypeName") or kg[1].get("SourceTypeName") or "").lower())
+        for key, group in named_groups:
+            type_name = group.get("TypeName") or group.get("SourceTypeName")
+            display = "{}: {}".format(label, type_name) if multi_category else type_name
+            items.append(display)
+            refs.append((label, key))
+
+    if not items:
+        return None
+
+    selected = ui.uiUtils_select_indices(
+        items,
+        title="Import Type Layers",
+        prompt="Select the type(s) to import ({} found). Ctrl+Click / Shift+Click for multiple, Ctrl+A for all.".format(len(items)),
+        multiselect=True,
+        width=760,
+        height=640,
+    )
+    if not selected:
+        return None
+
+    chosen = {}
+    for idx in selected:
+        label, key = refs[idx]
+        chosen.setdefault(label, set()).add(key)
+    return chosen
 
 
 def element_id_value(elem_id):
@@ -180,6 +234,53 @@ def element_id_value(elem_id):
         return int(elem_id)
     except Exception:
         return -1
+
+
+def get_elem_name(elem):
+    # Some Revit API versions expose Element.Name in a way IronPython's dynamic
+    # attribute lookup cannot resolve directly for certain element types
+    # (fails with "AttributeError: Name" / MissingMemberException even though
+    # the member exists). Fall back to the reflected property descriptor and,
+    # failing that, the underlying type-name parameter.
+    if elem is None:
+        return None
+    try:
+        return elem.Name
+    except Exception:
+        pass
+    try:
+        return DB.Element.Name.__get__(elem)
+    except Exception:
+        pass
+    try:
+        bips = (DB.BuiltInParameter.SYMBOL_NAME_PARAM, DB.BuiltInParameter.ALL_MODEL_TYPE_NAME)
+    except Exception:
+        bips = ()
+    for bip in bips:
+        try:
+            param = elem.get_Parameter(bip)
+            if param and param.HasValue:
+                value = param.AsString()
+                if value:
+                    return value
+        except Exception:
+            continue
+    return None
+
+
+def set_elem_name(elem, new_name):
+    if elem is None or not new_name:
+        return False
+    try:
+        elem.Name = new_name
+        return True
+    except Exception:
+        pass
+    try:
+        DB.Element.Name.__set__(elem, new_name)
+        return True
+    except Exception:
+        return False
 
 
 def pick_excel_path(doc, ui):
@@ -388,10 +489,7 @@ def get_material_cache(doc):
     normalized = {}
     materials = []
     for mat in DB.FilteredElementCollector(doc).OfClass(DB.Material):
-        try:
-            name = mat.Name
-        except Exception:
-            continue
+        name = get_elem_name(mat)
         if not name:
             continue
         norm = normalize_lookup_text(name)
@@ -407,6 +505,148 @@ def get_material_cache(doc):
         "materials": materials,
     }
     return _material_cache
+
+
+def invalidate_material_cache():
+    global _material_cache
+    _material_cache = None
+
+
+def choose_material_json_path(ui, doc):
+    initial_dir = ""
+    try:
+        if doc.PathName:
+            initial_dir = os.path.dirname(doc.PathName)
+    except Exception:
+        initial_dir = ""
+    if not initial_dir or not os.path.isdir(initial_dir):
+        initial_dir = ""
+    return ui.uiUtils_open_file_dialog(
+        title="Select Materials JSON File",
+        filter_text="JSON File (*.json)|*.json|All Files (*.*)|*.*",
+        multiselect=False,
+        initial_directory=initial_dir,
+    )
+
+
+def load_materials_json(path):
+    with open(path, "r") as f:
+        payload = json.load(f)
+    records_by_name = {}
+    for record in payload.get("materials", []) or []:
+        record_name = record.get("name")
+        if record_name:
+            records_by_name[record_name] = record
+    return records_by_name
+
+
+def color_from_list(values):
+    if not values or len(values) < 3:
+        return None
+    try:
+        return DB.Color(int(values[0]), int(values[1]), int(values[2]))
+    except Exception:
+        return None
+
+
+def find_fill_pattern_by_name(doc, name, cache):
+    if not name:
+        return DB.ElementId.InvalidElementId
+    key = name.strip().lower()
+    if key in cache:
+        return cache[key]
+    match = DB.ElementId.InvalidElementId
+    for pattern in DB.FilteredElementCollector(doc).OfClass(DB.FillPatternElement):
+        pattern_name = get_elem_name(pattern)
+        if pattern_name and pattern_name.strip().lower() == key:
+            match = pattern.Id
+            break
+    cache[key] = match
+    return match
+
+
+def apply_material_record(doc, mat, record, pattern_cache, warnings):
+    name = record.get("name")
+
+    def set_pattern(prop_prefix, pattern_key, color_key):
+        pattern_name = record.get(pattern_key)
+        if pattern_name:
+            pattern_id = find_fill_pattern_by_name(doc, pattern_name, pattern_cache)
+            if pattern_id == DB.ElementId.InvalidElementId:
+                warnings.append(
+                    "Pattern '{}' referenced by material '{}' was not found in this project.".format(pattern_name, name)
+                )
+            else:
+                try:
+                    setattr(mat, prop_prefix + "Id", pattern_id)
+                except Exception:
+                    pass
+        color = color_from_list(record.get(color_key))
+        if color is not None:
+            try:
+                setattr(mat, prop_prefix + "Color", color)
+            except Exception:
+                pass
+
+    set_pattern("CutForegroundPattern", "cutForegroundPattern", "cutForegroundColor")
+    set_pattern("CutBackgroundPattern", "cutBackgroundPattern", "cutBackgroundColor")
+    set_pattern("SurfaceForegroundPattern", "surfaceForegroundPattern", "surfaceForegroundColor")
+    set_pattern("SurfaceBackgroundPattern", "surfaceBackgroundPattern", "surfaceBackgroundColor")
+
+    shading_color = color_from_list(record.get("color"))
+    if shading_color is not None:
+        try:
+            mat.Color = shading_color
+        except Exception:
+            pass
+
+    for prop, key in (("Transparency", "transparency"), ("Shininess", "shininess"), ("Smoothness", "smoothness")):
+        value = record.get(key)
+        if value is not None:
+            try:
+                setattr(mat, prop, int(value))
+            except Exception:
+                pass
+
+    for prop, key in (("MaterialClass", "materialClass"), ("MaterialCategory", "materialCategory")):
+        value = record.get(key)
+        if value:
+            try:
+                setattr(mat, prop, value)
+            except Exception:
+                pass
+
+    keynote = record.get("keynote")
+    if keynote:
+        try:
+            param = mat.get_Parameter(DB.BuiltInParameter.KEYNOTE_PARAM)
+            if param and not param.IsReadOnly:
+                param.Set(keynote)
+        except Exception:
+            pass
+
+
+def import_materials_from_json(doc, records_by_name, names):
+    copied = set()
+    not_found = set()
+    failed = {}
+    warnings = []
+    pattern_cache = {}
+
+    for name in names:
+        record = records_by_name.get(name)
+        if record is None:
+            not_found.add(name)
+            continue
+        try:
+            mat_id = DB.Material.Create(doc, name)
+            mat = doc.GetElement(mat_id)
+            apply_material_record(doc, mat, record, pattern_cache, warnings)
+            copied.add(name)
+        except Exception as exc:
+            failed[name] = str(exc)
+
+    return copied, not_found, failed, warnings
 
 
 def material_name_aliases(mat_name):
@@ -448,7 +688,7 @@ def find_material_id(doc, mat_id_value, mat_name):
 
     lower = cache["lower"].get(name.lower())
     if lower:
-        return lower.Id, "Material matched case-insensitively: '{}' -> '{}'.".format(mat_name, lower.Name)
+        return lower.Id, "Material matched case-insensitively: '{}' -> '{}'.".format(mat_name, get_elem_name(lower))
 
     aliases = material_name_aliases(name)
     for alias in aliases:
@@ -456,9 +696,9 @@ def find_material_id(doc, mat_id_value, mat_name):
         mats = cache["normalized"].get(norm) or []
         if len(mats) == 1:
             mat = mats[0]
-            if mat.Name == name:
+            if get_elem_name(mat) == name:
                 return mat.Id, ""
-            return mat.Id, "Material matched by normalized name: '{}' -> '{}'.".format(mat_name, mat.Name)
+            return mat.Id, "Material matched by normalized name: '{}' -> '{}'.".format(mat_name, get_elem_name(mat))
 
     contains_candidates = []
     for alias in aliases:
@@ -474,7 +714,7 @@ def find_material_id(doc, mat_id_value, mat_name):
     if contains_candidates:
         contains_candidates.sort(key=lambda item: (item[0], item[1]))
         best = contains_candidates[0][2]
-        return best.Id, "Material matched by partial normalized name: '{}' -> '{}'.".format(mat_name, best.Name)
+        return best.Id, "Material matched by partial normalized name: '{}' -> '{}'.".format(mat_name, get_elem_name(best))
 
     token_candidates = []
     source_tokens = set(tokenize_lookup_text(aliases[0] if aliases else name))
@@ -487,7 +727,7 @@ def find_material_id(doc, mat_id_value, mat_name):
     if token_candidates:
         token_candidates.sort(key=lambda item: (item[0], item[1], item[2]))
         best = token_candidates[0][3]
-        return best.Id, "Material matched by token overlap: '{}' -> '{}'.".format(mat_name, best.Name)
+        return best.Id, "Material matched by token overlap: '{}' -> '{}'.".format(mat_name, get_elem_name(best))
 
     return DB.ElementId.InvalidElementId, ""
 
@@ -511,7 +751,12 @@ def resolve_duplicated_type(doc, duplicated):
             return doc.GetElement(duplicated)
     except Exception:
         pass
-    if hasattr(duplicated, "Id") and hasattr(duplicated, "Name"):
+    # Note: do not probe hasattr(duplicated, "Name") here - on this Revit
+    # version, Element.Name access fails via IronPython's dynamic attribute
+    # lookup for WallType (see get_elem_name), which makes hasattr() return
+    # False even for a perfectly valid duplicated type and silently defeats
+    # every type creation.
+    if hasattr(duplicated, "Id"):
         return duplicated
     try:
         return doc.GetElement(duplicated)
@@ -701,7 +946,11 @@ def collect_types_by_category(doc, type_class):
         except Exception:
             pass
         by_id[element_id_value(item.Id)] = item
-        by_name[item.Name] = item
+        item_name = get_elem_name(item)
+        if item_name:
+            by_name[item_name] = item
+        else:
+            log_warn("Could not read Name for element id {}; it will be skipped for name matching.".format(element_id_value(item.Id)))
     return items, by_unique, by_id, by_name
 
 
@@ -797,11 +1046,8 @@ def update_type_layers(doc, elem_type, layers):
 def rename_type(elem_type, new_name):
     if not new_name:
         return
-    try:
-        if elem_type.Name != new_name:
-            elem_type.Name = new_name
-    except Exception:
-        pass
+    if get_elem_name(elem_type) != new_name:
+        set_elem_name(elem_type, new_name)
 
 
 def get_existing_layers(elem_type):
@@ -951,8 +1197,35 @@ def main():
         ui.uiUtils_alert("No matching category sheets found.", title="Import Type Layers")
         return
 
+    category_groups = [(label, type_class, group_rows(rows)) for label, type_class, rows in category_data]
+
+    selected_keys_by_label = choose_types_to_import(ui, category_groups)
+    if not selected_keys_by_label:
+        log_warn("No types selected. Command cancelled.")
+        return
+
+    filtered_groups = []
+    for label, type_class, grouped in category_groups:
+        keys = selected_keys_by_label.get(label)
+        if not keys:
+            continue
+        filtered = dict((k, v) for k, v in grouped.items() if k in keys)
+        if filtered:
+            filtered_groups.append((label, type_class, filtered))
+
+    if not filtered_groups:
+        log_warn("No types selected. Command cancelled.")
+        return
+
+    log_info("Selected {} type(s) to import.".format(sum(len(g) for _, _, g in filtered_groups)))
+
+    category_data = [
+        (label, type_class, [row for group in grouped.values() for row in group["Layers"]])
+        for label, type_class, grouped in filtered_groups
+    ]
+
     missing_materials = collect_missing_materials(doc, category_data)
-    if missing_materials:
+    while missing_materials:
         log_warn(
             "Missing materials detected before import: {} material(s) across {} type(s).".format(
                 len(missing_materials),
@@ -975,7 +1248,44 @@ def main():
                     log_info(line)
             ui.uiUtils_alert(summary, title="Import Type Layers")
             return
-        log_warn("User chose to ignore missing materials. Unresolved layers will use <By Category>.")
+        if missing_material_mode == MISSING_MATERIALS_IGNORE:
+            log_warn("User chose to ignore missing materials. Unresolved layers will use <By Category>.")
+            break
+
+        # MISSING_MATERIALS_IMPORT
+        json_path = choose_material_json_path(ui, doc)
+        if not json_path:
+            log_warn("No materials JSON file selected.")
+            continue
+
+        try:
+            records_by_name = load_materials_json(json_path)
+        except Exception as exc:
+            ui.uiUtils_alert("Failed to read materials JSON file.\n{}".format(exc), title="Import Type Layers")
+            continue
+
+        log_info("Importing materials from JSON: {}".format(json_path))
+        names_to_copy = sorted(missing_materials.keys())
+        with revit_transaction(doc, "Import Materials From JSON"):
+            copied, not_found, failed, warnings = import_materials_from_json(doc, records_by_name, names_to_copy)
+
+        invalidate_material_cache()
+
+        if copied:
+            log_info("Imported {} material(s) from JSON: {}.".format(len(copied), ", ".join(sorted(copied))))
+        if not_found:
+            log_warn("{} material(s) not found in JSON file: {}.".format(len(not_found), ", ".join(sorted(not_found))))
+        for warning in warnings:
+            log_warn(warning)
+        if failed:
+            for name, err in failed.items():
+                log_error("Failed to import material '{}': {}.".format(name, err))
+
+        missing_materials = collect_missing_materials(doc, category_data)
+        if missing_materials:
+            log_warn("Still missing {} material(s) after import.".format(len(missing_materials)))
+        else:
+            log_info("All missing materials were resolved from the JSON file.")
 
     overwrite_mode = choose_overwrite_mode(ui)
     if not overwrite_mode:
@@ -987,16 +1297,13 @@ def main():
     created = 0
     skipped = 0
     errors = []
-    missing_types_summary = []
     overwrite_skipped = 0
 
     with revit_transaction(doc, "Import Type Layers"):
-        for label, type_class, rows in category_data:
+        for label, type_class, grouped in filtered_groups:
             log_section(label)
             types, by_unique, by_id, by_name = collect_types_by_category(doc, type_class)
-            grouped = group_rows(rows)
-            excel_ids = set()
-            log_info("Existing Revit types: {}. Excel groups: {}.".format(len(types), len(grouped)))
+            log_info("Existing Revit types: {}. Selected Excel groups: {}.".format(len(types), len(grouped)))
 
             for key, group in grouped.items():
                 unique_id = group.get("TypeUniqueId")
@@ -1039,7 +1346,7 @@ def main():
                     base_type = pick_seed_type(types, group.get("FamilyName"))
                     if base_type and type_name:
                         try:
-                            log_info("No existing type matched. Creating '{}' from seed '{}'.".format(type_name, base_type.Name))
+                            log_info("No existing type matched. Creating '{}' from seed '{}'.".format(type_name, get_elem_name(base_type)))
                             duplicated = base_type.Duplicate(type_name)
                             elem_type = resolve_duplicated_type(doc, duplicated)
                             if elem_type is None:
@@ -1057,10 +1364,9 @@ def main():
                         skipped += 1
                         continue
                 else:
-                    log_info("Matched Revit type '{}' by {}.".format(elem_type.Name, match_reason))
+                    log_info("Matched Revit type '{}' by {}.".format(get_elem_name(elem_type), match_reason))
 
-                excel_ids.add(element_id_value(elem_type.Id))
-                existing_name = elem_type.Name
+                existing_name = get_elem_name(elem_type)
 
                 sorted_rows = sorted(
                     group["Layers"],
@@ -1113,7 +1419,7 @@ def main():
                 existing_layers = get_existing_layers(elem_type)
                 thickness_changed = layers_thickness_changed(existing_layers, layers)
                 if was_created:
-                    log_info("Applying imported layers to newly created type '{}' without overwrite prompt.".format(elem_type.Name))
+                    log_info("Applying imported layers to newly created type '{}' without overwrite prompt.".format(get_elem_name(elem_type)))
                 elif name_changed or thickness_changed:
                     prompt_parts = []
                     if name_changed:
@@ -1123,7 +1429,7 @@ def main():
                     prompt = (
                         "Type '{}' has changes in {}.\n\n"
                         "Overwrite from Excel?"
-                    ).format(elem_type.Name, " and ".join(prompt_parts))
+                    ).format(existing_name, " and ".join(prompt_parts))
                     allow_overwrite = False
                     if overwrite_mode == OVERWRITE_MODE_ALL:
                         allow_overwrite = True
@@ -1132,62 +1438,26 @@ def main():
                     else:
                         allow_overwrite = ui.uiUtils_confirm(prompt, title="Import Type Layers")
                     if not allow_overwrite:
-                        log_warn("User declined overwrite for '{}'.".format(elem_type.Name))
+                        log_warn("User declined overwrite for '{}'.".format(existing_name))
                         overwrite_skipped += 1
                         skipped += 1
                         continue
-                    log_info("User accepted overwrite for '{}' ({}).".format(elem_type.Name, " and ".join(prompt_parts)))
+                    log_info("User accepted overwrite for '{}' ({}).".format(existing_name, " and ".join(prompt_parts)))
 
                 if name_changed:
                     log_info("Renaming type '{}' -> '{}'.".format(existing_name, type_name))
                     rename_type(elem_type, type_name)
 
                 ok, err = update_type_layers(doc, elem_type, layers)
+                current_name = get_elem_name(elem_type) or existing_name
                 if ok:
-                    log_info("Updated '{}' with {} layer(s).".format(elem_type.Name, len(layers)))
+                    log_info("Updated '{}' with {} layer(s).".format(current_name, len(layers)))
                     updated += 1
                 else:
                     skipped += 1
-                    log_error("Failed to update '{}': {}.".format(elem_type.Name, err))
+                    log_error("Failed to update '{}': {}.".format(current_name, err))
                     if err:
-                        errors.append("{}: {}".format(elem_type.Name, err))
-
-            missing = [t for t in types if element_id_value(t.Id) not in excel_ids]
-            if missing:
-                log_warn("{} type(s) exist in Revit but not in Excel for {}.".format(len(missing), label))
-                missing_types_summary.append(
-                    (label, [t.Name for t in missing])
-                )
-
-    if missing_types_summary:
-        confirm = ui.uiUtils_confirm(
-            "Some Revit types are not listed in the Excel file.\n"
-            "Do you want to delete those types?\n\n"
-            "This cannot be undone.",
-            title="Import Type Layers",
-        )
-        if confirm:
-            log_section("Delete Missing Types")
-            with revit_transaction(doc, "Delete Types Not In Excel"):
-                for label, names in missing_types_summary:
-                    items, _, _, by_name = collect_types_by_category(
-                        doc,
-                        DB.WallType if label == "Wall Types" else
-                        DB.CeilingType if label == "Ceiling Types" else
-                        DB.FloorType if label == "Floor Types" else
-                        DB.RoofType
-                    )
-                    for name in names:
-                        elem = by_name.get(name)
-                        if elem:
-                            try:
-                                doc.Delete(elem.Id)
-                                log_info("Deleted {} type '{}' because it was not found in Excel.".format(label, name))
-                            except Exception:
-                                log_warn("Failed to delete {} type '{}'.".format(label, name))
-                                pass
-        else:
-            log_info("User kept Revit types that were missing from Excel.")
+                        errors.append("{}: {}".format(current_name, err))
 
     summary = "Updated: {}\nCreated: {}\nSkipped: {}".format(updated, created, skipped)
     if overwrite_skipped:
