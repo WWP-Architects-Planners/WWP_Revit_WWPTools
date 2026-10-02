@@ -1078,189 +1078,27 @@ def _select_update_branch(repo_info, repo_root):
         return branches[0] if branches else "main"
 
 
-def _update_repo(repo_info, repo_root):
-    target_branch = _select_update_branch(repo_info, repo_root)
-    if not target_branch:
-        return
-    if not _git_cli_available():
-        if _confirm(
-            "Git for Windows is not available on this machine.\n\n"
-            "WWPTools can still update by downloading the '{}' branch from GitHub as a ZIP.\n"
-            "The update will run after Revit closes and will replace the local extension folder.\n\n"
-            "Prepare that update now?".format(target_branch),
-            TITLE,
-        ):
-            _prepare_full_zip_update(repo_root, target_branch)
-        return
-    repo_info = _ensure_target_branch(repo_info, repo_root, target_branch)
-    if repo_info is None:
-        return
-    divergence = _history_divergence(repo_info, repo_root, target_branch)
-    behind = int(divergence.BehindBy) if divergence and divergence.BehindBy is not None else 0
-    ahead  = int(divergence.AheadBy)  if divergence and divergence.AheadBy  is not None else 0
-    dirty = _working_tree_dirty(repo_root)
-
-    current_tag = _latest_tag(repo_root)
-    current_label = "{} ({})".format(current_tag, repo_info.last_commit_hash[:7]) if current_tag \
-        else repo_info.last_commit_hash[:7]
-
-    if behind <= 0 and ahead <= 0 and not dirty:
-        msg = "WWPTools is already up to date.\n\nVersion: {}\nBranch: {}".format(
-            current_label, repo_info.branch,
-        )
-        _alert(msg, TITLE)
-        return
-
-    remote_tag = _remote_tag(repo_root, target_branch)
-    remote_label = "{} ({})".format(remote_tag, "incoming") if remote_tag else "{} commit(s)".format(behind)
-    changelog = _incoming_log(repo_root, target_branch)
-    update_changes = _classify_incoming_changes(repo_root, target_branch)
-    has_dll_changes = update_changes["has_dll"]
-    has_structural_changes = update_changes["has_structural"]
-
-    confirm_msg = (
-        "Updates are available for WWPTools.\n\n"
-        "Current version:  {}\n"
-        "New version:      {}\n"
-        "Update branch:    {}\n\n"
-        "What's new:\n{}\n\n"
-        "Update behavior:\n"
-        "Local WWPTools files will be overwritten with GitHub files.\n"
-        "Local changes will not be committed or kept.\n"
-        "Files not in GitHub will be deleted locally.\n\n"
-        "Update now?"
-    ).format(
-        current_label,
-        remote_label,
-        target_branch,
-        changelog if changelog else "  (commit log unavailable)",
-    )
-    if has_dll_changes:
-        confirm_msg = (
-            confirm_msg +
-            "\n\nThis update includes DLL files that require Revit to be closed.\n"
-            "A console updater will open. Close all Revit windows, then press any key\n"
-            "in that console. If Revit is still running, it will ask again."
-        )
-    elif has_structural_changes:
-        confirm_msg = (
-            confirm_msg +
-            "\n\nThis update changes folder structure, file names, or created/deleted files.\n"
-            "WWPTools will update now. Please restart Revit afterwards to apply cleanly."
-        )
-    else:
-        confirm_msg = (
-            confirm_msg +
-            "\n\nThis update only changes existing non-DLL files.\n"
-            "WWPTools will replace those files without reloading pyRevit."
-        )
-    if not _confirm(confirm_msg, TITLE):
-        return
-
-    if has_dll_changes:
-        bat_path = _write_deferred_update_bat(repo_root, target_branch)
-        if bat_path:
-            launched = _launch_bat_in_console(bat_path)
-            if launched:
-                _alert(
-                    "A console window is waiting to finish the WWPTools update.\n\n"
-                    "Close all Revit windows, then press any key in that console.\n"
-                    "If Revit is still running, it will ask again.\n\n"
-                    "Script location (if the window was blocked):\n"
-                    "{}".format(bat_path),
-                    TITLE,
-                )
-            else:
-                _alert(
-                    "DLL files require Revit to be closed before they can be replaced.\n\n"
-                    "Double-click this script after closing Revit:\n"
-                    "{}\n\n"
-                    "It will check whether Revit is closed before updating.".format(bat_path),
-                    TITLE,
-                )
-                try:
-                    subprocess.Popen(
-                        ["explorer", "/select,", bat_path],
-                        shell=False,
-                        creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
-                    )
-                except Exception:
-                    pass
-        else:
-            _alert(
-                "DLL files require Revit to be closed before they can be replaced.\n\n"
-                "Please close Revit completely, then run Update WWPTools again.",
-                TITLE,
-            )
-        return
+def _check_for_updates():
+    """Primary update path: check GitHub releases and show the LDM-style
+    TaskDialog with Install / Remind later / Skip options."""
+    import WWP_update_service as update_svc
 
     try:
-        updated_repo = _sync_to_github(repo_root, target_branch)
-    except Exception as sync_err:
-        if _is_revit_locked_update_error(sync_err):
-            bat_path = _write_deferred_update_bat(repo_root, target_branch)
-            if bat_path:
-                launched = _launch_bat_in_console(bat_path)
-                if launched:
-                    _alert(
-                        "A WWPTools DLL is locked by Revit.\n\n"
-                        "A console window is waiting to finish the update.\n"
-                        "Close all Revit windows, then press any key in that console.\n\n"
-                        "Script location (if the window was blocked):\n"
-                        "{}".format(bat_path),
-                        TITLE,
-                    )
-                else:
-                    _alert(
-                        "A WWPTools DLL is locked by Revit.\n\n"
-                        "Double-click this script after closing Revit:\n"
-                        "{}".format(bat_path),
-                        TITLE,
-                    )
-                    try:
-                        subprocess.Popen(
-                            ["explorer", "/select,", bat_path],
-                            shell=False,
-                            creationflags=_DETACHED_PROCESS | _CREATE_NEW_PROCESS_GROUP,
-                        )
-                    except Exception:
-                        pass
-            else:
-                _alert(
-                    "A WWPTools DLL is locked by Revit.\n\n"
-                    "Please close Revit completely, then run Update WWPTools again.",
-                    TITLE,
-                )
-            return
-        raise
+        release = update_svc.get_latest_release()
+    except Exception as e:
+        update_svc.show_check_failed(str(e))
+        return
 
-    after_hash = updated_repo.last_commit_hash[:7]
-    new_tag = _latest_tag(repo_root)
-    after_label = "{} ({})".format(new_tag, after_hash) if new_tag else after_hash
+    if release is None:
+        update_svc.show_up_to_date()
+        return
 
-    if has_structural_changes:
-        _alert(
-            "WWPTools updated successfully.\n\n"
-            "Previous version: {}\n"
-            "New version:      {}\n\n"
-            "This update changed folder structure or file names.\n"
-            "Please restart Revit to apply the changes cleanly.\n\n"
-            "(A pyRevit hot-reload is not used here because it can cause\n"
-            "'ribbon name already exists' errors when updating from older versions.)".format(
-                current_label, after_label),
-            TITLE,
-        )
-    else:
-        _alert(
-            "WWPTools updated successfully.\n\n"
-            "Previous version: {}\n"
-            "New version:      {}\n\n"
-            "Only existing non-DLL files changed, so pyRevit was not reloaded.".format(
-                current_label,
-                after_label,
-            ),
-            TITLE,
-        )
+    installed = update_svc.get_installed_version()
+    if not update_svc.is_newer(release.version, installed):
+        update_svc.show_up_to_date()
+        return
+
+    update_svc.show_update_prompt(release, offer_skip=False)
 
 
 def main():
@@ -1272,10 +1110,7 @@ def main():
     if MANUAL_GENERATE_UPDATER:
         _launch_manual_deferred_update(repo_info, repo_root)
         return
-    if not repo_info:
-        _show_not_repo_message()
-        return
-    _update_repo(repo_info, repo_root)
+    _check_for_updates()
 
 
 if __name__ == "__main__":

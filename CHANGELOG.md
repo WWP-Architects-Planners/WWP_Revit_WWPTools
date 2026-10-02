@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update system: ported the LandscapeDataManager updater pattern -- startup and manual update checks now show a Revit TaskDialog with "Download and install when Revit closes" / "Remind me later" / "Skip this version" options instead of a toast notification
+- Update system: replaced .bat deferred updaters with a PowerShell installer script that downloads in the background (via BITS Transfer) while the user keeps working, then waits for Revit to close and installs automatically
+- Update system: update state (last check time, skipped version) now persists in `%LOCALAPPDATA%\WWPTools\Updates\update-state.json` instead of pyRevit script data
+
+### Added
+
+- `WWP_update_service.py`: new shared update service module (GitHub release check, version comparison, state management, PowerShell installer generation, TaskDialog prompt)
+- Room to Area Boundaries: moved from Suite Plan Tools pulldown to a new Area Plan Tools pulldown alongside Area Plan Duplicator
+- Room to Area Boundaries: area plan view list now sorts by scheme name, then level elevation (numeric), then view name
+- Room to Area Boundaries: added option to delete all existing area boundaries in selected views before processing
+
 ### Fixed
 
 - Titleblock Updater and Import Key Schedule dialogs threw `Provide value on 'System.Windows.StaticResourceExtension' threw an exception` on open -- their loose XAML referenced shared theme brushes/styles (`WindowBrush`, `BrandLogoFooter`, `SelectedBrush`, etc.) that weren't defined locally. Fixed by defining the missing resources directly in each dialog's own `Window.Resources`.

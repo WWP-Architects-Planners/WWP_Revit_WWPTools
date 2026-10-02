@@ -380,6 +380,45 @@ def _show_target_dialog(uidoc, doc, choices, payload=None):
         FontFamily="Segoe UI"
         FontSize="14"
         Background="#F3F5F7">
+    <Window.Resources>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#3F9AD9"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#3F9AD9"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="18,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2E87C5"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2E87C5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1F2937"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+        </Style>
+    </Window.Resources>
     <Grid Margin="16">
         <Border Background="#FFFFFF"
                 BorderBrush="#D7DEE6"
@@ -419,12 +458,12 @@ def _show_target_dialog(uidoc, doc, choices, payload=None):
                             HorizontalAlignment="Right">
                     <Button x:Name="OkButton"
                             Width="130"
-                            Height="28"
                             Margin="0,0,8,0"
+                            Style="{StaticResource PrimaryButtonStyle}"
                             Content="Continue"/>
                     <Button x:Name="CancelButton"
                             Width="130"
-                            Height="28"
+                            Style="{StaticResource SecondaryButtonStyle}"
                             Content="Cancel"/>
                 </StackPanel>
             </Grid>

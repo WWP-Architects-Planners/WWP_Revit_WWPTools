@@ -5,9 +5,6 @@ import clr
 from pyrevit import forms, script
 from WWP_msgUtils import *
 import json
-import re
-from datetime import datetime
-from WWP_compat import Request, decode_to_text, urlopen
 
 try:
 	import WWP_telemetry
@@ -152,103 +149,20 @@ toolbar_title = "WWP_Tool"
 toolbar_msg = "Toolbar has been loaded!"
 
 # ----------------------------------------------------
-# Update check (GitHub latest release)
+# Update check (GitHub latest release via WWP_update_service)
 # ----------------------------------------------------
-def _parse_semver(value):
-	if not value:
-		return None
-	match = re.search(r"(\d+)\.(\d+)\.(\d+)", value)
-	if not match:
-		return None
-	return tuple(int(x) for x in match.groups())
-
-
-def _get_local_version():
-	try:
-		repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
-		version_files = [
-			os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "lib", "WWPTools.version.json")),
-			os.path.join(repo_root, "WWPTools.extension", "lib", "WWPTools.version.json"),
-		]
-		for version_file in version_files:
-			if os.path.exists(version_file):
-				with open(version_file, "r") as fp:
-					data = json.load(fp)
-				version_value = data.get("version") if isinstance(data, dict) else None
-				parsed = _parse_semver(version_value)
-				if parsed:
-					return parsed
-
-		changelog = os.path.join(repo_root, "CHANGELOG.md")
-		if not os.path.exists(changelog):
-			return None
-		with open(changelog, "r") as fp:
-			content = fp.read()
-		versions = re.findall(r"^## \\[(\\d+\\.\\d+\\.\\d+)\\]", content, flags=re.MULTILINE)
-		if not versions:
-			return None
-		parsed = [_parse_semver(v) for v in versions]
-		parsed = [v for v in parsed if v]
-		if not parsed:
-			return None
-		return max(parsed)
-	except Exception:
-		return None
-
-
-def _get_latest_release_version():
-	try:
-		req = Request(
-			"https://api.github.com/repos/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest",
-			headers={"User-Agent": "WWPTools"},
-		)
-		with urlopen(req, timeout=2) as resp:
-			data = json.loads(decode_to_text(resp.read(), "utf-8"))
-		tag = data.get("tag_name") or data.get("name")
-		return _parse_semver(tag)
-	except Exception:
-		return None
-
-
-def _should_check_updates():
-	try:
-		cache = script.load_data("wwptools_update_check", this_project=False)
-		if not cache:
-			return True
-		last_date = cache.get("date")
-		today = datetime.now().strftime("%Y-%m-%d")
-		return last_date != today
-	except Exception:
-		return True
-
-
-def _mark_checked():
-	try:
-		script.save_data("wwptools_update_check", {"date": datetime.now().strftime("%Y-%m-%d")}, this_project=False)
-	except Exception:
-		pass
-
-
 try:
-	if _should_check_updates():
-		local_ver = _get_local_version()
-		latest_ver = _get_latest_release_version()
-		_mark_checked()
-		if local_ver and latest_ver:
-			local_str = "{}.{}.{}".format(*local_ver)
-			latest_str = "{}.{}.{}".format(*latest_ver)
-			if latest_ver > local_ver:
-				toolbar_msg = "Toolbar loaded. Your version ({}) is outdated.".format(local_str)
-				forms.toaster.send_toast(
-					"New version available: {}".format(latest_str),
-					title="WWPTools Update",
-					appid="WWP Architects + Planners",
-					icon=icon_path if os.path.exists(icon_path) else None,
-					click="https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/latest",
-					actions=None,
-				)
-			else:
-				toolbar_msg = "Toolbar loaded. You are running the latest version ({})".format(local_str)
+	import WWP_update_service as _update_svc
+	_pending_release = _update_svc.check_in_background()
+	if _pending_release:
+		toolbar_msg = "Toolbar loaded. Your version ({}) is outdated.".format(
+			_update_svc.installed_version_text(),
+		)
+		_update_svc.show_update_prompt(_pending_release, offer_skip=True)
+	else:
+		_ver_text = _update_svc.installed_version_text()
+		if _ver_text and _ver_text != "unknown":
+			toolbar_msg = "Toolbar loaded. You are running the latest version ({})".format(_ver_text)
 except Exception:
 	pass
 
