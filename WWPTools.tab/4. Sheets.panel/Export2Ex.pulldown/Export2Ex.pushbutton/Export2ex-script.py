@@ -107,7 +107,7 @@ def _get_schedule_category_name(doc, view):
 
 
 def normalize_excel_output_path(path, default_ext=".xlsx"):
-    value = (path or "").strip()
+    value = os.path.expandvars((path or "").strip())
     if not value:
         return ""
     root, ext = os.path.splitext(value)
@@ -803,6 +803,33 @@ def _show_export_settings_popup(current_settings, ui):
     return s
 
 
+_PROFILE_TOKEN = "%userprofile%"
+
+
+def _portable_path(path):
+    """Replace the current user's profile folder (C:/Users/<name>) with %userprofile% so saved
+    paths, notably ACC Desktop Connector (DC) folders, resolve for every user."""
+    try:
+        p = (path or "").strip()
+        prof = os.environ.get("USERPROFILE", "").rstrip("/" + os.sep)
+        if prof and (p.lower() == prof.lower() or p.lower().startswith(prof.lower() + os.sep)):
+            return _PROFILE_TOKEN + p[len(prof):]
+        return p
+    except Exception:
+        return path
+
+
+def _expand_path(path):
+    """Resolve %userprofile% (and other env vars) to a real path before use."""
+    try:
+        return os.path.expandvars(path or "")
+    except Exception:
+        return path
+
+
+_display_path = _portable_path
+
+
 def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                        default_settings=None, edit_callback=None, add_callback=None):
     """Primary export UI: checkbox | set name | schedule (search) | sheet name | file path | ... | Export | Delete"""
@@ -835,6 +862,10 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     data_row_elements = []
     _ok_clicked = [False]
 
+    try:
+        load_uiutils().uiUtils_ensure_theme()
+    except Exception:
+        pass
     window = Window()
     window.Title = "Batch Export"
     window.Width = 1000
@@ -885,7 +916,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
 
     def _make_browse(sname_, mode_):
         def _on_browse(_s, _e):
-            cur = paths.get(sname_) or ""
+            cur = _expand_path(paths.get(sname_) or "")
             if mode_ == 0:
                 init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
                 fname = os.path.basename(cur) if cur else "{}.xlsx".format(sanitize_file_name(sname_))
@@ -900,8 +931,8 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                 new_path = _pick_folder("'{}' -- Choose CSV Folder".format(sname_), initial_directory=init_dir)
                 new_path = (new_path or "").strip()
             if new_path:
-                paths[sname_] = new_path
-                path_labels[sname_].Text = new_path
+                paths[sname_] = _portable_path(new_path)
+                path_labels[sname_].Text = paths[sname_]
         return _on_browse
 
     def _make_export_row(sname_):
@@ -913,7 +944,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                 if sel:
                     sdata["schedule_names"] = [sel]
             mode = int(sdata.get("export_mode", current_settings.get("export_mode", 0)))
-            path = paths.get(sname_) or ""
+            path = _expand_path(paths.get(sname_) or "")
             if not path:
                 init_dir = get_default_dir(doc)
                 safe = re.sub(r'[\\/:*?"<>|]', "_", sname_)
@@ -927,9 +958,9 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                     new_path = (new_path or "").strip()
                 if not new_path:
                     return
-                paths[sname_] = new_path
+                paths[sname_] = _portable_path(new_path)
                 if sname_ in path_labels:
-                    path_labels[sname_].Text = new_path
+                    path_labels[sname_].Text = paths[sname_]
                 path = new_path
             all_sched = {v.Name: v for v in collect_schedules(doc)}
             sched_names = sdata.get("schedule_names") or []
@@ -1007,7 +1038,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
             set_modes[sname] = mode
             if sname not in paths:
                 raw = sdata.get("excel_path") if mode == 0 else sdata.get("csv_folder")
-                paths[sname] = (raw or "").strip()
+                paths[sname] = _portable_path(_expand_path(raw or ""))
 
             rd = RowDefinition(); rd.Height = GridLength(42)
             tbl.RowDefinitions.Add(rd)
@@ -1022,6 +1053,8 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
             name_box = TextBox(); name_box.Text = sname
             name_box.VerticalAlignment = VerticalAlignment.Center
             name_box.Margin = Thickness(2, 3, 4, 3)
+            name_box.Padding = Thickness(8, 0, 8, 0)
+            name_box.MinHeight = 0; name_box.Height = 32
             Grid.SetRow(name_box, row_idx); Grid.SetColumn(name_box, 1)
             tbl.Children.Add(name_box); name_boxes[sname] = name_box; row_elems.append(name_box)
 
@@ -1090,7 +1123,8 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
             _wire_combo(sched_combo, sheet_lbl, all_schedule_names)
 
             path_tb = TextBlock()
-            path_tb.Text = paths.get(sname) or "(no path)"
+            path_tb.Text = _display_path(paths.get(sname)) or "(no path)"
+            path_tb.ToolTip = _expand_path(paths.get(sname) or "")
             path_tb.VerticalAlignment = VerticalAlignment.Center
             path_tb.Margin = Thickness(4, 0, 4, 0)
             path_tb.TextTrimming = TextTrimming.CharacterEllipsis
@@ -1245,7 +1279,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
 
     current_names = sorted(saved_sets.keys())
     selected = [sname for sname in current_names if checkboxes.get(sname) and checkboxes[sname].IsChecked]
-    return selected, dict(paths), dict(current_settings)
+    return selected, dict((k, _expand_path(v)) for k, v in paths.items()), dict(current_settings)
 
 
 def _show_export_form(
@@ -1428,7 +1462,7 @@ def _show_export_form(
             "export_column_headers": bool(export_column_headers.IsChecked),
             "export_group_headers": bool(export_group_headers.IsChecked),
             "export_grouped_column_headers": bool(export_grouped_column_headers.IsChecked),
-            "csv_folder": csv_folder.Text or "",
+            "csv_folder": _portable_path(csv_folder.Text or ""),
             "use_category_sheet_name": bool(use_category_sheet_name_ctrl.IsChecked) if use_category_sheet_name_ctrl is not None else False,
         }
 
@@ -2407,10 +2441,12 @@ def main():
                     continue
                 mode = int(sdata.get("export_mode", 0))
                 if mode == 0:
+                    new_path = _portable_path(new_path)
                     if new_path and new_path != (sdata.get("excel_path") or "").strip():
                         sdata["excel_path"] = new_path
                         paths_changed = True
                 else:
+                    new_path = _portable_path(new_path)
                     if new_path and new_path != (sdata.get("csv_folder") or "").strip():
                         sdata["csv_folder"] = new_path
                         paths_changed = True
@@ -2471,7 +2507,7 @@ def main():
             except Exception:
                 pass
         else:
-            folder = (inputs.get("csv_folder") or "").strip()
+            folder = os.path.expandvars((inputs.get("csv_folder") or "").strip())
             if not folder:
                 ui.uiUtils_alert("Choose a CSV folder.", title="Multiple Schedules Exporter")
                 return

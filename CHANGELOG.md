@@ -15,12 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Export2Ex: paths under the user profile (e.g. ACC Desktop Connector `DC` folders) are saved and shown as `%userprofile%\...` so saved sets resolve for every user; the token is expanded before export, and typing it manually also works
+
 - `WWP_update_service.py`: new shared update service module (GitHub release check, version comparison, state management, PowerShell installer generation, TaskDialog prompt)
 - Room to Area Boundaries: moved from Suite Plan Tools pulldown to a new Area Plan Tools pulldown alongside Area Plan Duplicator
 - Room to Area Boundaries: area plan view list now sorts by scheme name, then level elevation (numeric), then view name
 - Room to Area Boundaries: added option to delete all existing area boundaries in selected views before processing
 
 ### Fixed
+
+- Batch Export dialog (and other dialogs using the shared theme): button text was dark on dark buttons because the global TextBlock style overrode the button foreground; Set Name box text was clipped by oversized padding
 
 - Titleblock Updater and Import Key Schedule dialogs threw `Provide value on 'System.Windows.StaticResourceExtension' threw an exception` on open -- their loose XAML referenced shared theme brushes/styles (`WindowBrush`, `BrandLogoFooter`, `SelectedBrush`, etc.) that weren't defined locally. Fixed by defining the missing resources directly in each dialog's own `Window.Resources`.
 - 24 more command dialogs (UK/Web Context Builder, Area Scheme Copy, Copy Color Scheme, Copy Filter x3, Door Fire Rating Wall, Door Type Duplicator, Fire Line, Fire Rating + FRR Mapping, Fire Rating FRR Views, Parking Generator, Parking to Room, Make Key Plan View, Make Views, Export2Ex x2, Sheet Duplicator, Lay Views on Sheet, Delete Unused Views, Combined Print Set, About) had the same latent bug: their scripts loaded loose XAML via `XamlReader` without first calling `WWP_uiUtils.uiUtils_ensure_theme()`, which merges the shared `FlatTheme.xaml` into `Application.Resources`. The dialogs could still open if another theme-loading tool had already run earlier in the same Revit session (masking the bug), but failed when run first. Fixed by adding the missing `uiUtils_ensure_theme()` call before each dialog's XAML load.
