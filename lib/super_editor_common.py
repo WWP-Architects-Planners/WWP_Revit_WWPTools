@@ -439,6 +439,19 @@ def _collect_types_by_category(current_doc, cat_id, cat_name=None):
 def _collect_families_by_category(current_doc, cat_id):
     targets = []
     seen_ids = set()
+    # Direct scan by FamilyCategory -- reliable for annotation/tag/symbol families, whose
+    # Family.Category can be None and which may have no placed instances to discover them.
+    try:
+        cat_int = _elem_id_int(cat_id)
+        for family in DB.FilteredElementCollector(current_doc).OfClass(DB.Family).ToElements():
+            try:
+                fam_cat = family.FamilyCategory
+                if fam_cat is not None and _elem_id_int(fam_cat.Id) == cat_int:
+                    _add_unique(targets, seen_ids, family)
+            except Exception:
+                pass
+    except Exception:
+        pass
     for element_type in _collect_types_by_category(current_doc, cat_id):
         _add_unique(targets, seen_ids, _get_family_from_element_type(element_type))
     return targets

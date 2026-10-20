@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Super Editor: family renaming now also finds families directly by `Family.FamilyCategory`, so annotation symbol/tag families that have no placed instances (or a null `Family.Category`) are included
+
 - Batch Export dialog (and other dialogs using the shared theme): button text was dark on dark buttons because the global TextBlock style overrode the button foreground; Set Name box text was clipped by oversized padding
 
 - Titleblock Updater and Import Key Schedule dialogs threw `Provide value on 'System.Windows.StaticResourceExtension' threw an exception` on open -- their loose XAML referenced shared theme brushes/styles (`WindowBrush`, `BrandLogoFooter`, `SelectedBrush`, etc.) that weren't defined locally. Fixed by defining the missing resources directly in each dialog's own `Window.Resources`.
