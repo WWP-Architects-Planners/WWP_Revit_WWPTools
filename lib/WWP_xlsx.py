@@ -19,7 +19,8 @@ Supported surface:
   Reading  -- load_workbook(path, data_only=True); wb.active / wb.worksheets /
               wb.sheetnames / wb[name]; ws.title / ws.max_row / ws.max_column;
               ws.cell(row, column).value; ws.cell(...).fill (patternType,
-              fgColor.rgb, start_color.rgb); ws.iter_rows(values_only=True).
+              fgColor.rgb, start_color.rgb, including resolved theme colors and
+              tints); ws.iter_rows(values_only=True).
   Writing  -- Workbook(); ws.append(row); ws.cell(row, column, value=...);
               cell.value / cell.number_format / cell.font; ws.title;
               wb.create_sheet(title, index); wb.remove(ws); ws.columns;
@@ -31,7 +32,9 @@ sheets but not their original styling/formulas/charts; .xlsm macros are not
 preserved on save.
 """
 
+import colorsys
 import os
+import posixpath
 
 try:
     import clr
@@ -367,7 +370,68 @@ def _parse_shared_strings(text):
     return strings
 
 
-def _parse_styles(text):
+def _parse_theme_colors(text):
+    """Return SpreadsheetML theme order (light/dark), not DrawingML XML order."""
+    if not text:
+        return []
+    from System.Xml.Linq import XDocument
+
+    doc = XDocument.Parse(text)
+    scheme = _first(doc.Root, "clrScheme")
+    colors = {}
+    if scheme is not None:
+        for slot in scheme.Elements():
+            color = _first(slot, "srgbClr")
+            rgb = _attr(color, "val")
+            if rgb is None:
+                rgb = _attr(_first(slot, "sysClr"), "lastClr")
+            colors[slot.Name.LocalName] = rgb
+    return [colors.get(name) for name in (
+        "lt1", "dk1", "lt2", "dk2", "accent1", "accent2", "accent3",
+        "accent4", "accent5", "accent6", "hlink", "folHlink",
+    )]
+
+
+def _load_theme_colors(archive):
+    text = _read_entry_text(archive, "xl/_rels/workbook.xml.rels")
+    if not text:
+        return []
+    from System.Xml.Linq import XDocument
+
+    doc = XDocument.Parse(text)
+    for rel in _descendants(doc.Root, "Relationship"):
+        if (_attr(rel, "Type") or "").endswith("/theme"):
+            if _attr(rel, "TargetMode") == "External":
+                continue
+            target = _attr(rel, "Target")
+            if not target:
+                continue
+            path = target.lstrip("/") if target.startswith("/") else posixpath.join("xl", target)
+            return _parse_theme_colors(_read_entry_text(archive, posixpath.normpath(path)))
+    return []
+
+
+def _tinted_rgb(rgb, tint):
+    """Apply Excel tint to HLS luminance, preserving the alpha byte if present."""
+    if not rgb or not tint:
+        return rgb
+    try:
+        amount = max(-1.0, min(1.0, float(tint)))
+        if amount == 0.0:
+            return rgb
+        channels = [int(rgb[-6:][offset:offset + 2], 16) / 255.0 for offset in (0, 2, 4)]
+        hue, lightness, saturation = colorsys.rgb_to_hls(*channels)
+        if amount < 0.0:
+            lightness *= 1.0 + amount
+        else:
+            lightness = lightness * (1.0 - amount) + amount
+        tinted = colorsys.hls_to_rgb(hue, lightness, saturation)
+        return rgb[:-6] + "".join("{:02X}".format(int(channel * 255.0 + 0.5)) for channel in tinted)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_styles(text, theme_colors=None):
     """Returns (cellxf_fill_ids, fills) where fills[i] = (patternType, rgb)."""
     cellxf_fill_ids = []
     fills = []
@@ -382,6 +446,14 @@ def _parse_styles(text):
         pattern_type = _attr(pattern, "patternType")
         fg = _first(pattern, "fgColor") if pattern is not None else None
         rgb = _attr(fg, "rgb")
+        if rgb is None and theme_colors:
+            try:
+                theme_index = int(_attr(fg, "theme"))
+                if 0 <= theme_index < len(theme_colors):
+                    rgb = theme_colors[theme_index]
+            except (TypeError, ValueError):
+                pass
+        rgb = _tinted_rgb(rgb, _attr(fg, "tint"))
         fills.append((pattern_type, rgb))
 
     cellxfs_node = _first(doc.Root, "cellXfs")
@@ -517,7 +589,8 @@ def load_workbook(path, data_only=True, read_only=False, keep_vba=False, **kwarg
     archive = ZipFile.OpenRead(path)
     try:
         shared = _parse_shared_strings(_read_entry_text(archive, "xl/sharedStrings.xml"))
-        cellxf_fill_ids, fills = _parse_styles(_read_entry_text(archive, "xl/styles.xml"))
+        theme_colors = _load_theme_colors(archive)
+        cellxf_fill_ids, fills = _parse_styles(_read_entry_text(archive, "xl/styles.xml"), theme_colors)
         sheets, active_index = _resolve_sheet_targets(archive)
 
         workbook = Workbook()

@@ -37,7 +37,7 @@ for path in (pulldown_dir, lib_path):
     if path not in sys.path:
         sys.path.append(path)
 
-for module_name in ("WWP_colorSchemeUtils", "color_scheme_common"):
+for module_name in ("WWP_xlsx", "WWP_colorSchemeUtils", "color_scheme_common"):
     try:
         if module_name in sys.modules:
             del sys.modules[module_name]
