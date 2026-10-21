@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Room to Area Boundaries: moved from Suite Plan Tools pulldown to a new Area Plan Tools pulldown alongside Area Plan Duplicator
+- Room to Area Boundaries: area plan view list now sorts by scheme name, then level elevation (numeric), then view name
+- Room to Area Boundaries: added option to delete all existing area boundaries in selected views before processing
+
+## [2.6.2] - 2026-10-21
+
 ### Changed
 
 - Update system: ported the LandscapeDataManager updater pattern -- startup and manual update checks now show a Revit TaskDialog with "Download and install when Revit closes" / "Remind me later" / "Skip this version" options instead of a toast notification
@@ -18,12 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export2Ex: paths under the user profile (e.g. ACC Desktop Connector `DC` folders) are saved and shown as `%userprofile%\...` so saved sets resolve for every user; the token is expanded before export, and typing it manually also works
 
 - `WWP_update_service.py`: new shared update service module (GitHub release check, version comparison, state management, PowerShell installer generation, TaskDialog prompt)
-- Room to Area Boundaries: moved from Suite Plan Tools pulldown to a new Area Plan Tools pulldown alongside Area Plan Duplicator
-- Room to Area Boundaries: area plan view list now sorts by scheme name, then level elevation (numeric), then view name
-- Room to Area Boundaries: added option to delete all existing area boundaries in selected views before processing
 
 ### Fixed
 
+- Import Color Scheme from Excel: theme-based cell fills and their lighter/darker tints are now resolved to RGB in both color override and mapped import modes. Previously, these rows were silently skipped, leaving existing Revit colors unchanged (including the gray `RES_SHAFT_ABOVE-GRADE` and waste chute entries). The Excel reader reloads on each import so the fix is available immediately.
 - Super Editor: family renaming now also finds families directly by `Family.FamilyCategory`, so annotation symbol/tag families that have no placed instances (or a null `Family.Category`) are included
 
 - Batch Export dialog (and other dialogs using the shared theme): button text was dark on dark buttons because the global TextBlock style overrode the button foreground; Set Name box text was clipped by oversized padding
@@ -594,3 +600,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [1.2.4]: https://github.com/jason-svn/WWPTools/releases/tag/V1.2.4
 [1.5.0]: https://github.com/jason-svn/WWPTools/releases/tag/V1.5.0
 [2.0.0]: https://github.com/jason-svn/WWPTools/releases/tag/V2.0.0
+[2.6.2]: https://github.com/WWP-Architects-Planners/WWP_Revit_WWPTools/releases/tag/V2.6.2
