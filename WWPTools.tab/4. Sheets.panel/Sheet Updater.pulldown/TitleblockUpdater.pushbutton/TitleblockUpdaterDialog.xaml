@@ -7,665 +7,393 @@
         MinHeight="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        FontFamily="Segoe UI"
-        FontSize="14">
-    <Window.Resources>
-        <SolidColorBrush x:Key="WindowBrush" Color="#F3F5F7" />
-        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="FieldBrush" Color="#FFFFFF" />
-        <SolidColorBrush x:Key="BorderBrush" Color="#CBD5E1" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#3F9AD9" />
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#2E87C5" />
-        <SolidColorBrush x:Key="MutedBrush" Color="#6B7280" />
-        <SolidColorBrush x:Key="TextBrush" Color="#1F2937" />
-        <SolidColorBrush x:Key="DangerBrush" Color="#C43D3D" />
-        <SolidColorBrush x:Key="CardBrush" Color="#FAFBFC" />
-        <SolidColorBrush x:Key="CardBorderBrush" Color="#E2E8F0" />
-        <SolidColorBrush x:Key="SelectedBrush" Color="#E4E4E7" />
+        Background="{StaticResource WindowBrush}">
+    <!-- Styles, brushes, tabs, list boxes and toggle switches all come from the shared
+         FlatTheme (lib/FlatTheme.xaml), loaded by the script before this XAML is parsed. -->
 
-        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-            <Setter Property="FontSize" Value="12.5" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-            <Setter Property="FontSize" Value="11.5" />
-            <Setter Property="FontWeight" Value="Bold" />
-        </Style>
+        <StackPanel Margin="0,0,0,12">
+            <TextBlock Text="Titleblock Updater"
+                       Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="PromptText"
+                       Style="{StaticResource PageSubtitle}" />
+        </StackPanel>
 
-        <Style x:Key="SectionCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource CardBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="16" />
-        </Style>
+        <TabControl x:Name="MainTabControl"
+                    Grid.Row="1">
 
-        <Style x:Key="FlatTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="{StaticResource FieldBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="MinHeight" Value="38" />
-        </Style>
+            <TabItem Header="True North">
+                <!-- FontWeight: the selected TabItem is SemiBold and that inherits into its content. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              FontWeight="Normal">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-        <Style x:Key="FlatComboBox" TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource FieldBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,5" />
-            <Setter Property="MinHeight" Value="38" />
-        </Style>
+                        <Border Grid.Row="0" Style="{StaticResource WwpCard}" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-        <Style x:Key="FlatListBox" TargetType="ListBox">
-            <Setter Property="Background" Value="{StaticResource FieldBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6" />
-        </Style>
-
-        <Style x:Key="FlatListBoxItem" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0,0,0,4" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="1"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#EFF6FB" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#DCEFFC" />
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#A9D0EE" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="PrimaryButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Height" Value="26.5" />
-            <Setter Property="Padding" Value="18,0" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource AccentHoverBrush}" />
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.9" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-        </Style>
-
-        <Style x:Key="ToggleSwitchCheckBox" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Grid Width="38"
-                                  Height="19"
-                                  VerticalAlignment="Center">
-                                <Border x:Name="SwitchTrack"
-                                        Background="{StaticResource SelectedBrush}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="9.5" />
-                                <Ellipse x:Name="SwitchThumb"
-                                         Width="15"
-                                         Height="15"
-                                         Margin="2,2,21,2"
-                                         HorizontalAlignment="Left"
-                                         VerticalAlignment="Center"
-                                         Fill="White"
-                                         Stroke="#AEB8C4"
-                                         StrokeThickness="1" />
+                                <TextBlock Grid.Column="0" Text="Angle parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Column="2" Text="Visibility parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Ctrl/Shift-click to select multiple targets."
+                                           Style="{StaticResource CaptionText}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,0,8" />
+                                <CheckBox x:Name="TN_SetVisibilityCheckBox"
+                                          Grid.Row="1"
+                                          Grid.Column="2"
+                                          Content="Update visibility controls"
+                                          IsChecked="True"
+                                          Margin="0,0,0,8"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <ListBox x:Name="TN_ParameterList"
+                                         Grid.Row="2"
+                                         Grid.Column="0"
+                                         SelectionMode="Extended"
+                                         Height="240" />
+                                <ListBox x:Name="TN_VisibilityParamList"
+                                         Grid.Row="2"
+                                         Grid.Column="2"
+                                         SelectionMode="Extended"
+                                         Height="240" />
+                                <CheckBox x:Name="TN_HideCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="2"
+                                          Content="Hide arrow for elevation, section, or 3D primary views"
+                                          IsChecked="True"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
                             </Grid>
-
-                            <ContentPresenter Grid.Column="1"
-                                              Margin="12,0,0,0"
-                                              VerticalAlignment="Center"
-                                              RecognizesAccessKey="True" />
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="SwitchTrack" Property="Background" Value="{StaticResource AccentBrush}" />
-                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                <Setter TargetName="SwitchThumb" Property="Margin" Value="21,2,2,2" />
-                                <Setter TargetName="SwitchThumb" Property="Stroke" Value="{StaticResource AccentBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.6" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="FlatTabControl" TargetType="TabControl">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabControl">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <Border Grid.Row="0"
-                                    BorderBrush="{StaticResource CardBorderBrush}"
-                                    BorderThickness="0,0,0,1">
-                                <TabPanel IsItemsHost="True" Margin="0,0,0,-1" />
-                            </Border>
-                            <ScrollViewer Grid.Row="1"
-                                          Margin="0,16,0,0"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Disabled">
-                                <ContentPresenter ContentSource="SelectedContent" />
-                            </ScrollViewer>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="BrandLogoFooter" TargetType="Image">
-            <Setter Property="Width" Value="56" />
-            <Setter Property="Height" Value="56" />
-            <Setter Property="Stretch" Value="Uniform" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
-        </Style>
-
-        <Style x:Key="FlatTabItem" TargetType="TabItem">
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="18,10" />
-            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="TabBorder"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="0,0,0,2"
-                                Padding="{TemplateBinding Padding}"
-                                Margin="0,0,4,0">
-                            <ContentPresenter ContentSource="Header"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
                         </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
 
-    <Grid Background="{StaticResource WindowBrush}" Margin="16">
-        <Border Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                Padding="20">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                <StackPanel Margin="0,0,0,10">
-                    <TextBlock Text="Titleblock Updater"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" />
-                    <TextBlock x:Name="PromptText"
-                               Margin="0,6,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource MutedBrush}" />
-                </StackPanel>
+                                <TextBlock Text="Sheets" Style="{StaticResource SectionHeader}" />
 
-                <TabControl x:Name="MainTabControl"
-                            Grid.Row="1"
-                            Style="{StaticResource FlatTabControl}">
-
-                    <TabItem Header="True North" Style="{StaticResource FlatTabItem}">
-                        <Grid Margin="0,16,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-
-                            <Border Grid.Row="0" Style="{StaticResource SectionCard}" Margin="0,0,0,14">
-                                <Grid>
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Column="0" Text="ANGLE PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Column="2" Text="VISIBILITY PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Row="1" Grid.Column="0"
-                                               Text="Ctrl/Shift-click to select multiple targets."
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontSize="12"
-                                               Margin="0,0,0,8" />
-                                    <CheckBox x:Name="TN_SetVisibilityCheckBox"
-                                              Grid.Row="1"
+                                    <TextBox x:Name="TN_SearchBox" />
+                                    <CheckBox x:Name="TN_AllSheetsCheckBox"
                                               Grid.Column="2"
-                                              Content="Update visibility controls"
-                                              IsChecked="True"
-                                              Margin="0,0,0,8"
-                                              Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    <ListBox x:Name="TN_ParameterList"
-                                             Grid.Row="2"
-                                             Grid.Column="0"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <ListBox x:Name="TN_VisibilityParamList"
-                                             Grid.Row="2"
-                                             Grid.Column="2"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <CheckBox x:Name="TN_HideCheckBox"
-                                              Grid.Row="3"
-                                              Grid.Column="2"
-                                              Content="Hide arrow for elevation, section, or 3D primary views"
-                                              IsChecked="True"
-                                              Margin="0,10,0,0"
+                                              Content="All Sheets"
+                                              VerticalAlignment="Center"
                                               Style="{StaticResource ToggleSwitchCheckBox}" />
                                 </Grid>
-                            </Border>
 
-                            <Border Grid.Row="1" Style="{StaticResource SectionCard}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                                <ListBox x:Name="TN_SheetsList"
+                                         Grid.Row="2"
+                                         SelectionMode="Extended"
+                                         MinHeight="220" />
 
-                                    <TextBlock Text="SHEETS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,10" />
+                                <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                                    <TextBlock x:Name="TN_AllSheetsWarningText"
+                                               Text="To update individual sheets, uncheck 'All Sheets'."
+                                               Style="{StaticResource CaptionText}" />
+                                    <TextBlock x:Name="TN_ValidationText"
+                                               Foreground="{StaticResource DangerBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
 
-                                    <Grid Grid.Row="1" Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="16" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="TN_SearchBox" Style="{StaticResource FlatTextBox}" />
-                                        <CheckBox x:Name="TN_AllSheetsCheckBox"
-                                                  Grid.Column="2"
-                                                  Content="All Sheets"
-                                                  VerticalAlignment="Center"
-                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    </Grid>
+            <TabItem Header="Project North(Construction North)">
+                <!-- FontWeight: the selected TabItem is SemiBold and that inherits into its content. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              FontWeight="Normal">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                                    <ListBox x:Name="TN_SheetsList"
-                                             Grid.Row="2"
-                                             SelectionMode="Extended"
-                                             MinHeight="220"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
+                        <Border Grid.Row="0" Style="{StaticResource WwpCard}" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
-                                        <TextBlock x:Name="TN_AllSheetsWarningText"
-                                                   Text="To update individual sheets, uncheck 'All Sheets'."
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="12"
-                                                   FontStyle="Italic"
-                                                   TextWrapping="Wrap" />
-                                        <TextBlock x:Name="TN_ValidationText"
-                                                   Foreground="{StaticResource DangerBrush}"
-                                                   Visibility="Collapsed"
-                                                   Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"
-                                                   FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
+                                <TextBlock Grid.Column="0" Text="Angle parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Column="2" Text="Visibility parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Ctrl/Shift-click to select multiple targets."
+                                           Style="{StaticResource CaptionText}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,0,8" />
+                                <CheckBox x:Name="PN_SetVisibilityCheckBox"
+                                          Grid.Row="1"
+                                          Grid.Column="2"
+                                          Content="Update visibility controls"
+                                          IsChecked="True"
+                                          Margin="0,0,0,8"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <ListBox x:Name="PN_ParameterList"
+                                         Grid.Row="2"
+                                         Grid.Column="0"
+                                         SelectionMode="Extended"
+                                         Height="240" />
+                                <ListBox x:Name="PN_VisibilityParamList"
+                                         Grid.Row="2"
+                                         Grid.Column="2"
+                                         SelectionMode="Extended"
+                                         Height="240" />
+                                <CheckBox x:Name="PN_HideCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="2"
+                                          Content="Hide arrow for elevation, section, or 3D primary views"
+                                          IsChecked="True"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                            </Grid>
+                        </Border>
 
-                    <TabItem Header="Project North(Construction North)" Style="{StaticResource FlatTabItem}">
-                        <Grid Margin="0,16,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
+                        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" Style="{StaticResource SectionCard}" Margin="0,0,0,14">
-                                <Grid>
+                                <TextBlock Text="Sheets" Style="{StaticResource SectionHeader}" />
+
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Column="0" Text="ANGLE PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Column="2" Text="VISIBILITY PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Row="1" Grid.Column="0"
-                                               Text="Ctrl/Shift-click to select multiple targets."
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontSize="12"
-                                               Margin="0,0,0,8" />
-                                    <CheckBox x:Name="PN_SetVisibilityCheckBox"
-                                              Grid.Row="1"
+                                    <TextBox x:Name="PN_SearchBox" />
+                                    <CheckBox x:Name="PN_AllSheetsCheckBox"
                                               Grid.Column="2"
-                                              Content="Update visibility controls"
-                                              IsChecked="True"
-                                              Margin="0,0,0,8"
-                                              Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    <ListBox x:Name="PN_ParameterList"
-                                             Grid.Row="2"
-                                             Grid.Column="0"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <ListBox x:Name="PN_VisibilityParamList"
-                                             Grid.Row="2"
-                                             Grid.Column="2"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <CheckBox x:Name="PN_HideCheckBox"
-                                              Grid.Row="3"
-                                              Grid.Column="2"
-                                              Content="Hide arrow for elevation, section, or 3D primary views"
-                                              IsChecked="True"
-                                              Margin="0,10,0,0"
+                                              Content="All Sheets"
+                                              VerticalAlignment="Center"
                                               Style="{StaticResource ToggleSwitchCheckBox}" />
                                 </Grid>
-                            </Border>
 
-                            <Border Grid.Row="1" Style="{StaticResource SectionCard}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                                <ListBox x:Name="PN_SheetsList"
+                                         Grid.Row="2"
+                                         SelectionMode="Extended"
+                                         MinHeight="220" />
 
-                                    <TextBlock Text="SHEETS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,10" />
+                                <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                                    <TextBlock x:Name="PN_AllSheetsWarningText"
+                                               Text="To update individual sheets, uncheck 'All Sheets'."
+                                               Style="{StaticResource CaptionText}" />
+                                    <TextBlock x:Name="PN_ValidationText"
+                                               Foreground="{StaticResource DangerBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
 
-                                    <Grid Grid.Row="1" Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="16" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="PN_SearchBox" Style="{StaticResource FlatTextBox}" />
-                                        <CheckBox x:Name="PN_AllSheetsCheckBox"
-                                                  Grid.Column="2"
-                                                  Content="All Sheets"
-                                                  VerticalAlignment="Center"
-                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    </Grid>
+            <TabItem Header="Scale">
+                <!-- FontWeight: the selected TabItem is SemiBold and that inherits into its content. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              FontWeight="Normal">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                                    <ListBox x:Name="PN_SheetsList"
-                                             Grid.Row="2"
-                                             SelectionMode="Extended"
-                                             MinHeight="220"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
+                        <Border Grid.Row="0" Style="{StaticResource WwpCard}" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
-                                        <TextBlock x:Name="PN_AllSheetsWarningText"
-                                                   Text="To update individual sheets, uncheck 'All Sheets'."
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="12"
-                                                   FontStyle="Italic"
-                                                   TextWrapping="Wrap" />
-                                        <TextBlock x:Name="PN_ValidationText"
-                                                   Foreground="{StaticResource DangerBrush}"
-                                                   Visibility="Collapsed"
-                                                   Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"
-                                                   FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
+                                <TextBlock Grid.Column="0" Text="Target parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Column="2" Text="Visibility parameters" Style="{StaticResource SectionHeader}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Ctrl/Shift-click to select multiple targets."
+                                           Style="{StaticResource CaptionText}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,0,8" />
+                                <CheckBox x:Name="SC_SetVisibilityCheckBox"
+                                          Grid.Row="1"
+                                          Grid.Column="2"
+                                          Content="Update visibility controls"
+                                          Margin="0,0,0,8"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <ListBox x:Name="SC_ParameterList"
+                                         Grid.Row="2"
+                                         Grid.Column="0"
+                                         SelectionMode="Extended"
+                                         Height="240" />
+                                <ListBox x:Name="SC_VisibilityParamList"
+                                         Grid.Row="2"
+                                         Grid.Column="2"
+                                         SelectionMode="Extended"
+                                         Height="240"
+                                         IsEnabled="False" />
+                                <CheckBox x:Name="SC_IgnoreDraftingViewsCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="0"
+                                          Content="Ignore Drafting Views when calculating sheet scale"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <CheckBox x:Name="SC_HideCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="2"
+                                          Content="Also hide (set to No) on sheets with no scaleable views"
+                                          IsEnabled="False"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                            </Grid>
+                        </Border>
 
-                    <TabItem Header="Scale" Style="{StaticResource FlatTabItem}">
-                        <Grid Margin="0,16,0,0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
+                        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                            <Border Grid.Row="0" Style="{StaticResource SectionCard}" Margin="0,0,0,14">
-                                <Grid>
+                                <TextBlock Text="Sheets" Style="{StaticResource SectionHeader}" />
+
+                                <Grid Grid.Row="1" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Column="0" Text="TARGET PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Column="2" Text="VISIBILITY PARAMETERS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,8" />
-                                    <TextBlock Grid.Row="1" Grid.Column="0"
-                                               Text="Ctrl/Shift-click to select multiple targets."
-                                               Foreground="{StaticResource MutedBrush}"
-                                               FontSize="12"
-                                               Margin="0,0,0,8" />
-                                    <CheckBox x:Name="SC_SetVisibilityCheckBox"
-                                              Grid.Row="1"
+                                    <TextBox x:Name="SC_SearchBox" />
+                                    <CheckBox x:Name="SC_AllSheetsCheckBox"
                                               Grid.Column="2"
-                                              Content="Update visibility controls"
-                                              Margin="0,0,0,8"
-                                              Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    <ListBox x:Name="SC_ParameterList"
-                                             Grid.Row="2"
-                                             Grid.Column="0"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <ListBox x:Name="SC_VisibilityParamList"
-                                             Grid.Row="2"
-                                             Grid.Column="2"
-                                             SelectionMode="Extended"
-                                             Height="240"
-                                             IsEnabled="False"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-                                    <CheckBox x:Name="SC_IgnoreDraftingViewsCheckBox"
-                                              Grid.Row="3"
-                                              Grid.Column="0"
-                                              Content="Ignore Drafting Views when calculating sheet scale"
-                                              Margin="0,10,0,0"
-                                              Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    <CheckBox x:Name="SC_HideCheckBox"
-                                              Grid.Row="3"
-                                              Grid.Column="2"
-                                              Content="Also hide (set to No) on sheets with no scaleable views"
-                                              IsEnabled="False"
-                                              Margin="0,10,0,0"
+                                              Content="All Sheets"
+                                              VerticalAlignment="Center"
                                               Style="{StaticResource ToggleSwitchCheckBox}" />
                                 </Grid>
-                            </Border>
 
-                            <Border Grid.Row="1" Style="{StaticResource SectionCard}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                                <ListBox x:Name="SC_SheetsList"
+                                         Grid.Row="2"
+                                         SelectionMode="Extended"
+                                         MinHeight="220" />
 
-                                    <TextBlock Text="SHEETS" Style="{StaticResource SectionHeaderStyle}" Margin="0,0,0,10" />
+                                <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                                    <TextBlock x:Name="SC_AllSheetsWarningText"
+                                               Text="To update individual sheets, uncheck 'All Sheets'."
+                                               Style="{StaticResource CaptionText}" />
+                                    <TextBlock x:Name="SC_ValidationText"
+                                               Foreground="{StaticResource DangerBrush}"
+                                               Visibility="Collapsed"
+                                               Margin="0,4,0,0"
+                                               TextWrapping="Wrap"
+                                               FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
 
-                                    <Grid Grid.Row="1" Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="16" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox x:Name="SC_SearchBox" Style="{StaticResource FlatTextBox}" />
-                                        <CheckBox x:Name="SC_AllSheetsCheckBox"
-                                                  Grid.Column="2"
-                                                  Content="All Sheets"
-                                                  VerticalAlignment="Center"
-                                                  Style="{StaticResource ToggleSwitchCheckBox}" />
-                                    </Grid>
+        <TextBlock x:Name="GlobalValidationText"
+                   Grid.Row="2"
+                   Foreground="{StaticResource DangerBrush}"
+                   Visibility="Collapsed"
+                   Margin="0,8,0,0"
+                   TextWrapping="Wrap"
+                   FontWeight="SemiBold" />
 
-                                    <ListBox x:Name="SC_SheetsList"
-                                             Grid.Row="2"
-                                             SelectionMode="Extended"
-                                             MinHeight="220"
-                                             Style="{StaticResource FlatListBox}"
-                                             ItemContainerStyle="{StaticResource FlatListBoxItem}" />
-
-                                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
-                                        <TextBlock x:Name="SC_AllSheetsWarningText"
-                                                   Text="To update individual sheets, uncheck 'All Sheets'."
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="12"
-                                                   FontStyle="Italic"
-                                                   TextWrapping="Wrap" />
-                                        <TextBlock x:Name="SC_ValidationText"
-                                                   Foreground="{StaticResource DangerBrush}"
-                                                   Visibility="Collapsed"
-                                                   Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"
-                                                   FontWeight="SemiBold" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </TabItem>
-                </TabControl>
-
-                <TextBlock x:Name="GlobalValidationText"
-                           Grid.Row="2"
-                           Foreground="{StaticResource DangerBrush}"
-                           Visibility="Collapsed"
-                           Margin="0,8,0,0"
-                           TextWrapping="Wrap"
-                           FontWeight="SemiBold" />
-
-                <Grid Grid.Row="3" Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
-                           VerticalAlignment="Bottom"
-                           HorizontalAlignment="Left" />
-                    <CheckBox x:Name="RememberChoicesCheckBox"
-                              Grid.Column="1"
-                              Content="Remember my choices for this project"
-                              IsChecked="True"
-                              Margin="18,0"
-                              VerticalAlignment="Center"
-                              Style="{StaticResource ToggleSwitchCheckBox}" />
-                    <StackPanel Grid.Column="2"
-                                 Orientation="Horizontal"
-                                HorizontalAlignment="Right">
-                        <Button x:Name="OkButton"
-                                Content="Update True North"
-                                MinWidth="170"
-                                Margin="0,0,8,0"
-                                IsDefault="True"
-                                Style="{StaticResource PrimaryButton}" />
-                        <Button x:Name="CancelButton"
-                                Content="Cancel"
-                                MinWidth="110"
-                                IsCancel="True"
-                                Style="{StaticResource SecondaryButton}" />
-                    </StackPanel>
-                </Grid>
-            </Grid>
-        </Border>
+        <Grid Grid.Row="3" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Image x:Name="LogoImage"
+                   Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Left" />
+            <CheckBox x:Name="RememberChoicesCheckBox"
+                      Grid.Column="1"
+                      Content="Remember my choices for this project"
+                      IsChecked="True"
+                      Margin="16,0"
+                      VerticalAlignment="Center"
+                      Style="{StaticResource ToggleSwitchCheckBox}" />
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right">
+                <Button x:Name="OkButton"
+                        Content="Update True North"
+                        MinWidth="170"
+                        Margin="0,0,8,0"
+                        IsDefault="True"
+                        Style="{StaticResource PrimaryButton}" />
+                <Button x:Name="CancelButton"
+                        Content="Cancel"
+                        MinWidth="110"
+                        IsCancel="True" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

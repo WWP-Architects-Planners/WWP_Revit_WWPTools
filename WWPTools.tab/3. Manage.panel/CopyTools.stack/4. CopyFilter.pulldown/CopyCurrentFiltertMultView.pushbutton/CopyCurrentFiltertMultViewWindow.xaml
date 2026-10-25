@@ -2,87 +2,95 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Copy Current Filters to Multiple Templates"
         Width="760"
-        Height="720"
+        Height="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource WindowBrush}"
         MinWidth="720"
-        MinHeight="680">
-    <Grid Margin="18">
+        MinHeight="700">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock x:Name="HeaderTitle" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-            <TextBlock x:Name="HeaderSubtitle" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}"/>
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock x:Name="HeaderTitle" Style="{StaticResource PageTitle}"/>
+            <TextBlock x:Name="HeaderSubtitle" Style="{StaticResource PageSubtitle}"/>
         </StackPanel>
 
-        <Border Grid.Row="1" CornerRadius="10" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+        <Border Grid.Row="1" Style="{StaticResource WwpCard}" Padding="20,14" Margin="0,0,0,12">
             <StackPanel>
-                <TextBlock Text="Source View" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-                <TextBlock x:Name="SourceViewText" Margin="0,6,0,0" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                <TextBlock Text="Source View" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+                <TextBlock x:Name="SourceViewText" TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
 
-        <TextBlock Grid.Row="2" Text="Target Templates" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-
-        <Grid Grid.Row="3" Margin="0,8,0,8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBox x:Name="TargetSearchBox" Grid.Column="0" Height="30" VerticalContentAlignment="Center"/>
-            <Button x:Name="BtnSelectVisibleTargets" Grid.Column="1" Margin="8,0,0,0" Padding="10,4" Content="Select Visible"/>
-            <Button x:Name="BtnClearTargets" Grid.Column="2" Margin="8,0,0,0" Padding="10,4" Content="Clear"/>
-        </Grid>
-
-        <Border Grid.Row="4" CornerRadius="10" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="8" Margin="0,0,0,12">
-            <ListBox x:Name="TargetsList" SelectionMode="Extended" BorderThickness="0" Background="Transparent"/>
+        <Border Grid.Row="2" Style="{StaticResource WwpCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Target Templates" Style="{StaticResource SectionHeader}"/>
+                <Grid Grid.Row="1" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TargetSearchBox" Grid.Column="0"/>
+                    <Button x:Name="BtnSelectVisibleTargets" Grid.Column="1" Margin="8,0,0,0" Content="Select Visible"/>
+                    <Button x:Name="BtnClearTargets" Grid.Column="2" Margin="8,0,0,0" Content="Clear"/>
+                </Grid>
+                <ListBox x:Name="TargetsList" Grid.Row="2" SelectionMode="Extended"/>
+            </Grid>
         </Border>
 
-        <TextBlock Grid.Row="5" Text="Filters To Copy" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-
-        <Grid Grid.Row="6" Margin="0,8,0,8">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <Grid Grid.Row="0" Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="FilterSearchBox" Grid.Column="0" Height="30" VerticalContentAlignment="Center"/>
-                <Button x:Name="BtnSelectVisibleFilters" Grid.Column="1" Margin="8,0,0,0" Padding="10,4" Content="Select Visible"/>
-                <Button x:Name="BtnClearFilters" Grid.Column="2" Margin="8,0,0,0" Padding="10,4" Content="Clear"/>
+        <Border Grid.Row="3" Style="{StaticResource WwpCard}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Filters To Copy" Style="{StaticResource SectionHeader}"/>
+                <Grid Grid.Row="1" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="FilterSearchBox" Grid.Column="0"/>
+                    <Button x:Name="BtnSelectVisibleFilters" Grid.Column="1" Margin="8,0,0,0" Content="Select Visible"/>
+                    <Button x:Name="BtnClearFilters" Grid.Column="2" Margin="8,0,0,0" Content="Clear"/>
+                </Grid>
+                <ListBox x:Name="FiltersList" Grid.Row="2" SelectionMode="Extended"/>
             </Grid>
-            <Border Grid.Row="1" CornerRadius="10" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="8">
-                <ListBox x:Name="FiltersList" SelectionMode="Extended" BorderThickness="0" Background="Transparent"/>
-            </Border>
-        </Grid>
+        </Border>
 
-        <TextBlock x:Name="WarningText" Grid.Row="7" Margin="0,4,0,0" Foreground="{StaticResource DangerBrush}" Visibility="Collapsed" TextWrapping="Wrap"/>
+        <TextBlock x:Name="WarningText" Grid.Row="4" Margin="0,10,0,0" Foreground="{StaticResource DangerBrush}" Visibility="Collapsed" TextWrapping="Wrap"/>
 
-        <Grid Grid.Row="8" Margin="0,14,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock x:Name="FooterStatus" Grid.Column="0" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}"/>
-            <Button x:Name="BtnCancel" Grid.Column="1" Margin="8,0,0,0" MinWidth="110" Padding="14,8" Content="Cancel"/>
-            <Button x:Name="BtnCopy" Grid.Column="2" Margin="8,0,0,0" MinWidth="140" Padding="14,8" Content="Copy Filters"/>
-        </Grid>
+        <DockPanel Grid.Row="5" Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
+                   DockPanel.Dock="Left"
+                   Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BtnCancel" Margin="8,0,0,0" MinWidth="110" Content="Cancel"/>
+                <Button x:Name="BtnCopy" Margin="8,0,0,0" MinWidth="140" Style="{StaticResource PrimaryButton}" Content="Copy Filters"/>
+            </StackPanel>
+            <TextBlock x:Name="FooterStatus"
+                       Margin="12,0"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap"
+                       Style="{StaticResource MutedText}"/>
+        </DockPanel>
     </Grid>
 </Window>

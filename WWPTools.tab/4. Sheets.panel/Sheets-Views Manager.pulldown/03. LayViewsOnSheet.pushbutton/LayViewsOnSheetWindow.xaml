@@ -2,13 +2,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Lay Views on Sheet"
         Width="1320"
-        Height="860"
+        Height="900"
         MinWidth="1080"
         MinHeight="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{StaticResource WindowBrush}">
-    <Grid Margin="20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="16"/>
@@ -17,48 +17,31 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Padding="16"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="8">
-            <DockPanel LastChildFill="True">
-                <StackPanel>
-                    <TextBlock x:Name="HeaderTitle"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               Text="Lay Views on Sheet"/>
-                    <TextBlock x:Name="HeaderSubtitle"
-                               Margin="0,6,0,0"
-                               Foreground="{StaticResource MutedBrush}"
-                               TextWrapping="Wrap"
-                               Text="Create one new sheet from selected views. Drag the grey boxes to adjust viewport locations before placing them."/>
-                </StackPanel>
-            </DockPanel>
-        </Border>
+        <StackPanel Grid.Row="0">
+            <TextBlock x:Name="HeaderTitle"
+                       Style="{StaticResource PageTitle}"
+                       Text="Lay Views on Sheet"/>
+            <TextBlock x:Name="HeaderSubtitle"
+                       Style="{StaticResource PageSubtitle}"
+                       Text="Create one new sheet from selected views. Drag the grey boxes to adjust viewport locations before placing them."/>
+        </StackPanel>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="340"/>
+                <ColumnDefinition Width="16"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0"
-                    Padding="16"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
+            <Border Grid.Column="0" Style="{StaticResource WwpCard}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="16"/>
+                        <RowDefinition Height="12"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="4"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="0"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
@@ -66,50 +49,54 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
-                        <TextBlock FontSize="15"
-                                   FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource SectionHeader}"
                                    Text="Sheet Setup"/>
 
-                        <TextBlock Margin="0,14,0,4"
-                                   FontWeight="SemiBold"
-                                   Text="Sheet number"/>
-                        <TextBox x:Name="TxtSheetNumber"
-                                 MinWidth="220"/>
+                        <!-- Number and name share a row to leave room for the views list below. -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Sheet number"/>
+                                <TextBox x:Name="TxtSheetNumber"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Sheet name"/>
+                                <TextBox x:Name="TxtSheetName"/>
+                            </StackPanel>
+                        </Grid>
 
-                        <TextBlock Margin="0,12,0,4"
-                                   FontWeight="SemiBold"
-                                   Text="Sheet name"/>
-                        <TextBox x:Name="TxtSheetName"
-                                 MinWidth="220"/>
-
-                        <TextBlock Margin="0,12,0,4"
-                                   FontWeight="SemiBold"
+                        <TextBlock Margin="0,12,0,6"
+                                   Style="{StaticResource FieldLabel}"
                                    Text="Titleblock"/>
                         <ComboBox x:Name="CmbTitleblock"
                                   MinWidth="220"/>
 
-                        <TextBlock Margin="0,12,0,4"
-                                   FontWeight="SemiBold"
+                        <TextBlock Margin="0,12,0,6"
+                                   Style="{StaticResource FieldLabel}"
                                    Text="Viewport gap (mm)"/>
                         <TextBox x:Name="TxtGapMm"
                                  MinWidth="120"/>
 
-                        <TextBlock Margin="0,12,0,0"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   TextWrapping="Wrap"
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource CaptionText}"
                                    Text="Reset auto layout after changing the gap or titleblock. You can then drag individual boxes in the preview."/>
 
                         <Button x:Name="BtnAutoLayout"
                                 Margin="0,12,0,0"
-                                Height="34"
+                                HorizontalAlignment="Left"
                                 Content="Reset Auto Layout"/>
                     </StackPanel>
 
                     <Separator Grid.Row="2"/>
 
                     <TextBlock Grid.Row="4"
-                               FontSize="15"
-                               FontWeight="SemiBold"
+                               Style="{StaticResource SectionHeader}"
                                Text="Views"/>
 
                     <Grid Grid.Row="6">
@@ -128,33 +115,23 @@
                         <StackPanel Grid.Row="2"
                                     Orientation="Horizontal">
                             <Button x:Name="BtnSelectVisible"
-                                    Width="100"
-                                    Height="30"
                                     Content="Select Visible"/>
                             <Button x:Name="BtnClearVisible"
-                                    Width="95"
-                                    Height="30"
                                     Margin="8,0,0,0"
                                     Content="Clear Visible"/>
                         </StackPanel>
 
-                        <Border Grid.Row="4"
-                                BorderBrush="{StaticResource BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Background="{StaticResource WindowBrush}">
-                            <ListBox x:Name="ViewsList"/>
-                        </Border>
+                        <ListBox x:Name="ViewsList"
+                                 Grid.Row="4"/>
                     </Grid>
 
                     <TextBlock x:Name="TxtViewSummary"
                                Grid.Row="8"
-                               Foreground="{StaticResource MutedBrush}"
-                               TextWrapping="Wrap"
+                               Style="{StaticResource CaptionText}"
                                Text=""/>
                     <TextBlock x:Name="TxtWarning"
                                Grid.Row="9"
-                               Margin="0,8,0,0"
+                               Margin="0,6,0,0"
                                Foreground="{StaticResource DangerBrush}"
                                TextWrapping="Wrap"
                                Text=""/>
@@ -162,19 +139,14 @@
             </Border>
 
             <GridSplitter Grid.Column="1"
-                          Width="8"
+                          Width="16"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
                           Background="Transparent"
                           ResizeDirection="Columns"
                           ResizeBehavior="PreviousAndNext"/>
 
-            <Border Grid.Column="2"
-                    Padding="16"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
+            <Border Grid.Column="2" Style="{StaticResource WwpCard}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -183,21 +155,17 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
-                        <TextBlock FontSize="15"
-                                   FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource SectionHeader}"
+                                   Margin="0,0,0,4"
                                    Text="Sheet Preview"/>
-                        <TextBlock Margin="0,6,0,0"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   TextWrapping="Wrap"
+                        <TextBlock Style="{StaticResource CaptionText}"
                                    Text="Grey boxes represent viewport bounds. Drag them to set the final placement before creating the sheet."/>
                     </StackPanel>
 
                     <Border Grid.Row="2"
                             x:Name="PreviewHost"
-                            Background="{StaticResource WindowBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
+                            Style="{StaticResource WwpInset}"
+                            Padding="0"
                             MinHeight="420">
                         <Canvas x:Name="PreviewCanvas"
                                 ClipToBounds="True"
@@ -211,18 +179,17 @@
                    LastChildFill="False">
             <TextBlock x:Name="FooterStatus"
                        VerticalAlignment="Center"
-                       Foreground="{StaticResource MutedBrush}"
+                       Style="{StaticResource MutedText}"
                        Text=""/>
             <StackPanel Orientation="Horizontal"
                         DockPanel.Dock="Right">
                 <Button x:Name="BtnCancel"
-                        Width="110"
-                        Height="34"
-                        Margin="0,0,10,0"
+                        MinWidth="110"
+                        Margin="0,0,8,0"
                         Content="Cancel"/>
                 <Button x:Name="BtnCreate"
-                        Width="120"
-                        Height="34"
+                        MinWidth="120"
+                        Style="{StaticResource PrimaryButton}"
                         Content="Create Sheet"/>
             </StackPanel>
         </DockPanel>

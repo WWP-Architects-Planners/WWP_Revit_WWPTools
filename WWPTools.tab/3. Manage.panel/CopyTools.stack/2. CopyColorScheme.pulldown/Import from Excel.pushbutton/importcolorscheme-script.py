@@ -257,6 +257,7 @@ def _show_mapping_dialog(uidoc, workbook_info):
     validation = window.FindName("ValidationText")
     ok_btn = window.FindName("OkButton")
     cancel_btn = window.FindName("CancelButton")
+    ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
     sheets = workbook_info.get("sheets", [])
     for sheet in sheets:
@@ -377,100 +378,59 @@ def _show_target_dialog(uidoc, doc, choices, payload=None):
         MinHeight="560"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
-        FontSize="14"
-        Background="#F3F5F7">
-    <Window.Resources>
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#3F9AD9"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#3F9AD9"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="28"/>
-            <Setter Property="Padding" Value="18,0"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2E87C5"/>
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2E87C5"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="Foreground" Value="#1F2937"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-        </Style>
-    </Window.Resources>
-    <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
-                BorderThickness="1"
-                Padding="20">
+        Background="{StaticResource WindowBrush}">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0"
+                   Style="{StaticResource PageSubtitle}"
+                   Margin="0,0,0,16"
+                   Text="Select the target color scheme. Leave Create New off to overwrite the selected scheme."/>
+        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0"
-                           Text="Select the target color scheme. Leave Create New off to overwrite the selected scheme."
-                           TextWrapping="Wrap"
-                           Foreground="#374151"
-                           Margin="0,0,0,12"/>
                 <CheckBox x:Name="CreateNewCheck"
-                          Grid.Row="1"
+                          Grid.Row="0"
                           IsChecked="False"
                           Margin="0,0,0,12"
                           Content="Create new scheme by duplicating the selected target before import" />
                 <ListBox x:Name="TargetList"
-                         Grid.Row="2"
-                         BorderBrush="#CBD5E1"
-                         BorderThickness="1"
-                         Background="#FFFFFF"
+                         Grid.Row="1"
                          Margin="0,0,0,12"/>
                 <TextBlock x:Name="SummaryText"
-                           Grid.Row="3"
-                           TextWrapping="Wrap"
-                           Foreground="#4B5563"
-                           Margin="0,0,0,12"/>
-                <StackPanel Grid.Row="4"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right">
-                    <Button x:Name="OkButton"
-                            Width="130"
-                            Margin="0,0,8,0"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Content="Continue"/>
-                    <Button x:Name="CancelButton"
-                            Width="130"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Content="Cancel"/>
-                </StackPanel>
+                           Grid.Row="2"
+                           Style="{StaticResource MutedText}"/>
             </Grid>
         </Border>
+        <DockPanel Grid.Row="2" Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
+                   DockPanel.Dock="Left"
+                   Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center"/>
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button x:Name="OkButton"
+                        MinWidth="130"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="Continue"/>
+                <Button x:Name="CancelButton"
+                        MinWidth="130"
+                        Content="Cancel"/>
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Window>
 """
+    ui.uiUtils_ensure_theme()
     window = XamlReader.Parse(xaml)
     _set_owner(window, uidoc)
 
@@ -479,6 +439,7 @@ def _show_target_dialog(uidoc, doc, choices, payload=None):
     summary_text = window.FindName("SummaryText")
     ok_btn = window.FindName("OkButton")
     cancel_btn = window.FindName("CancelButton")
+    ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
     for choice in choices:
         target_list.Items.Add(choice.get("label", "Color Scheme"))

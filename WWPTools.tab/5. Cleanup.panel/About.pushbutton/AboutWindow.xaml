@@ -12,46 +12,26 @@
         KeyDown="handleclick"
         MouseDown="handleclick">
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelText" Color="#243746"/>
-        <SolidColorBrush x:Key="PanelAccent" Color="#1F78D1"/>
-        <SolidColorBrush x:Key="PanelAccentSoft" Color="#E9F3FC"/>
-        <Style TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="Background" Value="{StaticResource PanelText}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="14,5" />
-            <Setter Property="Margin" Value="4,4,4,0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="12">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource PanelAccent}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <!-- Small pill for the version / branch / commit facts. -->
+        <Style x:Key="AboutBadge" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Margin" Value="0,0,8,8" />
         </Style>
     </Window.Resources>
 
+    <!-- The card is the whole window; the outer margin leaves room for the shadow. -->
     <Border Margin="18"
-            Background="{StaticResource PanelBrush}"
-            CornerRadius="18"
-            BorderBrush="#D8E2EB"
-            BorderThickness="1">
+            Style="{StaticResource WwpCard}"
+            Padding="24">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="20" Opacity="0.2" Color="#1D2D3A"/>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.16" Color="Black"/>
         </Border.Effect>
 
-        <Grid Margin="22">
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" />
                 <ColumnDefinition Width="*" />
@@ -62,59 +42,55 @@
                     Height="190"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
-                    Background="{StaticResource PanelAccentSoft}"
-                    CornerRadius="24">
+                    Background="{StaticResource AccentSoftBrush}"
+                    CornerRadius="16">
                 <Image x:Name="LogoImage" Style="{StaticResource BrandLogoHero}"
                        Margin="24" />
             </Border>
 
-            <StackPanel Grid.Column="1" Margin="18,4,0,0">
+            <StackPanel Grid.Column="1" Margin="16,0,0,0">
                 <TextBlock x:Name="TitleText"
-                           FontSize="38"
-                           FontWeight="SemiBold"
+                           Style="{StaticResource PageTitle}"
+                           FontSize="30"
                            Text="WWPTools" />
                 <TextBlock x:Name="SubtitleText"
-                           Margin="0,4,0,0"
-                           FontSize="15"
-                           TextWrapping="Wrap"
+                           Style="{StaticResource PageSubtitle}"
                            Text="WW+P Revit productivity tools and automation workflows." />
 
                 <WrapPanel Margin="0,14,0,0">
-                    <Border Background="#EEF4FA" CornerRadius="10" Padding="10,4" Margin="0,0,8,8">
-                        <TextBlock x:Name="VersionText" FontSize="13" FontWeight="SemiBold" Text="Version v1.3.3" />
+                    <Border Style="{StaticResource AboutBadge}">
+                        <TextBlock x:Name="VersionText" FontSize="12" FontWeight="SemiBold" Text="Version v1.3.3" />
                     </Border>
-                    <Border x:Name="BranchBadge" Background="#EEF4FA" CornerRadius="10" Padding="10,4" Margin="0,0,8,8" Visibility="Collapsed">
-                        <TextBlock x:Name="BranchText" FontSize="13" Text="Branch main" />
+                    <Border x:Name="BranchBadge" Style="{StaticResource AboutBadge}" Visibility="Collapsed">
+                        <TextBlock x:Name="BranchText" FontSize="12" Foreground="{StaticResource MutedBrush}" Text="Branch main" />
                     </Border>
-                    <Border x:Name="CommitBadge" Background="#EEF4FA" CornerRadius="10" Padding="10,4" Margin="0,0,8,8" Visibility="Collapsed">
-                        <TextBlock x:Name="CommitText" FontSize="13" Text="Commit abc1234" />
+                    <Border x:Name="CommitBadge" Style="{StaticResource AboutBadge}" Visibility="Collapsed">
+                        <TextBlock x:Name="CommitText" FontSize="12" Foreground="{StaticResource MutedBrush}" Text="Commit abc1234" />
                     </Border>
                 </WrapPanel>
 
                 <TextBlock x:Name="BodyText"
                            Margin="0,4,0,0"
-                           FontSize="13"
                            TextWrapping="Wrap"
                            LineHeight="20"
                            Text="Use this panel to quickly open WWP resources, release notes, and the GitHub repository." />
 
-                <WrapPanel Margin="0,18,0,0">
-                    <Button x:Name="WebsiteButton" Content="Website" />
-                    <Button x:Name="GuidebookButton" Content="Guidebook" />
-                    <Button x:Name="GithubButton" Content="GitHub" />
-                    <Button x:Name="ReleaseButton" Content="Release Notes" />
+                <WrapPanel Margin="0,16,0,0">
+                    <Button x:Name="WebsiteButton" Content="Website" Margin="0,0,8,8" />
+                    <Button x:Name="GuidebookButton" Content="Guidebook" Margin="0,0,8,8" />
+                    <Button x:Name="GithubButton" Content="GitHub" Margin="0,0,8,8" />
+                    <Button x:Name="ReleaseButton" Content="Release Notes" Margin="0,0,8,8" />
                 </WrapPanel>
 
                 <TextBlock x:Name="FooterText"
-                           Margin="0,20,0,0"
-                           FontSize="12"
-                           Foreground="#6A7E90"
+                           Margin="0,12,0,0"
+                           Style="{StaticResource CaptionText}"
                            Text="Click anywhere outside the panel or press Esc to close." />
 
                 <CheckBox x:Name="TelemetryCheckBox"
                           Margin="0,10,0,0"
                           FontSize="12"
-                          Foreground="#6A7E90"
+                          Foreground="{StaticResource MutedBrush}"
                           IsChecked="True"
                           Checked="on_telemetry_changed"
                           Unchecked="on_telemetry_changed"

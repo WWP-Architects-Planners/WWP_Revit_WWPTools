@@ -8,58 +8,43 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{StaticResource WindowBrush}">
-    <Grid Margin="20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="16"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="16"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Padding="16"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="8">
-            <StackPanel>
-                <TextBlock x:Name="HeaderTitle"
-                           FontSize="20"
-                           FontWeight="SemiBold"
-                           Text="Combined Print Set"/>
-                <TextBlock x:Name="HeaderSubtitle"
-                           Margin="0,6,0,0"
-                           Foreground="{StaticResource MutedBrush}"
-                           TextWrapping="Wrap"
-                           Text="Load sheets from open or closed Revit models, arrange the final order, and print one merged PDF drawing set."/>
-            </StackPanel>
-        </Border>
+        <StackPanel Grid.Row="0">
+            <TextBlock x:Name="HeaderTitle"
+                       Style="{StaticResource PageTitle}"
+                       Text="Combined Print Set"/>
+            <TextBlock x:Name="HeaderSubtitle"
+                       Style="{StaticResource PageSubtitle}"
+                       Text="Load sheets from open or closed Revit models, arrange the final order, and print one merged PDF drawing set."/>
+        </StackPanel>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="420"/>
-                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="110"/>
-                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="110"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
-                    Padding="16"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
+                    Style="{StaticResource WwpCard}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="160"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
+                        <RowDefinition Height="160"/>
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
                         <RowDefinition Height="*"/>
@@ -67,20 +52,18 @@
 
                     <DockPanel Grid.Row="0"
                                LastChildFill="False">
-                        <TextBlock FontSize="15"
-                                   FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource SectionHeader}"
+                                   Margin="0"
                                    VerticalAlignment="Center"
                                    Text="Source Models"/>
                         <StackPanel Orientation="Horizontal"
                                     DockPanel.Dock="Right">
                             <Button x:Name="BtnAddFiles"
                                     Width="110"
-                                    Height="30"
                                     Margin="0,0,8,0"
                                     Content="Add Files"/>
                             <Button x:Name="BtnRemoveSource"
-                                    Width="120"
-                                    Height="30"
+                                    Width="130"
                                     Content="Remove Source"/>
                         </StackPanel>
                     </DockPanel>
@@ -89,18 +72,16 @@
                              Grid.Row="2"/>
 
                     <TextBlock Grid.Row="4"
-                               FontSize="15"
-                               FontWeight="SemiBold"
+                               Style="{StaticResource SectionHeader}"
                                Text="Available Sheets"/>
 
                     <TextBox x:Name="TxtSheetFilter"
-                             Grid.Row="6"
-                             Height="30"
+                             Grid.Row="5"
                              VerticalContentAlignment="Center"
                              ToolTip="Filter sheets in the selected source model"/>
 
                     <ListBox x:Name="AvailableSheetsList"
-                             Grid.Row="8"
+                             Grid.Row="7"
                              SelectionMode="Extended"/>
                 </Grid>
             </Border>
@@ -108,37 +89,29 @@
             <StackPanel Grid.Column="2"
                         VerticalAlignment="Center">
                 <Button x:Name="BtnAddSelected"
-                        Height="34"
-                        Margin="0,0,0,10"
+                        Margin="0,0,0,8"
                         Content="Add >"/>
                 <Button x:Name="BtnAddAll"
-                        Height="34"
-                        Margin="0,0,0,10"
                         Content="Add All >>"/>
             </StackPanel>
 
             <Border Grid.Column="4"
-                    Padding="16"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
+                    Style="{StaticResource WwpCard}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="12"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="16"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
-                        <TextBlock FontSize="15"
-                                   FontWeight="SemiBold"
+                        <TextBlock Style="{StaticResource SectionHeader}"
+                                   Margin="0"
                                    Text="Ordered Print Set"/>
-                        <TextBlock Margin="0,6,0,0"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   TextWrapping="Wrap"
+                        <TextBlock Style="{StaticResource CaptionText}"
+                                   Margin="0,4,0,0"
                                    Text="The right-hand list defines the final PDF page order. Use the move buttons to sort sheets across models."/>
                     </StackPanel>
 
@@ -148,34 +121,32 @@
 
                     <Grid Grid.Row="4">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="12"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0"
-                                    Orientation="Horizontal">
+                                    VerticalAlignment="Center">
                             <TextBlock x:Name="TxtSummary"
+                                       Style="{StaticResource MutedText}"
                                        VerticalAlignment="Center"
-                                       Foreground="{StaticResource MutedBrush}"
-                                       TextWrapping="Wrap"
                                        Text=""/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
-                            <TextBlock FontWeight="SemiBold"
+                            <TextBlock Style="{StaticResource FieldLabel}"
                                        Text="PDF Printer"/>
                             <ComboBox x:Name="CmbPrinter"
-                                      Margin="0,4,0,0"
                                       MinWidth="340"/>
 
-                            <TextBlock Margin="0,12,0,0"
-                                       FontWeight="SemiBold"
+                            <TextBlock Style="{StaticResource FieldLabel}"
+                                       Margin="0,12,0,6"
                                        Text="Output PDF"/>
-                            <Grid Margin="0,4,0,0">
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="110"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="TxtOutputPath"
@@ -183,7 +154,6 @@
                                          MinWidth="360"/>
                                 <Button x:Name="BtnBrowseOutput"
                                         Grid.Column="2"
-                                        Height="30"
                                         Content="Browse"/>
                             </Grid>
 
@@ -197,52 +167,50 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Column="5"
+            <StackPanel Grid.Column="6"
                         VerticalAlignment="Center">
                 <Button x:Name="BtnMoveTop"
-                        Height="32"
                         Margin="0,0,0,8"
                         Content="Top"/>
                 <Button x:Name="BtnMoveUp"
-                        Height="32"
                         Margin="0,0,0,8"
                         Content="Up"/>
                 <Button x:Name="BtnMoveDown"
-                        Height="32"
                         Margin="0,0,0,8"
                         Content="Down"/>
                 <Button x:Name="BtnMoveBottom"
-                        Height="32"
                         Margin="0,0,0,16"
                         Content="Bottom"/>
                 <Button x:Name="BtnRemoveSelected"
-                        Height="32"
                         Margin="0,0,0,8"
                         Content="Remove"/>
                 <Button x:Name="BtnClearSet"
-                        Height="32"
                         Content="Clear"/>
             </StackPanel>
         </Grid>
 
-        <DockPanel Grid.Row="4"
-                   LastChildFill="False">
-            <TextBlock x:Name="FooterStatus"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource MutedBrush}"
-                       Text=""/>
+        <DockPanel Grid.Row="3"
+                   Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
+                   Style="{StaticResource BrandLogoFooter}"
+                   DockPanel.Dock="Left"
+                   VerticalAlignment="Center"
+                   Margin="0,0,12,0"/>
             <StackPanel Orientation="Horizontal"
                         DockPanel.Dock="Right">
                 <Button x:Name="BtnCancel"
                         Width="110"
-                        Height="34"
-                        Margin="0,0,10,0"
+                        Margin="0,0,8,0"
                         Content="Cancel"/>
                 <Button x:Name="BtnPrint"
+                        Style="{StaticResource PrimaryButton}"
                         Width="150"
-                        Height="34"
                         Content="Print PDF Set"/>
             </StackPanel>
+            <TextBlock x:Name="FooterStatus"
+                       Style="{StaticResource MutedText}"
+                       VerticalAlignment="Center"
+                       Text=""/>
         </DockPanel>
     </Grid>
 </Window>

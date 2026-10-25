@@ -90,6 +90,7 @@ class CopyFiltersToTemplateDialog(object):
         self._footer_status = self.window.FindName("FooterStatus")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._btn_copy = self.window.FindName("BtnCopy")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._header_title.Text = WINDOW_TITLE
         self._header_subtitle.Text = "Copy selected filter overrides from one template to another template."

@@ -1,226 +1,64 @@
+<!--
+  Export2Ex - By Schedule: export settings, opened from the Settings button of the main window
+  (BatchExportDialog.xaml). Export2ex-script.py (_show_export_settings_popup) reads and writes
+  every named control below.
+-->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Export Schedules"
-        Height="840"
-        Width="1040"
-        MinHeight="780"
-        MinWidth="920"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
-        FontSize="14"
+        Title="Export Settings"
+        Width="480"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
         Background="{StaticResource WindowBrush}">
-    <Window.Resources>
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#3F9AD9"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#3F9AD9"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="26.5"/>
-            <Setter Property="Padding" Value="18,0"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2E87C5"/>
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2E87C5"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="Foreground" Value="#1F2937"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-        </Style>
-        <Style x:Key="FlatToggleStyle" TargetType="ToggleButton">
-            <Setter Property="Width" Value="38"/>
-            <Setter Property="Height" Value="23"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
-                            <Border x:Name="SwitchTrack"
-                                    Background="{StaticResource SelectedBrush}"
-                                    BorderBrush="{StaticResource BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="11.5"/>
-                            <Ellipse x:Name="SwitchThumb"
-                                     Width="19"
-                                     Height="19"
-                                     Fill="White"
-                                     Stroke="#AEB8C4"
-                                     StrokeThickness="1"
-                                     HorizontalAlignment="Left"
-                                     VerticalAlignment="Center"
-                                     Margin="2,2,23,2"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="SwitchTrack" Property="Background" Value="#3F9AD9"/>
-                                <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="#3F9AD9"/>
-                                <Setter TargetName="SwitchThumb" Property="Margin" Value="17,2,2,2"/>
-                                <Setter TargetName="SwitchThumb" Property="Stroke" Value="#3F9AD9"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="SwitchTrack" Property="Opacity" Value="0.5"/>
-                                <Setter TargetName="SwitchThumb" Property="Opacity" Value="0.6"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,7"/>
-            <Setter Property="MinHeight" Value="36"/>
-        </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="MinHeight" Value="36"/>
-        </Style>
-        <Style TargetType="ListBox">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="4"/>
-        </Style>
-        <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="0,6,0,8"/>
-            <Setter Property="Padding" Value="10,10,10,8"/>
-        </Style>
-    </Window.Resources>
-    <Grid Margin="16">
-        <Border Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                Padding="20">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0">
-                    <TextBlock Text="Search schedules"
-                               Margin="0,0,0,6"
-                               Foreground="{StaticResource MutedBrush}"
-                               FontWeight="SemiBold"/>
-                    <TextBox Name="SearchBox" Margin="0,0,0,10"/>
+    <StackPanel Margin="{StaticResource PageMargin}">
+        <TextBlock Text="Export settings" Style="{StaticResource PageTitle}" FontSize="20" />
+        <TextBlock Style="{StaticResource PageSubtitle}"
+                   Text="Defaults for new sets and for sets saved without their own options." />
+
+        <Border Style="{StaticResource WwpCard}" Margin="0,16,0,0">
+            <StackPanel>
+                <TextBlock Text="Export to" Style="{StaticResource SectionHeader}" />
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                    <RadioButton x:Name="ExcelMode" Content="Excel workbook" GroupName="ExportMode"
+                                 Margin="0,0,24,0" />
+                    <RadioButton x:Name="CsvMode" Content="CSV files" GroupName="ExportMode" />
                 </StackPanel>
-                <Grid Grid.Row="1">
+
+                <TextBlock Text="Schedule appearance" Style="{StaticResource SectionHeader}" />
+                <CheckBox x:Name="ExportTitle" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Export title" Margin="0,0,0,10" />
+                <CheckBox x:Name="ExportColumnHeaders" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Export column headers" Margin="0,0,0,10" />
+                <CheckBox x:Name="ExportGroupedColumnHeaders" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Include grouped column headers" Margin="50,0,0,10" />
+                <CheckBox x:Name="ExportGroupHeaders" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Export group headers, footers and blank lines" Margin="0,0,0,10" />
+                <CheckBox x:Name="UseCategorySheetName" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Name each sheet after the schedule's category" Margin="0,0,0,18" />
+
+                <TextBlock Text="Text format" Style="{StaticResource SectionHeader}" />
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="360" MinWidth="320"/>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <ListBox Name="ScheduleList" Grid.Column="0" SelectionMode="Extended" Margin="0,0,6,0"/>
-                    <GridSplitter Grid.Column="1"
-                                  Width="8"
-                                  HorizontalAlignment="Stretch"
-                                  VerticalAlignment="Stretch"
-                                  ResizeBehavior="PreviousAndNext"
-                                  Background="{StaticResource BorderBrush}"
-                                  ShowsPreview="True"/>
-                    <ScrollViewer Grid.Column="2"
-                                  Margin="10,0,0,0"
-                                  VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                            <TextBlock Text="Export mode" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <RadioButton Name="ExcelMode" Content="Excel" GroupName="ModeGroup" Margin="0,0,12,0"/>
-                                <RadioButton Name="CsvMode" Content="CSV" GroupName="ModeGroup"/>
-                            </StackPanel>
-                            <GroupBox Header="Schedule appearance">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                                        <ToggleButton Name="ExportTitle" Style="{StaticResource FlatToggleStyle}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Export title" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                                        <ToggleButton Name="ExportColumnHeaders" IsChecked="True" Style="{StaticResource FlatToggleStyle}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Export column headers" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,6">
-                                        <ToggleButton Name="ExportGroupedColumnHeaders" Style="{StaticResource FlatToggleStyle}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Include grouped column headers" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                                        <ToggleButton Name="ExportGroupHeaders" Style="{StaticResource FlatToggleStyle}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Export group headers, footers, and blank lines" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,0,0">
-                                        <ToggleButton Name="UseCategorySheetName" Style="{StaticResource FlatToggleStyle}" Margin="0,0,10,0"/>
-                                        <TextBlock Text="Use category as sheet name" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </GroupBox>
-                            <GroupBox Name="CsvOutputOptions" Header="Output options">
-                                <StackPanel>
-                                    <TextBlock Text="CSV folder" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
-                                    <DockPanel Margin="0,0,0,10" LastChildFill="True">
-                                        <Button Name="BrowseCsv" Content="Browse" Width="80" DockPanel.Dock="Right" Style="{StaticResource SecondaryButtonStyle}"/>
-                                        <TextBox Name="CsvFolder" Margin="0,0,6,0"/>
-                                    </DockPanel>
-                                    <TextBlock Text="CSV delimiter" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
-                                    <ComboBox Name="CsvDelimiter" Margin="0,0,0,10"/>
-                                    <TextBlock Text="Text qualifier" Margin="0,0,0,6" Foreground="{StaticResource MutedBrush}" FontWeight="SemiBold"/>
-                                    <ComboBox Name="TextQualifier" Margin="0,0,0,10"/>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="Quote all fields" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                        <ToggleButton Name="QuoteAll" Style="{StaticResource FlatToggleStyle}" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </GroupBox>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <TextBlock Text="Delimiter" VerticalAlignment="Center" />
+                    <ComboBox x:Name="CsvDelimiter" Grid.Column="2" />
                 </Grid>
-                <DockPanel Grid.Row="2" Margin="0,12,0,0">
-                    <Image Name="LogoImage"
-                           DockPanel.Dock="Left"
-                           Width="56"
-                           Height="56"
-                           VerticalAlignment="Bottom"
-                           HorizontalAlignment="Left"
-                           IsHitTestVisible="False" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Name="BatchExportButton" Style="{StaticResource PrimaryButtonStyle}" Width="160" Margin="0,0,8,0">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                                <TextBlock Text="Save" FontSize="14"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Name="CancelButton" Style="{StaticResource SecondaryButtonStyle}" Width="150">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,8,0"/>
-                                <TextBlock Text="Cancel" FontSize="14"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </DockPanel>
-            </Grid>
+                <CheckBox x:Name="QuoteAll" Style="{StaticResource ToggleSwitchCheckBox}"
+                          Content="Quote all fields" Margin="0,12,0,0" />
+                <TextBlock Style="{StaticResource CaptionText}" Margin="0,10,0,0"
+                           Text="The delimiter is also used to read the schedule back when building Excel sheets." />
+            </StackPanel>
         </Border>
-    </Grid>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="ApplyButton" Content="Apply" MinWidth="96" Margin="0,0,8,0"
+                    Style="{StaticResource PrimaryButton}" IsDefault="True" />
+            <Button x:Name="CancelButton" Content="Cancel" MinWidth="88" IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
 </Window>

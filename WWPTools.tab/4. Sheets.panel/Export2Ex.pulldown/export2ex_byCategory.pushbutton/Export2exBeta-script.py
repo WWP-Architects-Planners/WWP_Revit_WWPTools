@@ -44,287 +44,196 @@ MODE_BY_CATEGORY = "category"
 EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Export2Ex - By Category"
-        Height="820"
-        Width="1000"
-        MinHeight="640"
-        MinWidth="800"
+        Height="780"
+        Width="1160"
+        MinHeight="620"
+        MinWidth="940"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
-        FontSize="14"
-        Background="#F3F5F7">
-    <Window.Resources>
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#3F9AD9"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#3F9AD9"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Padding" Value="18,0"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="Foreground" Value="#1F2937"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-        </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="MinHeight" Value="28"/>
-        </Style>
-        <Style TargetType="ListBox">
-            <Setter Property="Background" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="2"/>
-        </Style>
-    </Window.Resources>
-    <Grid Margin="16">
-        <Border Background="#FFFFFF"
-                BorderBrush="#D7DEE6"
-                BorderThickness="1"
-                Padding="20">
+        Background="{StaticResource WindowBrush}">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Export set" Style="{StaticResource PageTitle}" />
+            <TextBlock Style="{StaticResource PageSubtitle}"
+                       Text="Pick a category (or a schedule, to use its category and fields), then choose the parameters to export in column order." />
+        </StackPanel>
+
+        <!-- Set details -->
+        <Border Grid.Row="1" Style="{StaticResource WwpCard}" Padding="20,16">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- Row 0: Saved sets -->
-                <Grid Grid.Row="0" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Saved set:"
-                               Foreground="#374151"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Margin="0,0,8,0"/>
-                    <ComboBox Name="SavedSetBox"
-                              Grid.Column="1"
-                              IsEditable="True"
-                              Margin="0,0,8,0"/>
-                    <Button Name="LoadSetButton"
-                            Grid.Column="2"
-                            Content="Load"
-                            Width="64"
-                            Margin="0,0,6,0"
-                            Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button Name="SaveSetButton"
-                            Grid.Column="3"
-                            Content="Save"
-                            Width="64"
-                            Margin="0,0,6,0"
-                            Style="{StaticResource SecondaryButtonStyle}"/>
-                    <Button Name="DeleteSetButton"
-                            Grid.Column="4"
-                            Content="Delete"
-                            Width="64"
-                            Style="{StaticResource SecondaryButtonStyle}"/>
-                </Grid>
-
-                <!-- Row 1: Excel path + Browse -->
-                <Grid Grid.Row="1" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="90"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox Name="ExcelPath" Margin="0,0,8,0"/>
-                    <Button Name="BrowseExcel"
-                            Grid.Column="1"
-                            Content="Browse"
-                            Style="{StaticResource SecondaryButtonStyle}"/>
-                </Grid>
-
-                <!-- Row 2: Sheet name -->
-                <Grid Grid.Row="2" Margin="0,0,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0"
-                               Text="Sheet name:"
-                               Foreground="#374151"
-                               VerticalAlignment="Center"
-                               FontSize="12"
-                               Margin="0,0,8,0"/>
-                    <TextBox Name="SheetNameBox" Grid.Column="1"/>
-                </Grid>
-
-                <!-- Row 3: Mode toggle + Units selector -->
-                <Border Grid.Row="3"
-                        BorderBrush="#E2E8F0"
-                        BorderThickness="0,1,0,0"
-                        Margin="0,12,0,0"
-                        Padding="0,10,0,0">
-                    <DockPanel>
-                        <StackPanel DockPanel.Dock="Right"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Center">
-                            <TextBlock Text="Units:"
-                                       Foreground="#6B7280"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,6,0"/>
-                            <ComboBox Name="UnitsBox"
-                                      Width="150"
-                                      FontSize="12"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="Project units"/>
-                                <ComboBoxItem Content="Imperial"/>
-                                <ComboBoxItem Content="Metric"/>
-                            </ComboBox>
-                        </StackPanel>
-                        <CheckBox Name="FromScheduleToggle"
-                                  Content="Category From Schedule"
-                                  FontSize="13"
-                                  FontWeight="SemiBold"
-                                  Foreground="#374151"
-                                  VerticalAlignment="Center"/>
-                    </DockPanel>
-                </Border>
-
-                <!-- Row 4: Source search + list -->
-                <StackPanel Grid.Row="4" Margin="0,10,0,0">
-                    <TextBlock Name="SourceLabel"
-                               Text="Search categories:"
-                               Foreground="#6B7280"
-                               FontSize="12"
-                               Margin="0,0,0,2"/>
-                    <TextBox Name="SourceSearchBox" Margin="0,0,0,4"/>
-                    <TextBlock Name="SourceListLabel"
-                               Text="Categories"
-                               Foreground="#6B7280"
-                               FontSize="12"
-                               Margin="0,0,0,2"/>
-                    <ListBox Name="SourceList"
-                             Height="150"
-                             SelectionMode="Single"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="200" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Set name" Style="{StaticResource FieldLabel}" />
+                    <TextBox Name="SetNameBox" AutomationProperties.Name="Set name" />
                 </StackPanel>
-
-                <!-- Row 5: Available Parameters | buttons | Selected Properties -->
-                <Grid Grid.Row="5" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="130"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- LEFT: Available Parameters -->
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0"
-                                   Text="Available Parameters:"
-                                   Foreground="#374151"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,4"/>
-                        <WrapPanel Grid.Row="1" Margin="0,0,0,4">
-                            <CheckBox Name="ShowReadOnlyFilter"
-                                      Content="Show Read-Only"
-                                      IsChecked="True"
-                                      FontSize="12"
-                                      Foreground="#374151"
-                                      VerticalAlignment="Center"
-                                      Margin="0,0,12,0"/>
-                            <TextBlock Text="Search:"
-                                       Foreground="#6B7280"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,4,0"/>
-                            <TextBox Name="ParameterSearchBox" Width="120" FontSize="12"/>
-                        </WrapPanel>
-                        <ListBox Name="ParameterList"
-                                 Grid.Row="2"
-                                 SelectionMode="Extended"
-                                 MinHeight="80"/>
-                    </Grid>
-
-                    <!-- MIDDLE: Add/Remove + Move buttons -->
-                    <StackPanel Grid.Column="1"
-                                Margin="6,30,6,0"
-                                VerticalAlignment="Top">
-                        <Button Name="AddParameterButton"
-                                Content="Add -->"
-                                Margin="0,0,0,6"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Button Name="RemoveParameterButton"
-                                Content="&lt;-- Remove"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Rectangle Height="1" Fill="#E2E8F0" Margin="0,12,0,10"/>
-                        <Button Name="MoveParameterUpButton"
-                                Content="Move Up"
-                                Margin="0,0,0,6"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                        <Button Name="MoveParameterDownButton"
-                                Content="Move Down"
-                                Style="{StaticResource SecondaryButtonStyle}"/>
-                    </StackPanel>
-
-                    <!-- RIGHT: Selected Properties -->
-                    <Grid Grid.Column="2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0"
-                                   Text="Selected Properties:"
-                                   Foreground="#374151"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,4"/>
-                        <ListBox Name="SelectedParameterList"
-                                 Grid.Row="1"
-                                 SelectionMode="Extended"
-                                 MinHeight="80"/>
-                    </Grid>
-                </Grid>
-
-                <!-- Row 6: Footer -->
-                <DockPanel Grid.Row="6" Margin="0,16,0,0">
-                    <Image Name="LogoImage"
-                           DockPanel.Dock="Left"
-                           Width="56"
-                           Height="56"
-                           VerticalAlignment="Bottom"
-                           HorizontalAlignment="Left"
-                           IsHitTestVisible="False"/>
-                    <StackPanel DockPanel.Dock="Right"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Right">
-                        <Button Name="BatchExportButton"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Width="150"
-                                Margin="0,0,8,0"
-                                Content="Batch Export..."/>
-                        <Button Name="OkButton"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="150"
-                                Margin="0,0,8,0"
-                                Content="Export"/>
-                        <Button Name="CancelButton"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Width="150"
-                                Content="Cancel"/>
-                    </StackPanel>
-                </DockPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Sheet name" Style="{StaticResource FieldLabel}" />
+                    <TextBox Name="SheetNameBox" AutomationProperties.Name="Sheet name" />
+                </StackPanel>
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="Units" Style="{StaticResource FieldLabel}" />
+                    <ComboBox Name="UnitsBox" SelectedIndex="0" AutomationProperties.Name="Units">
+                        <ComboBoxItem Content="Project units" />
+                        <ComboBoxItem Content="Imperial" />
+                        <ComboBoxItem Content="Metric" />
+                    </ComboBox>
+                </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Source, available parameters, exported columns -->
+        <Border Grid.Row="2" Style="{StaticResource WwpCard}" Margin="0,12,0,0" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- SOURCE -->
+                <Border Grid.Column="0" Style="{StaticResource TableLane}" Margin="0"
+                        Background="{StaticResource LaneGreyBrush}" Padding="12,0,12,12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="SOURCE" Style="{StaticResource TableGroupLabel}"
+                                   Margin="0,10,0,10" />
+                        <CheckBox Grid.Row="1" Name="FromScheduleToggle"
+                                  Style="{StaticResource ToggleSwitchCheckBox}"
+                                  Content="Category from schedule"
+                                  ToolTip="Pick a schedule instead: its category and visible fields are used"
+                                  Margin="0,0,0,12" />
+                        <TextBlock Grid.Row="2" Name="SourceLabel" Text="Search categories"
+                                   Style="{StaticResource FieldLabel}" />
+                        <TextBox Grid.Row="3" Name="SourceSearchBox" Margin="0,0,0,10"
+                                 AutomationProperties.Name="Search sources" />
+                        <TextBlock Grid.Row="4" Name="SourceListLabel" Text="Categories"
+                                   Style="{StaticResource FieldLabel}" />
+                        <ListBox Grid.Row="5" Name="SourceList" SelectionMode="Single" MinHeight="120"
+                                 AutomationProperties.Name="Sources" />
+                    </Grid>
+                </Border>
+
+                <!-- AVAILABLE -->
+                <Border Grid.Column="2" Style="{StaticResource TableLane}" Margin="0"
+                        Background="{StaticResource LaneBlueBrush}" Padding="12,0,12,12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="AVAILABLE PARAMETERS" Style="{StaticResource TableGroupLabel}"
+                                   Foreground="{StaticResource LaneBlueTextBrush}" Margin="0,10,0,10" />
+                        <Grid Grid.Row="1" Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Name="ParameterSearchBox" Margin="0,0,12,0"
+                                     ToolTip="Filter parameters by name"
+                                     AutomationProperties.Name="Search parameters" />
+                            <CheckBox Grid.Column="1" Name="ShowReadOnlyFilter" Content="Show read-only"
+                                      IsChecked="True" />
+                        </Grid>
+                        <ListBox Grid.Row="2" Name="ParameterList" SelectionMode="Extended" MinHeight="120"
+                                 AutomationProperties.Name="Available parameters" />
+                    </Grid>
+                </Border>
+
+                <!-- Move buttons -->
+                <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="12,0">
+                    <Button Name="AddParameterButton" Margin="0,0,0,8" HorizontalContentAlignment="Left"
+                            ToolTip="Add the selected parameters to the export">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE72A;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Add" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Name="RemoveParameterButton" HorizontalContentAlignment="Left"
+                            ToolTip="Remove the selected columns from the export">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE72B;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Remove" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Separator Margin="0,14" />
+                    <Button Name="MoveParameterUpButton" Margin="0,0,0,8" HorizontalContentAlignment="Left"
+                            ToolTip="Move the selected columns earlier">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE74A;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Move up" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Name="MoveParameterDownButton" HorizontalContentAlignment="Left"
+                            ToolTip="Move the selected columns later">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE74B;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="Move down" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- EXPORTED -->
+                <Border Grid.Column="4" Style="{StaticResource TableLane}" Margin="0"
+                        Background="{StaticResource LaneGreenBrush}" Padding="12,0,12,12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="EXPORTED COLUMNS" Style="{StaticResource TableGroupLabel}"
+                                   Foreground="{StaticResource LaneGreenTextBrush}" Margin="0,10,0,10" />
+                        <TextBlock Grid.Row="1" Style="{StaticResource CaptionText}" Margin="0,0,0,10"
+                                   MinHeight="32" VerticalAlignment="Center"
+                                   Text="Written left to right in this order. Id is always the first column." />
+                        <ListBox Grid.Row="2" Name="SelectedParameterList" SelectionMode="Extended" MinHeight="120"
+                                 AutomationProperties.Name="Exported columns" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Footer -->
+        <DockPanel Grid.Row="3" Style="{StaticResource WwpFooter}">
+            <Image Name="LogoImage" DockPanel.Dock="Left" Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Name="BatchExportButton" Content="Save set" MinWidth="110" Margin="0,0,8,0"
+                        Style="{StaticResource PrimaryButton}"
+                        ToolTip="Save this set to Project Information" />
+                <Button Name="OkButton" Content="Export" MinWidth="96" Margin="0,0,8,0"
+                        ToolTip="Export this set now" />
+                <Button Name="CancelButton" Content="Cancel" MinWidth="88" />
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Window>'''
 
@@ -360,6 +269,36 @@ def _pluralize(name):
 
 def default_sheet_name_for_category(category_name):
     return sanitize_sheet_name(_pluralize(category_name or "Category Export"))
+
+
+_PROFILE_TOKEN = "%userprofile%"
+
+
+def _portable_path(path):
+    """Replace the current user's profile folder (C:/Users/<name>) with %userprofile% so saved
+    paths, notably ACC Desktop Connector (DC) folders, resolve for every user. Same rule as
+    Export2Ex - By Schedule."""
+    try:
+        p = (path or "").strip()
+        prof = os.environ.get("USERPROFILE", "").rstrip("/" + os.sep)
+        if prof and (p.lower() == prof.lower() or p.lower().startswith(prof.lower() + os.sep)):
+            return _PROFILE_TOKEN + p[len(prof):]
+        return p
+    except Exception:
+        return path
+
+
+def _expand_path(path):
+    """Resolve %userprofile% (and other env vars) to a real path before use."""
+    try:
+        return os.path.expandvars(path or "")
+    except Exception:
+        return path
+
+
+def _same_saved_path(path):
+    # Saved paths may predate the portable form; compare everything in that form.
+    return _portable_path(_expand_path(path or ""))
 
 
 def normalize_excel_output_path(path, default_ext=".xlsx"):
@@ -913,78 +852,218 @@ def _import_sets_from_file(ui):
         return None
 
 
+SCHEDULE_TOOL_NAMESPACE = "export2ex"
+
+
+def read_schedule_tool_sets(doc):
+    """Saved sets of Export2Ex - By Schedule. They sit in the same Project Information
+    parameter under their own namespace, or in the parameter that tool was pointed at."""
+    param_names = [PARAM_SAVED_SETS]
+    try:
+        schedule_config, _save = get_tool_settings("Export2Ex", doc=doc)
+        other = (getattr(schedule_config, "saved_sets_param_name", "") or "").strip()
+        if other and other not in param_names:
+            param_names.append(other)
+    except Exception:
+        pass
+    for param_name in param_names:
+        try:
+            param = doc.ProjectInformation.LookupParameter(param_name)
+            raw = (param.AsString() or "").strip() if param is not None else ""
+            data = json.loads(raw) if raw else {}
+        except Exception:
+            continue
+        block = data.get(SCHEDULE_TOOL_NAMESPACE) if isinstance(data, dict) else None
+        if not isinstance(block, dict):
+            continue
+        # Current layout {"sets": ..., "settings": ...}; older projects keep the sets flat.
+        sets = block.get("sets") if ("sets" in block or "settings" in block) else block
+        if isinstance(sets, dict) and sets:
+            return dict((name, data_) for name, data_ in sets.items() if isinstance(data_, dict))
+    return {}
+
+
+def _schedule_field_names(schedule):
+    names = []
+    for field_info in get_visible_schedule_fields(schedule):
+        try:
+            name = field_info["field"].GetName()
+        except Exception:
+            name = ""
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def schedule_sets_to_category_sets(doc, schedule_sets, taken_names):
+    """Turn By Schedule sets into "from schedule" sets: each schedule's category and visible
+    fields, the set's Excel file, and the sheet name By Schedule would use. A set naming
+    several schedules gives one set per schedule. Returns (new_sets, skipped_notes)."""
+    schedules_by_name = dict((view.Name, view) for view in collect_schedules(doc))
+    new_sets = {}
+    notes = []
+    for set_name in sorted(schedule_sets):
+        sdata = schedule_sets[set_name]
+        if _coerce_int(sdata.get("export_mode"), 0) != 0:
+            notes.append("{}: a CSV set (By Category writes Excel only)".format(set_name))
+            continue
+        schedule_names = [n for n in (sdata.get("schedule_names") or []) if n]
+        if not schedule_names:
+            notes.append("{}: no schedule chosen".format(set_name))
+            continue
+        for schedule_name in schedule_names:
+            new_name = set_name if len(schedule_names) == 1 else "{} - {}".format(set_name, schedule_name)
+            view = schedules_by_name.get(schedule_name)
+            category_id = get_schedule_category_id(view) if view is not None else None
+            fields = _schedule_field_names(view) if category_id is not None else []
+            if view is None:
+                notes.append("{}: schedule '{}' is not in this model".format(new_name, schedule_name))
+            elif category_id is None:
+                notes.append("{}: '{}' is a multi-category schedule".format(new_name, schedule_name))
+            elif not fields:
+                notes.append("{}: '{}' has no visible fields".format(new_name, schedule_name))
+            elif new_name in taken_names or new_name in new_sets:
+                notes.append("{}: a By Category set with this name already exists".format(new_name))
+            else:
+                category = DB.Category.GetCategory(doc, category_id)
+                if sdata.get("use_category_sheet_name", True) and category is not None:
+                    sheet_name = default_sheet_name_for_category(category.Name)
+                else:
+                    sheet_name = sanitize_sheet_name(schedule_name)
+                new_sets[new_name] = {
+                    "mode": MODE_FROM_SCHEDULE,
+                    "source_id": element_id_value(view.Id),
+                    "category_id": element_id_value(category_id),
+                    "param_names": fields,
+                    "sheet_name": sheet_name,
+                    "excel_path": _same_saved_path(normalize_excel_output_path(sdata.get("excel_path") or "")),
+                }
+    return new_sets, notes
+
+
+def _load_batch_window():
+    from System.IO import StringReader
+    from System.Windows.Markup import XamlReader
+    from System.Xml import XmlReader
+
+    xaml_path = os.path.join(os.path.dirname(__file__), "BatchExportDialog.xaml")
+    load_uiutils().uiUtils_ensure_theme()
+    reader = XmlReader.Create(StringReader(File.ReadAllText(xaml_path)))
+    return XamlReader.Load(reader)
+
+
 def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_callback=None):
-    """Primary UI for Export2Ex Beta: manage and batch-export saved sets."""
+    """Primary UI for Export2Ex Beta (BatchExportDialog.xaml): manage and batch-export saved sets.
+    There is no Save button: sheet and path edits are written to Project Information once,
+    when the window closes, and only if something changed. Add set and Edit go through the
+    set editor, which saves the set itself."""
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
     clr.AddReference("WindowsBase")
-    from System.Windows import (Window, WindowStartupLocation, Thickness,
-                                 HorizontalAlignment, VerticalAlignment,
-                                 FontWeights, TextTrimming, GridLength, GridUnitType,
-                                 ResizeMode)
-    from System.Windows.Controls import (Grid, StackPanel, ScrollViewer, Button,
-                                          CheckBox, TextBlock, TextBox, ColumnDefinition,
-                                          RowDefinition, Orientation, ScrollBarVisibility)
+    from System.Windows import LogicalTreeHelper, Visibility
+    from System.Windows.Controls.Primitives import PlacementMode
 
     paths = {}
+    sheet_edits = {}
     _ok_clicked = [False]
     checkboxes = {}
     path_labels = {}
     sheet_boxes = {}
-    data_row_elements = []
 
-    window = Window()
-    window.Title = "Export2Ex Beta"
-    window.Width = 820
-    window.MinWidth = 560
-    window.Height = 500
-    window.MinHeight = 300
-    window.ResizeMode = ResizeMode.CanResizeWithGrip
-    window.WindowStartupLocation = WindowStartupLocation.CenterScreen
+    window = _load_batch_window()
+    apply_window_title(window, "Export2Ex Beta")
+    window.Height = min(380 + max(len(saved_sets), 2) * 50, 720)
 
-    outer = Grid()
-    outer.Margin = Thickness(12)
-    rh = RowDefinition(); rh.Height = GridLength.Auto
-    rc = RowDefinition()
-    rb = RowDefinition(); rb.Height = GridLength.Auto
-    outer.RowDefinitions.Add(rh)
-    outer.RowDefinitions.Add(rc)
-    outer.RowDefinitions.Add(rb)
-    window.Content = outer
+    rows_host = window.FindName("RowsHost")
+    empty_state = window.FindName("EmptyState")
+    set_count_text = window.FindName("SetCountText")
+    row_template = window.FindResource("SetRowTemplate")
+    text_brush = window.FindResource("TextBrush")
+    muted_brush = window.FindResource("MutedBrush")
+    try:
+        (ui or load_uiutils()).uiUtils_load_logo(window.FindName("LogoImage"))
+    except Exception:
+        pass
 
-    prompt = TextBlock()
-    prompt.Text = "Manage export sets below. Select sets and click Export Selected to run."
-    prompt.Margin = Thickness(0, 0, 0, 8)
-    Grid.SetRow(prompt, 0)
-    outer.Children.Add(prompt)
+    def _row_part(row, name):
+        return LogicalTreeHelper.FindLogicalNode(row, name)
 
-    scroll = ScrollViewer()
-    scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-    scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-    Grid.SetRow(scroll, 1)
-    outer.Children.Add(scroll)
+    def _set_path_label(label, path):
+        shown = _portable_path(path)
+        label.Text = shown or "Not set"
+        label.ToolTip = _expand_path(path or "") or None
+        label.Foreground = text_brush if shown else muted_brush
 
-    tbl = Grid()
-    for w in [28, 160, 150, -1, 34, 60, 60]:
-        cd = ColumnDefinition()
-        cd.Width = GridLength(1, GridUnitType.Star) if w == -1 else GridLength(w)
-        tbl.ColumnDefinitions.Add(cd)
-    scroll.Content = tbl
+    def _category_name(sdata):
+        cat_id = _coerce_int(sdata.get("category_id"), None)
+        if cat_id in (None, -1):
+            return ""
+        try:
+            category = DB.Category.GetCategory(doc, DB.ElementId(Int64(cat_id)))
+            return category.Name if category is not None else ""
+        except Exception:
+            return ""
 
-    hrd = RowDefinition(); hrd.Height = GridLength.Auto
-    tbl.RowDefinitions.Add(hrd)
-    for col, text in [(1, "Set Name"), (2, "Sheet Name"), (3, "File Path")]:
-        tb = TextBlock()
-        tb.Text = text
-        tb.FontWeight = FontWeights.Bold
-        tb.Margin = Thickness(4, 2, 4, 6)
-        Grid.SetRow(tb, 0)
-        Grid.SetColumn(tb, col)
-        tbl.Children.Add(tb)
+    def _source_summary(sdata):
+        """Category name and field count shown in the SOURCE lane."""
+        fields = len(sdata.get("param_names") or [])
+        if sdata.get("mode") == MODE_FROM_SCHEDULE:
+            origin = "from schedule"
+        else:
+            origin = "by category"
+        field_text = "1 field" if fields == 1 else "{} fields".format(fields)
+        return _category_name(sdata) or "No category", "{}, {}".format(field_text, origin)
+
+    def _saved_sheet(sname, sdata):
+        # A set without a sheet name exports to its category's plural, as the editor does.
+        saved = (sdata.get("sheet_name") or "").strip()
+        if saved:
+            return saved
+        category_name = _category_name(sdata)
+        return default_sheet_name_for_category(category_name) if category_name else sanitize_sheet_name(sname)
+
+    def _collect_sheet_edits():
+        # Rows are rebuilt after Add, Edit and Delete; keep what was typed in the sheet boxes.
+        for sname, box in list(sheet_boxes.items()):
+            sheet_edits[sname] = (box.Text or "").strip()
+
+    def _apply_edits():
+        """Fold pending sheet and path edits into saved_sets (written by _write_sets)."""
+        _collect_sheet_edits()
+        for sname, sdata in list(saved_sets.items()):
+            if not isinstance(sdata, dict):
+                continue
+            new_sheet = sheet_edits.get(sname, "")
+            if new_sheet and new_sheet != _saved_sheet(sname, sdata):
+                sdata["sheet_name"] = new_sheet
+            new_path = (paths.get(sname) or "").strip()
+            if new_path and new_path != _same_saved_path(sdata.get("excel_path")):
+                sdata["excel_path"] = new_path
+
+    def _snapshot():
+        return json.dumps(saved_sets, sort_keys=True)
+
+    # What Project Information holds; the window writes on close when saved_sets differs.
+    _saved_snapshot = [_snapshot()]
+
+    def _write_sets():
+        ok_saved = write_saved_sets(doc, saved_sets)
+        if ok_saved:
+            _saved_snapshot[0] = _snapshot()
+        return ok_saved
+
+    def _forget_pending(names):
+        # Sets replaced from outside this window drop their pending path and sheet edits.
+        for name in names:
+            paths.pop(name, None)
+            sheet_edits.pop(name, None)
 
     def _make_edit_row(sname_):
         def _on_edit_row(_s, _e):
-            sdata = saved_sets.get(sname_) or {}
+            sdata = dict(saved_sets.get(sname_) or {})
+            # Hand the editor any output file chosen here but not saved yet.
+            if paths.get(sname_):
+                sdata["excel_path"] = paths[sname_]
             if edit_callback:
                 edit_callback(sname_, sdata)
             _refresh_from_project()
@@ -992,8 +1071,8 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
 
     def _make_browse(sname_):
         def _on_browse(_s, _e):
-            cur = paths.get(sname_) or ""
-            init_dir = os.path.dirname(cur) if cur else get_default_dir(doc)
+            cur = _expand_path(paths.get(sname_) or "")
+            init_dir = os.path.dirname(cur) if cur and os.path.isdir(os.path.dirname(cur)) else get_default_dir(doc)
             safe = re.sub(r'[\\/:*?"<>|]', "_", sname_)
             fname = os.path.basename(cur) if cur else "{}.xlsx".format(safe)
             new_path = _pick_save_file(
@@ -1005,169 +1084,83 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             )
             new_path = normalize_excel_output_path(new_path or "")
             if new_path:
-                paths[sname_] = new_path
-                path_labels[sname_].Text = new_path
+                paths[sname_] = _portable_path(new_path)
+                _set_path_label(path_labels[sname_], paths[sname_])
         return _on_browse
 
     def _make_delete_row(sname_):
+        # The set editor reads and writes the saved sets directly, so a delete is saved
+        # at once rather than when the window closes.
         def _on_delete_row(_s, _e):
-            if sname_ in saved_sets:
-                del saved_sets[sname_]
-            if sname_ in paths:
-                del paths[sname_]
-            write_saved_sets(doc, saved_sets)
+            _collect_sheet_edits()
+            saved_sets.pop(sname_, None)
+            paths.pop(sname_, None)
+            sheet_edits.pop(sname_, None)
+            _write_sets()
             _rebuild_rows()
         return _on_delete_row
 
     def _rebuild_rows():
-        for elems in data_row_elements:
-            for elem in elems:
-                tbl.Children.Remove(elem)
-        data_row_elements[:] = []
-        while tbl.RowDefinitions.Count > 1:
-            tbl.RowDefinitions.RemoveAt(1)
+        # Callers run _collect_sheet_edits() first, then drop what should not carry over.
+        rows_host.Children.Clear()
         checkboxes.clear()
         path_labels.clear()
         sheet_boxes.clear()
 
         current_names = sorted(saved_sets.keys())
-        if not current_names:
-            rd = RowDefinition(); rd.Height = GridLength.Auto
-            tbl.RowDefinitions.Add(rd)
-            empty_tb = TextBlock()
-            empty_tb.Text = "No saved sets. Click 'Add Set' to create one."
-            empty_tb.Margin = Thickness(4, 16, 4, 4)
-            empty_tb.HorizontalAlignment = HorizontalAlignment.Center
-            Grid.SetRow(empty_tb, 1)
-            Grid.SetColumnSpan(empty_tb, 7)
-            tbl.Children.Add(empty_tb)
-            data_row_elements.append([empty_tb])
-            return
+        set_count_text.Text = "1 set" if len(current_names) == 1 else "{} sets".format(len(current_names))
+        empty_state.Visibility = Visibility.Collapsed if current_names else Visibility.Visible
 
-        for row_idx, sname in enumerate(current_names, 1):
+        for sname in current_names:
             sdata = saved_sets.get(sname) or {}
             if sname not in paths:
-                paths[sname] = (sdata.get("excel_path") or "").strip()
-            saved_sheet = (sdata.get("sheet_name") or sanitize_sheet_name(sname)).strip()
+                paths[sname] = _same_saved_path(sdata.get("excel_path"))
 
-            rd = RowDefinition(); rd.Height = GridLength(34)
-            tbl.RowDefinitions.Add(rd)
-            row_elems = []
+            row = row_template.LoadContent()
 
-            cb = CheckBox()
-            cb.IsChecked = True
-            cb.VerticalAlignment = VerticalAlignment.Center
-            cb.HorizontalAlignment = HorizontalAlignment.Center
-            Grid.SetRow(cb, row_idx)
-            Grid.SetColumn(cb, 0)
-            tbl.Children.Add(cb)
-            checkboxes[sname] = cb
-            row_elems.append(cb)
+            checkboxes[sname] = _row_part(row, "RowCheck")
 
-            name_tb = TextBlock()
+            name_tb = _row_part(row, "NameText")
             name_tb.Text = sname
-            name_tb.VerticalAlignment = VerticalAlignment.Center
-            name_tb.Margin = Thickness(4, 0, 8, 0)
-            name_tb.TextTrimming = TextTrimming.CharacterEllipsis
-            Grid.SetRow(name_tb, row_idx)
-            Grid.SetColumn(name_tb, 1)
-            tbl.Children.Add(name_tb)
-            row_elems.append(name_tb)
+            name_tb.ToolTip = sname
 
-            sheet_tb = TextBox()
-            sheet_tb.Text = saved_sheet
-            sheet_tb.VerticalAlignment = VerticalAlignment.Center
-            sheet_tb.Margin = Thickness(4, 3, 8, 3)
-            Grid.SetRow(sheet_tb, row_idx)
-            Grid.SetColumn(sheet_tb, 2)
-            tbl.Children.Add(sheet_tb)
+            source_name, fields_text = _source_summary(sdata)
+            _row_part(row, "SourceText").Text = source_name
+            _row_part(row, "FieldsText").Text = fields_text
+
+            sheet_tb = _row_part(row, "SheetBox")
+            sheet_tb.Text = sheet_edits.get(sname) or _saved_sheet(sname, sdata)
             sheet_boxes[sname] = sheet_tb
-            row_elems.append(sheet_tb)
 
-            path_tb = TextBlock()
-            path_tb.Text = paths[sname] or "(no path)"
-            path_tb.VerticalAlignment = VerticalAlignment.Center
-            path_tb.Margin = Thickness(4, 0, 4, 0)
-            path_tb.TextTrimming = TextTrimming.CharacterEllipsis
-            Grid.SetRow(path_tb, row_idx)
-            Grid.SetColumn(path_tb, 3)
-            tbl.Children.Add(path_tb)
+            path_tb = _row_part(row, "PathText")
+            _set_path_label(path_tb, paths[sname])
             path_labels[sname] = path_tb
-            row_elems.append(path_tb)
 
-            btn = Button()
-            btn.Content = "..."
-            btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(btn, row_idx)
-            Grid.SetColumn(btn, 4)
-            tbl.Children.Add(btn)
-            btn.Click += _make_browse(sname)
-            row_elems.append(btn)
+            _row_part(row, "BrowseButton").Click += _make_browse(sname)
+            _row_part(row, "EditButton").Click += _make_edit_row(sname)
+            _row_part(row, "DeleteButton").Click += _make_delete_row(sname)
 
-            edit_row_btn = Button()
-            edit_row_btn.Content = "Edit"
-            edit_row_btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(edit_row_btn, row_idx)
-            Grid.SetColumn(edit_row_btn, 5)
-            tbl.Children.Add(edit_row_btn)
-            edit_row_btn.Click += _make_edit_row(sname)
-            row_elems.append(edit_row_btn)
-
-            del_row_btn = Button()
-            del_row_btn.Content = "Delete"
-            del_row_btn.Margin = Thickness(2, 3, 2, 3)
-            Grid.SetRow(del_row_btn, row_idx)
-            Grid.SetColumn(del_row_btn, 6)
-            tbl.Children.Add(del_row_btn)
-            del_row_btn.Click += _make_delete_row(sname)
-            row_elems.append(del_row_btn)
-
-            data_row_elements.append(row_elems)
+            rows_host.Children.Add(row)
 
     _rebuild_rows()
 
-    footer = Grid()
-    footer.Margin = Thickness(0, 10, 0, 0)
-    Grid.SetRow(footer, 2)
-    outer.Children.Add(footer)
-
-    left_btns = StackPanel()
-    left_btns.Orientation = Orientation.Horizontal
-    left_btns.HorizontalAlignment = HorizontalAlignment.Left
-    footer.Children.Add(left_btns)
-
-    save_file_btn = Button()
-    save_file_btn.Content = "Save Settings..."
-    save_file_btn.MinWidth = 100
-    save_file_btn.Margin = Thickness(0, 0, 6, 0)
-
-    load_file_btn = Button()
-    load_file_btn.Content = "Load Settings..."
-    load_file_btn.MinWidth = 100
-
-    right_btns = StackPanel()
-    right_btns.Orientation = Orientation.Horizontal
-    right_btns.HorizontalAlignment = HorizontalAlignment.Right
-    footer.Children.Add(right_btns)
-
-    add_btn = Button()
-    add_btn.Content = "Add Set"
-    add_btn.MinWidth = 80
-    add_btn.Margin = Thickness(0, 0, 20, 0)
-
-    ok_btn = Button()
-    ok_btn.Content = "Export Selected"
-    ok_btn.MinWidth = 110
-    ok_btn.Margin = Thickness(0, 0, 6, 0)
-
-    cancel_btn = Button()
-    cancel_btn.Content = "Cancel"
-    cancel_btn.MinWidth = 70
-
     def _refresh_from_project():
+        # The editor may have saved a set (Save set) or its last export path. What it saved
+        # replaces this window's pending edit for that set; other pending edits are kept.
+        _collect_sheet_edits()
         new_sets = read_saved_sets(doc)
+        for name, data in new_sets.items():
+            if not isinstance(data, dict):
+                continue
+            previous = saved_sets.get(name) or {}
+            new_path = _same_saved_path(data.get("excel_path"))
+            if new_path != _same_saved_path(previous.get("excel_path")):
+                paths[name] = new_path
+            if (data.get("sheet_name") or "").strip() != (previous.get("sheet_name") or "").strip():
+                sheet_edits.pop(name, None)
         saved_sets.clear()
         saved_sets.update(new_sets)
+        _saved_snapshot[0] = _snapshot()
         _rebuild_rows()
 
     def _add(_s, _e):
@@ -1175,56 +1168,95 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             add_callback()
         _refresh_from_project()
 
-    def _delete(_s, _e):
-        to_delete = [sname for sname, cb in list(checkboxes.items()) if cb.IsChecked]
-        if not to_delete:
-            if ui:
-                ui.uiUtils_alert("Check the sets you want to delete.", title="Export2Ex Beta")
-            return
-        for sname in to_delete:
-            if sname in saved_sets:
-                del saved_sets[sname]
-            if sname in paths:
-                del paths[sname]
-        write_saved_sets(doc, saved_sets)
-        _rebuild_rows()
-
     def _ok(_s, _e):
         _ok_clicked[0] = True
         window.Close()
 
-    def _cancel(_s, _e):
-        window.Close()
+    sets_file_button = window.FindName("SetsFileButton")
+
+    def _open_sets_menu(_s, _e):
+        menu = sets_file_button.ContextMenu
+        menu.PlacementTarget = sets_file_button
+        menu.Placement = PlacementMode.Bottom
+        menu.IsOpen = True
 
     def _save_file(_s, _e):
+        _apply_edits()
         _export_sets_to_file(saved_sets, ui, tool_name="Export2ExBeta")
 
     def _load_file(_s, _e):
         imported = _import_sets_from_file(ui)
         if imported is not None:
+            _apply_edits()
+            _forget_pending(imported.keys())
             saved_sets.update(imported)
-            write_saved_sets(doc, saved_sets)
+            _write_sets()
             _rebuild_rows()
 
-    add_btn.Click += _add
-    ok_btn.Click += _ok
-    cancel_btn.Click += _cancel
-    save_file_btn.Click += _save_file
-    load_file_btn.Click += _load_file
+    def _copy_schedule_sets(_s, _e):
+        # Reuse the By Schedule sets as a starting point; Edit then adds parameters.
+        dialogs = ui or load_uiutils()
+        schedule_sets = read_schedule_tool_sets(doc)
+        if not schedule_sets:
+            dialogs.uiUtils_alert("No sets saved in Export2Ex - By Schedule were found in this project.",
+                                  title="Export2Ex Beta")
+            return
+        names = sorted(schedule_sets)
+        labels = [
+            "{}   ({})".format(name, ", ".join(schedule_sets[name].get("schedule_names") or []) or "no schedule")
+            for name in names
+        ]
+        picked = dialogs.uiUtils_select_indices(
+            labels,
+            title="Copy sets from Export by Schedule",
+            prompt="Pick the By Schedule sets to copy. Each becomes a set with its schedule's category, "
+                   "visible fields and Excel file; choose Edit afterwards to add more parameters.",
+            multiselect=True,
+            width=760,
+            height=520,
+        )
+        if not picked:
+            return
+        chosen = dict((names[i], schedule_sets[names[i]]) for i in picked)
+        _apply_edits()
+        new_sets, notes = schedule_sets_to_category_sets(doc, chosen, set(saved_sets.keys()))
+        if new_sets:
+            _forget_pending(new_sets.keys())
+            saved_sets.update(new_sets)
+            if not _write_sets():
+                notes.append("Could not save to Project Information: {}".format(_last_write_error))
+            _rebuild_rows()
+        message = "Copied {} set(s).".format(len(new_sets))
+        if notes:
+            message += "\n\nNot copied:\n" + "\n".join(notes)
+        dialogs.uiUtils_alert(message, title="Export2Ex Beta")
 
-    left_btns.Children.Add(save_file_btn)
-    left_btns.Children.Add(load_file_btn)
-    right_btns.Children.Add(add_btn)
-    right_btns.Children.Add(ok_btn)
-    right_btns.Children.Add(cancel_btn)
+    # CancelButton ("Close") is IsCancel in the XAML: it closes the window (and so does Esc).
+    window.FindName("AddSetButton").Click += _add
+    window.FindName("CopyScheduleSetsButton").Click += _copy_schedule_sets
+    window.FindName("ExportSelectedButton").Click += _ok
+    sets_file_button.Click += _open_sets_menu
+    window.FindName("SaveFileMenuItem").Click += _save_file
+    window.FindName("LoadFileMenuItem").Click += _load_file
 
     window.ShowDialog()
+
+    _apply_edits()
+    if _snapshot() != _saved_snapshot[0] and not _write_sets() and ui:
+        ui.uiUtils_alert(
+            "Could not save the sheet and path changes to Project Information.\n{}".format(_last_write_error),
+            title="Export2Ex Beta",
+        )
 
     if not _ok_clicked[0]:
         return None
 
-    selected = [sname for sname in sorted(saved_sets.keys()) if sname in checkboxes and checkboxes[sname].IsChecked]
-    final_sheet_names = {sname: (sheet_boxes[sname].Text or "").strip() for sname in sorted(saved_sets.keys()) if sname in sheet_boxes}
+    names = sorted(saved_sets.keys())
+    selected = [sname for sname in names if sname in checkboxes and checkboxes[sname].IsChecked]
+    final_sheet_names = dict(
+        (sname, sheet_edits.get(sname) or _saved_sheet(sname, saved_sets[sname]))
+        for sname in names if isinstance(saved_sets[sname], dict)
+    )
     return selected, dict(paths), final_sheet_names
 
 
@@ -1326,7 +1358,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         id_item = ListBoxItem()
         id_item.Content = "Id  -- always exported"
         id_item.Tag = {"name": "__id__", "editable": False, "__permanent__": True}
-        id_item.Foreground = Brushes.SteelBlue
+        id_item.Foreground = window.TryFindResource("AccentBrush") or Brushes.SteelBlue
         selected_parameter_list.Items.Add(id_item)
         option_map = dict((option["name"], option) for option in _get_parameter_names(category_id))
         for name in selected_names:
@@ -1553,7 +1585,40 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
             return
         ui.uiUtils_alert("Set '{}' saved.".format(name), title="Export2Ex Beta")
 
+    _chosen_excel_path = [""]
+
     def _ok(_sender, _args):
+        # The editor has no path box, so Export asks where to write. Check the inputs
+        # first and treat a cancelled picker as "not yet": the editor stays open.
+        category_id = _resolve_category_id(source_list.SelectedItem)
+        if category_id in (None, -1):
+            ui.uiUtils_alert("Select a schedule or category with a valid category.", title="Export2Ex Beta")
+            return
+        if not selected_params_by_category.get(category_id):
+            ui.uiUtils_alert("Select at least one parameter to export.", title="Export2Ex Beta")
+            return
+        # Start from the set's own file (the batch window passes in an unsaved Browse
+        # choice); a Set name typed here that matches another saved set starts from that.
+        name = (set_name_box.Text or "").strip() if set_name_box is not None else ""
+        seed = init_excel_path
+        if name and name != initial_set_name:
+            seed = (saved_sets.get(name) or {}).get("excel_path") or seed
+        seed = normalize_excel_output_path(_expand_path(seed or ""))
+        seed_dir = os.path.dirname(seed) if seed else ""
+        picked = _pick_save_file(
+            title="Export2Ex Beta -- Choose Output File",
+            filter_text="Excel Workbook (*.xlsx;*.xlsm)|*.xlsx;*.xlsm",
+            default_extension=os.path.splitext(seed)[1].lstrip(".") if seed else "xlsx",
+            initial_directory=seed_dir if os.path.isdir(seed_dir) else get_default_dir(doc),
+            file_name=os.path.basename(seed) if seed else "CategoryExport.xlsx",
+        )
+        if not picked:
+            return
+        picked = normalize_excel_output_path(picked)
+        if not picked:
+            ui.uiUtils_alert("Choose an Excel file path ending with .xlsx or .xlsm.", title="Export2Ex Beta")
+            return
+        _chosen_excel_path[0] = picked
         window.DialogResult = True
         window.Close()
 
@@ -1561,8 +1626,7 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         window.DialogResult = False
         window.Close()
 
-    logo_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "lib", "WWPtools-logo.png"))
-    ui.uiUtils_load_logo(logo_image, logo_path)
+    ui.uiUtils_load_logo(logo_image)
 
     from_schedule_toggle.Checked += lambda _sender, _args: _refresh_source_list()
     from_schedule_toggle.Unchecked += lambda _sender, _args: _refresh_source_list()
@@ -1628,7 +1692,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         "source_name": source_name,
         "category_id": category_id,
         "selected_param_names": list(selected_params_by_category.get(category_id, [])),
-        "excel_path": "",
+        "excel_path": _chosen_excel_path[0],
+        "set_name": (set_name_box.Text or "").strip() if set_name_box is not None else "",
         "sheet_name": (sheet_name_box.Text or "").strip() if sheet_name_box is not None else "",
         "units_mode": units_mode,
     }
@@ -2169,7 +2234,10 @@ def make_unique_name(base, used):
         idx += 1
 
 
-def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None, units_mode="project"):
+def export_to_excel(doc, category_name, category_id, param_names, file_path, ui, sheet_name=None, units_mode="project", locked_messages=None):
+    """Write one category sheet. Returns True on success. If the workbook is open in
+    Excel, the "close it" message is appended to locked_messages when a list is given
+    (batch export), otherwise shown as an alert, and False is returned."""
     add_lib_path()
     try:
         import WWP_xlsx as openpyxl
@@ -2178,13 +2246,30 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui,
         ui.uiUtils_alert("Excel writer is not available.\n{}".format(exc), title="Export2Ex Beta")
         return False
 
-    if os.path.exists(file_path):
-        load_kwargs = {}
-        if os.path.splitext(file_path)[1].lower() == ".xlsm":
-            load_kwargs["keep_vba"] = True
-        workbook = openpyxl.load_workbook(file_path, **load_kwargs)
-    else:
-        workbook = openpyxl.Workbook()
+    def _report_locked():
+        message = openpyxl.file_locked_message(file_path)
+        log_message("export_to_excel locked file_path='{}'".format(file_path))
+        if locked_messages is not None:
+            locked_messages.append(message)
+        else:
+            ui.uiUtils_alert(message, title="Export2Ex Beta")
+        return False
+
+    if openpyxl.is_file_locked(file_path):
+        return _report_locked()
+
+    try:
+        if os.path.exists(file_path):
+            load_kwargs = {}
+            if os.path.splitext(file_path)[1].lower() == ".xlsm":
+                load_kwargs["keep_vba"] = True
+            workbook = openpyxl.load_workbook(file_path, **load_kwargs)
+        else:
+            workbook = openpyxl.Workbook()
+    except Exception as exc:
+        if openpyxl.is_file_lock_error(exc):
+            return _report_locked()
+        raise
 
     base_name = sanitize_sheet_name(sheet_name if sheet_name else _pluralize(category_name))
     sheet_name = base_name
@@ -2217,7 +2302,13 @@ def export_to_excel(doc, category_name, category_id, param_names, file_path, ui,
     if "Sheet" in workbook.sheetnames and len(workbook.sheetnames) > 1:
         workbook.remove(workbook["Sheet"])
 
-    workbook.save(file_path)
+    try:
+        workbook.save(file_path)
+    except Exception as exc:
+        # Excel can open the file while the sheet is being built.
+        if openpyxl.is_file_lock_error(exc):
+            return _report_locked()
+        raise
     return True
 
 
@@ -2264,7 +2355,7 @@ def main():
         if not selected_param_names:
             ui.uiUtils_alert("Select at least one parameter to export.", title="Export2Ex Beta")
             return
-        file_path = normalize_excel_output_path(result.get("excel_path"))
+        file_path = normalize_excel_output_path(_expand_path(result.get("excel_path")))
         if not file_path:
             ui.uiUtils_alert("Choose an Excel file path ending with .xlsx or .xlsm.", title="Export2Ex Beta")
             return
@@ -2284,6 +2375,15 @@ def main():
         config.last_excel_path = file_path
         config.last_sheet_name = sheet_name_raw
         save_config()
+        # Remember the file on the saved set of that name, so batch export reuses it.
+        # Only the path changes; the edited parameters are saved by "Save set".
+        set_name = (result.get("set_name") or "").strip()
+        current_sets = read_saved_sets(doc) if set_name else {}
+        existing = current_sets.get(set_name)
+        if isinstance(existing, dict) and _same_saved_path(existing.get("excel_path")) != _portable_path(file_path):
+            existing["excel_path"] = _portable_path(file_path)
+            if not write_saved_sets(doc, current_sets):
+                log_message("Could not save Excel path for set '{}': {}".format(set_name, _last_write_error))
         try:
             os.startfile(file_path)
         except Exception:
@@ -2347,7 +2447,7 @@ def main():
         if not param_names:
             failed.append("{}: no parameters configured".format(sname))
             continue
-        file_path = normalize_excel_output_path(batch_paths.get(sname) or "")
+        file_path = normalize_excel_output_path(_expand_path(batch_paths.get(sname) or ""))
         if not file_path:
             failed.append("{}: no output file path".format(sname))
             continue
@@ -2358,12 +2458,16 @@ def main():
                 category_record = item.record
                 break
         category_name = category_record["name"] if category_record else sname
+        locked_messages = []
         try:
             ok = export_to_excel(
                 doc, category_name, DB.ElementId(Int64(cat_id_val)),
                 param_names, file_path, ui, sheet_name=sheet_name_val,
+                locked_messages=locked_messages,
             )
-            if ok:
+            if locked_messages:
+                failed.append("{}: {}".format(sname, locked_messages[0]))
+            elif ok:
                 exported.append(sname)
             else:
                 failed.append("{}: export failed".format(sname))
@@ -2376,7 +2480,7 @@ def main():
         sdata = saved_sets.get(sname)
         if not isinstance(sdata, dict):
             continue
-        if new_path and new_path != (sdata.get("excel_path") or "").strip():
+        if new_path and new_path != _same_saved_path(sdata.get("excel_path")):
             sdata["excel_path"] = new_path
             changed = True
     for sname, new_sheet in batch_sheet_names.items():

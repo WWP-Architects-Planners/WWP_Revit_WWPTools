@@ -449,6 +449,7 @@ def show_publish_mapping_dialog(param_names, xaml_dir, preselect=None):
         highest_level_combo = window.FindName("HighestLevelParamCombo")
         ok_button = window.FindName("OkButton")
         cancel_button = window.FindName("CancelButton")
+        ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
         count_combo.ItemsSource = options
         area_combo.ItemsSource = options

@@ -73,15 +73,17 @@ def _mode_config(mode):
 
 
 TARGET_OPTIONS = [
-    ("Element names  (Views, Sheets, Rooms...)", "element_names"),
+    ("Element names  (Views, Families, Patterns...)", "element_names"),
     ("Type names", "type_names"),
+    ("Family names", "family_names"),
     ("Instance parameter values", "instance_params"),
     ("Type parameter values", "type_params"),
 ]
 
 _TARGET_TOOLTIPS = {
-    "element_names":   "Rename views, sheets, levels, grids, rooms, materials, etc. -- pick the category below.",
+    "element_names":   "Rename views, sheets, schedules, families, fill and line patterns, line styles, text and dimension types, etc. -- pick the kind below.",
     "type_names":      "Rename a family type (e.g. '900 x 2100mm'). Tick 'Also rename family name' below to rename the parent family with the same transformation.",
+    "family_names":    "Rename the loadable families of one category (e.g. all door families).",
     "instance_params": "Find and replace a text parameter value on placed instances.",
     "type_params":     "Find and replace a parameter value on element types.",
     "workset":         "Move placed instances to a different user-created workset.",
@@ -89,13 +91,23 @@ _TARGET_TOOLTIPS = {
 
 ELEMENT_SCOPE_OPTIONS = [
     ("Areas", "Areas"),
+    ("Dimension Types", "Dimension Types"),
+    ("Families (all categories)", "Families"),
+    ("Fill Patterns", "Fill Patterns"),
+    ("Filled Region Types", "Filled Region Types"),
     ("Grids", "Grids"),
+    ("Group Types", "Group Types"),
     ("Levels", "Levels"),
+    ("Line Patterns", "Line Patterns"),
+    ("Line Styles", "Line Styles"),
     ("Materials", "Materials"),
     ("Phases", "Phases"),
     ("Rooms", "Rooms"),
+    ("Schedules", "Schedules"),
+    ("Scope Boxes", "Scope Boxes"),
     ("Sheets", "Sheets"),
     ("Spaces", "Spaces"),
+    ("Text Types", "Text Types"),
     ("Types (Selection)", "Types (Selection)"),
     ("View Filters", "View Filters"),
     ("View Templates", "View Templates"),
@@ -138,7 +150,54 @@ def _get_name(element):
 
 
 def _set_name(element, name):
-    element.Name = name
+    if isinstance(element, DB.Category):
+        _rename_line_style(element, name)
+        return
+    try:
+        element.Name = name
+    except Exception:
+        # Pattern elements also carry the name on the pattern itself.
+        if isinstance(element, DB.FillPatternElement):
+            pattern = element.GetFillPattern()
+            pattern.Name = name
+            element.SetFillPattern(pattern)
+        elif isinstance(element, DB.LinePatternElement):
+            pattern = element.GetLinePattern()
+            pattern.Name = name
+            element.SetLinePattern(pattern)
+        else:
+            raise
+
+
+def _rename_line_style(category, name):
+    # A line style is a subcategory of Lines. Category.Name is read-only in some Revit
+    # versions, so fall back to the style's GraphicsStyle element, then check it took.
+    try:
+        category.Name = name
+    except Exception:
+        style = category.GetGraphicsStyle(DB.GraphicsStyleType.Projection)
+        if style is None:
+            raise Exception("this line style has no graphics style to rename")
+        style.Name = name
+    if (category.Name or "") != name:
+        raise Exception("Revit does not allow renaming this line style through the API")
+
+
+def _collect_line_styles(current_doc):
+    """User line styles: the subcategories of Lines. Built-in ones have negative ids."""
+    try:
+        lines = current_doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_Lines)
+    except Exception:
+        return []
+    styles = []
+    for sub in lines.SubCategories:
+        try:
+            if _elem_id_int(sub.Id) > 0 and sub.Name:
+                styles.append(sub)
+        except Exception:
+            pass
+    styles.sort(key=lambda c: c.Name.lower())
+    return styles
 
 
 def _is_in_group(element):
@@ -711,12 +770,12 @@ def _populate_param_list(lst, all_params, families):
     """Build grouped ListBox: 'All Families' header + flat list, then per-family sections."""
     lst.Items.Clear()
 
-    muted_brush = SolidColorBrush(Color.FromRgb(0x71, 0x71, 0x7A))   # zinc-500
+    muted_brush = _theme_brush(lst, "MutedBrush", Color.FromRgb(0x71, 0x71, 0x7A))
 
     def _add_header(text):
         tb = TextBlock()
         tb.Text = text.upper()
-        tb.FontSize = 10
+        tb.FontSize = 11.5
         tb.FontWeight = FontWeights.SemiBold
         tb.Foreground = muted_brush
         item = ListBoxItem()
@@ -880,6 +939,32 @@ def collect_elements(current_doc, scope_key):
             return list(current_doc.Phases)
         except Exception:
             return []
+    if scope_key == "Schedules":
+        return [
+            v for v in fec(current_doc).OfClass(DB.ViewSchedule).ToElements()
+            if not v.IsTemplate and not v.IsTitleblockRevisionSchedule
+        ]
+    if scope_key == "Families":
+        return [f for f in fec(current_doc).OfClass(DB.Family).ToElements() if _get_name(f)]
+    if scope_key == "Fill Patterns":
+        return list(fec(current_doc).OfClass(DB.FillPatternElement).ToElements())
+    if scope_key == "Line Patterns":
+        return list(fec(current_doc).OfClass(DB.LinePatternElement).ToElements())
+    if scope_key == "Line Styles":
+        return _collect_line_styles(current_doc)
+    if scope_key == "Scope Boxes":
+        return list(
+            fec(current_doc).OfCategory(DB.BuiltInCategory.OST_VolumeOfInterest)
+            .WhereElementIsNotElementType().ToElements()
+        )
+    if scope_key == "Text Types":
+        return list(fec(current_doc).OfClass(DB.TextNoteType).ToElements())
+    if scope_key == "Dimension Types":
+        return [t for t in fec(current_doc).OfClass(DB.DimensionType).ToElements() if _get_name(t)]
+    if scope_key == "Filled Region Types":
+        return list(fec(current_doc).OfClass(DB.FilledRegionType).ToElements())
+    if scope_key == "Group Types":
+        return list(fec(current_doc).OfClass(DB.GroupType).ToElements())
     return []
 
 
@@ -1060,6 +1145,18 @@ def _ensure_theme(lib_path):
         pass
 
 
+def _theme_brush(element, key, fallback_color):
+    """Theme brush looked up from the element's resources, else a solid fallback."""
+    brush = None
+    try:
+        brush = element.TryFindResource(key)
+    except Exception:
+        brush = None
+    if brush is None:
+        brush = SolidColorBrush(fallback_color)
+    return brush
+
+
 def _set_owner(window):
     try:
         helper = WindowInteropHelper(window)
@@ -1105,6 +1202,7 @@ def show_dialog(script_dir, lib_path, mode):
     chk_also_rename_family = window.FindName("ChkAlsoRenameFamily")
     btn_cancel             = window.FindName("BtnCancel")
     btn_apply         = window.FindName("BtnApply")
+    ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
     window.Title       = config["title"]
     txt_header.Text    = config["header"]
@@ -1191,8 +1289,9 @@ def show_dialog(script_dir, lib_path, mode):
                 category_ids.append(None)
                 category_names.append(display_name)
         else:
-            # Merge fixed scopes (Views, Sheets) with dynamic category list, sorted A-Z
-            all_opts = [("Sheets", "Sheets", None), ("Views", "Views", None)]
+            # Merge fixed scopes (Views, Sheets) with dynamic category list, sorted A-Z.
+            # Views and sheets have no family, so Family names lists categories only.
+            all_opts = [] if _target_key() == "family_names" else [("Sheets", "Sheets", None), ("Views", "Views", None)]
             for name, cid in _get_category_options(doc):
                 all_opts.append((name, name, cid))
             all_opts.sort(key=lambda x: x[0])
@@ -1367,16 +1466,17 @@ def show_preview_selection(script_dir, title, header_lines, main_label, main_row
     btn_select_none = window.FindName("BtnSelectNone")
     btn_cancel      = window.FindName("BtnCancel")
     btn_apply       = window.FindName("BtnApply")
+    ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
     window.Title = title
     txt_header.Text = "\n".join(header_lines)
 
-    muted_brush = SolidColorBrush(Color.FromRgb(0x71, 0x71, 0x7A))
+    muted_brush = _theme_brush(window, "MutedBrush", Color.FromRgb(0x71, 0x71, 0x7A))
 
     def _add_section_header(text):
         tb = TextBlock()
         tb.Text = text.upper()
-        tb.FontSize = 10
+        tb.FontSize = 11.5
         tb.FontWeight = FontWeights.SemiBold
         tb.Foreground = muted_brush
         item = ListBoxItem()

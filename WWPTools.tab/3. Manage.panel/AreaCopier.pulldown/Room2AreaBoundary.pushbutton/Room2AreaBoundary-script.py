@@ -109,13 +109,17 @@ def _get_area_plan_views(doc):
         views.append(v)
 
     def _sort_key(view):
+        scheme_name = _get_area_scheme_name(doc, view)
+        lvl_elevation = 0.0
         lvl_name = ""
         try:
             lvl = view.GenLevel
-            lvl_name = lvl.Name if lvl else ""
+            if lvl:
+                lvl_name = lvl.Name
+                lvl_elevation = lvl.Elevation
         except Exception:
-            lvl_name = ""
-        return (lvl_name, view.Name or "")
+            pass
+        return (scheme_name, lvl_elevation, lvl_name, view.Name or "")
 
     views.sort(key=_sort_key)
     return views
@@ -276,6 +280,43 @@ def _delete_duplicate_boundaries_in_view(doc, view, step=1e-4):
         pass
 
     return len(dup_ids), seen
+
+
+def _delete_all_boundaries_in_view(doc, view):
+    boundary_ids = _get_area_boundary_category_ids()
+    del_ids = []
+
+    collector = DB.FilteredElementCollector(doc, view.Id).OfClass(DB.CurveElement)
+    for elem in collector:
+        if elem is None:
+            continue
+        try:
+            cat = elem.Category
+            if not cat:
+                continue
+            if boundary_ids:
+                if _elem_id_int(cat.Id) not in boundary_ids:
+                    continue
+            else:
+                cname = (cat.Name or "").lower()
+                if "area" not in cname or "bound" not in cname:
+                    continue
+        except Exception:
+            continue
+        del_ids.append(elem.Id)
+
+    if not del_ids:
+        return 0
+
+    try:
+        net_ids = List[DB.ElementId]()
+        for eid in del_ids:
+            net_ids.Add(eid)
+        doc.Delete(net_ids)
+    except Exception:
+        pass
+
+    return len(del_ids)
 
 
 def _ensure_sketch_plane(doc, view):
@@ -561,6 +602,11 @@ def main():
     if not target_views:
         return
 
+    delete_existing = ui.uiUtils_confirm(
+        "Delete ALL existing area boundaries in the selected view(s) before processing?",
+        title="Room to Area Boundaries",
+    )
+
     # Determine room set once (then filter per level)
     selected_rooms = _get_selected_rooms(doc)
     if not selected_rooms:
@@ -569,11 +615,12 @@ def main():
             title="Room to Area Boundaries",
         ):
             return
-    
+
     # Totals across all targets
     total_created_boundaries = 0
     total_failed_boundaries = 0
     total_skipped_overlapped = 0
+    total_deleted_existing = 0
     total_deleted_overlapped = 0
     total_created_areas = 0
     total_failed_areas = 0
@@ -624,19 +671,24 @@ def main():
             created_boundaries = 0
             failed_boundaries = 0
             skipped_overlapped_boundaries = 0
+            deleted_existing_boundaries = 0
             deleted_overlapped_boundaries = 0
             created_areas = 0
             failed_areas = 0
             copied_params = 0
             failed_params = 0
 
-            deleted_overlapped_boundaries, existing_keys = _delete_duplicate_boundaries_in_view(
-                doc,
-                target_view,
-                step=1e-4,
-            )
-            if existing_keys is None:
+            if delete_existing:
+                deleted_existing_boundaries = _delete_all_boundaries_in_view(doc, target_view)
                 existing_keys = set()
+            else:
+                deleted_overlapped_boundaries, existing_keys = _delete_duplicate_boundaries_in_view(
+                    doc,
+                    target_view,
+                    step=1e-4,
+                )
+                if existing_keys is None:
+                    existing_keys = set()
 
             for room in rooms:
                 curves = _get_room_boundary_curves(room)
@@ -683,21 +735,27 @@ def main():
                 copied_params += c_ok
                 failed_params += c_fail
 
-            report.append(
-                "{} | rooms {} | areas {} | boundaries {} | skipped dup {} | deleted dup {}".format(
+            parts = [
+                "{} | rooms {} | areas {} | boundaries {}".format(
                     _format_area_plan_label(doc, target_view),
                     len(rooms),
                     created_areas,
                     created_boundaries,
-                    skipped_overlapped_boundaries,
-                    deleted_overlapped_boundaries,
-                )
-            )
+                ),
+            ]
+            if deleted_existing_boundaries:
+                parts.append("deleted existing {}".format(deleted_existing_boundaries))
+            if skipped_overlapped_boundaries:
+                parts.append("skipped dup {}".format(skipped_overlapped_boundaries))
+            if deleted_overlapped_boundaries:
+                parts.append("deleted dup {}".format(deleted_overlapped_boundaries))
+            report.append(" | ".join(parts))
 
             total_rooms_processed += len(rooms)
             total_created_boundaries += created_boundaries
             total_failed_boundaries += failed_boundaries
             total_skipped_overlapped += skipped_overlapped_boundaries
+            total_deleted_existing += deleted_existing_boundaries
             total_deleted_overlapped += deleted_overlapped_boundaries
             total_created_areas += created_areas
             total_failed_areas += failed_areas
@@ -720,8 +778,12 @@ def main():
     report.append("Rooms processed: {}".format(total_rooms_processed))
     report.append("Created Area Boundary Lines: {}".format(total_created_boundaries))
     report.append("Failed Area Boundary Lines: {}".format(total_failed_boundaries))
-    report.append("Skipped overlapped boundary curves: {}".format(total_skipped_overlapped))
-    report.append("Deleted overlapped existing boundaries: {}".format(total_deleted_overlapped))
+    if total_deleted_existing:
+        report.append("Deleted existing boundaries: {}".format(total_deleted_existing))
+    if total_skipped_overlapped:
+        report.append("Skipped overlapped boundary curves: {}".format(total_skipped_overlapped))
+    if total_deleted_overlapped:
+        report.append("Deleted overlapped existing boundaries: {}".format(total_deleted_overlapped))
     report.append("Created Areas: {}".format(total_created_areas))
     report.append("Failed Areas: {}".format(total_failed_areas))
     report.append("Copied parameter values: {}".format(total_copied_params))

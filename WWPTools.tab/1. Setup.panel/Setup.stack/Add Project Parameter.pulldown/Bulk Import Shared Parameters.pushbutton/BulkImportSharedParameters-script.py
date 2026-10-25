@@ -468,7 +468,11 @@ def _category_choices():
 class BulkImportWindow(forms.WPFWindow):
 
     def __init__(self, shared_parameter_path):
+        # The XAML uses the shared theme keys, so load the theme before parsing it.
+        ui.uiUtils_ensure_theme()
         forms.WPFWindow.__init__(self, "BulkImportSharedParameters.xaml")
+        ui.uiUtils_apply_window_theme(self)
+        ui.uiUtils_load_logo(self.LogoImage)
         self.result_rows = None
         self.shared_parameter_path = ""
         self._excel_path = ""
@@ -486,7 +490,19 @@ class BulkImportWindow(forms.WPFWindow):
 
         self._setup_grid()
         self._wire_events()
-        self._load_shared_file(shared_parameter_path, clear_rows=True)
+        # No file picker before the window: open with the default file, or empty with a
+        # prompt to use "Choose file..." when it cannot be read.
+        try:
+            self._load_shared_file(shared_parameter_path, clear_rows=True)
+        except Exception as exc:
+            self._table.Clear()
+            self._add_row()
+            self.SharedFileBox.Text = shared_parameter_path or ""
+            self.ParameterCountText.Text = "No Shared Parameters file loaded"
+            self.BrowseButton.Content = "Choose file..."
+            self.StatusText.Text = "{} Choose a Shared Parameters file to list its parameters.".format(
+                " ".join(str(exc).split())
+            )
 
     def _setup_grid(self):
         self._table = SD.DataTable("SharedParameterBindings")
@@ -530,6 +546,7 @@ class BulkImportWindow(forms.WPFWindow):
         self._parameter_labels = list(labels)
         self.ParameterGrid.Columns[0].ItemsSource = _net_string_list(labels)
         self.ParameterCountText.Text = "{} shared parameter(s) available".format(len(labels))
+        self.BrowseButton.Content = "Choose another..."
 
         if clear_rows:
             self._table.Clear()
@@ -1169,17 +1186,19 @@ def _main():
         )
         return
 
-    selected_path = _choose_shared_parameter_file(DEFAULT_SHARED_PARAMETERS_PATH)
-    if not selected_path:
-        return
-
     try:
         previous_shared_path = _safe_str(app.SharedParametersFilename)
     except Exception:
         previous_shared_path = ""
 
+    # The window shows the file and has its own "Choose another..." button, so start from
+    # the firm library file, else the file Revit already points at.
+    initial_path = DEFAULT_SHARED_PARAMETERS_PATH
+    if not os.path.isfile(initial_path) and os.path.isfile(previous_shared_path):
+        initial_path = previous_shared_path
+
     try:
-        window = BulkImportWindow(selected_path)
+        window = BulkImportWindow(initial_path)
         if window.ShowDialog() == True and window.result_rows:
             _run_import(window.result_rows)
     finally:

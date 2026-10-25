@@ -49,6 +49,7 @@ class FRRWallDialog(object):
         self._btn_run = self.window.FindName("BtnRun")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._lbl_status = self.window.FindName("LblStatus")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._txt_frr.Text = "FRR Walls"
         self._txt_stc.Text = "STC Walls"

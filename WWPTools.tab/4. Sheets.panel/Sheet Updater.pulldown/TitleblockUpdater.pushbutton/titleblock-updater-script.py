@@ -7,7 +7,7 @@ from Autodesk.Revit import DB, UI
 
 from pyrevit import script
 from WWP_settings import get_tool_settings
-from WWP_uiUtils import uiUtils_alert, uiUtils_load_logo
+from WWP_uiUtils import uiUtils_alert, uiUtils_ensure_theme, uiUtils_load_logo
 from WWP_versioning import apply_window_title
 
 doc = __revit__.ActiveUIDocument.Document
@@ -285,6 +285,9 @@ def _populate_parameter_list(list_box, param_groups, default_labels):
     defaults = set(default_labels or [])
     applied_defaults = set()
     first_selectable = None
+    # Shared theme colours (lib/FlatTheme.xaml), with the old fixed colours as a fallback.
+    muted_brush = list_box.TryFindResource("MutedBrush") or Brushes.Gray
+    text_brush = list_box.TryFindResource("TextBrush") or Brushes.Black
     for family_name, keys in (param_groups or []):
         if not keys:
             continue
@@ -292,9 +295,9 @@ def _populate_parameter_list(list_box, param_groups, default_labels):
             item = ListBoxItem()
             label = TextBlock()
             family_run = Run("{}: ".format(family_name))
-            family_run.Foreground = Brushes.Gray
+            family_run.Foreground = muted_brush
             parameter_run = Run(key)
-            parameter_run.Foreground = Brushes.Black
+            parameter_run.Foreground = text_brush
             label.Inlines.Add(family_run)
             label.Inlines.Add(parameter_run)
             item.Content = label
@@ -1015,6 +1018,8 @@ def _show_titleblock_dialog(
     if not os.path.isfile(xaml_path):
         raise Exception("Missing dialog XAML: {}".format(xaml_path))
 
+    # The dialog XAML uses shared theme keys, so the theme must be loaded before parsing.
+    uiUtils_ensure_theme()
     xaml_text = File.ReadAllText(xaml_path)
     xaml_reader = XmlReader.Create(StringReader(xaml_text))
     window = XamlReader.Load(xaml_reader)

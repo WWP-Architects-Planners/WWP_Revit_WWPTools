@@ -421,6 +421,14 @@ class SheetDuplicatorDialog(object):
     def ShowDialog(self):
         return self.window.ShowDialog()
 
+    def _brush(self, key, fallback):
+        # Shared theme brush (lib/FlatTheme.xaml); the old fixed colour if the theme is missing.
+        try:
+            brush = self.window.TryFindResource(key)
+        except Exception:
+            brush = None
+        return brush if brush is not None else fallback
+
     def _populate_source_sheets(self):
         selected_sheet_id = str(getattr(config, CONFIG_LAST_SOURCE_SHEET_ID, "") or "").strip()
         self._cmb_source_sheet.Items.Clear()
@@ -518,9 +526,9 @@ class SheetDuplicatorDialog(object):
             box.Margin = Thickness(0, 0, 0, 8)
             box.Padding = Thickness(10)
             box.CornerRadius = CornerRadius(6)
-            box.BorderBrush = Brushes.Gainsboro
+            box.BorderBrush = self._brush("BorderBrush", Brushes.Gainsboro)
             box.BorderThickness = Thickness(1)
-            box.Background = Brushes.White
+            box.Background = self._brush("PanelBrush", Brushes.White)
 
             panel = StackPanel()
             title = TextBlock()
@@ -532,7 +540,7 @@ class SheetDuplicatorDialog(object):
             note = TextBlock()
             note.Margin = Thickness(0, 4, 0, 8)
             note.Text = slot["mode_note"]
-            note.Foreground = Brushes.DimGray
+            note.Foreground = self._brush("MutedBrush", Brushes.DimGray)
             note.TextWrapping = TextWrapping.Wrap
             panel.Children.Add(note)
 
@@ -589,8 +597,8 @@ class SheetDuplicatorDialog(object):
         from System.Windows.Controls import Canvas
 
         sheet_border = Border()
-        sheet_border.Background = Brushes.WhiteSmoke
-        sheet_border.BorderBrush = Brushes.DimGray
+        sheet_border.Background = self._brush("PanelBrush", Brushes.WhiteSmoke)
+        sheet_border.BorderBrush = self._brush("StrongBorderBrush", Brushes.DimGray)
         sheet_border.BorderThickness = Thickness(1)
         sheet_border.CornerRadius = CornerRadius(0)
         sheet_border.IsHitTestVisible = False
@@ -602,8 +610,13 @@ class SheetDuplicatorDialog(object):
 
         for slot in self._viewport_slots:
             border = Border()
-            border.Background = Brushes.Gainsboro if slot["can_duplicate"] else Brushes.LightSteelBlue
-            border.BorderBrush = Brushes.Gray
+            # Grey = duplicated view, blue lane = source view reused as-is.
+            if slot["can_duplicate"]:
+                border.Background = self._brush("PressedBrush", Brushes.Gainsboro)
+                border.BorderBrush = self._brush("StrongBorderBrush", Brushes.Gray)
+            else:
+                border.Background = self._brush("LaneBlueBrush", Brushes.LightSteelBlue)
+                border.BorderBrush = self._brush("LaneBlueTextBrush", Brushes.Gray)
             border.BorderThickness = Thickness(1)
             border.CornerRadius = CornerRadius(4)
 
@@ -612,7 +625,7 @@ class SheetDuplicatorDialog(object):
             text.Margin = Thickness(8)
             text.TextWrapping = TextWrapping.Wrap
             text.TextAlignment = TextAlignment.Center
-            text.Foreground = Brushes.Black
+            text.Foreground = self._brush("TextBrush", Brushes.Black)
             border.Child = text
             slot["preview_text"] = text
 

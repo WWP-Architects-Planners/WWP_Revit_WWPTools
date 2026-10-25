@@ -7,11 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.4] - 2026-10-24
+
+### Added
+
+- Export2Ex - By Category: "Copy from By Schedule sets" (under the sets table) copies sets saved in Export2Ex - By Schedule. Each becomes a "from schedule" set with the schedule's category, visible fields, Excel file and sheet name; Edit then adds more parameters. CSV sets, missing or multi-category schedules and names already in use are listed and skipped
+- Super Editor: Element names can now rename Families (all categories), Fill Patterns, Line Patterns, Line Styles, Schedules, Scope Boxes, Text Types, Dimension Types, Filled Region Types and Group Types, and a new "Family names" target renames the families of one category. Line styles fall back to their graphics style because Revit 2024 cannot rename a category directly; a style Revit will not rename is listed as failed
+
+### Changed
+
+- Export2Ex (By Schedule and By Category): a "+ Add set" line under the last row replaces the toolbar Add set button, Load / Save to file are one "Sets file" menu, and the Sheet column moves into the Output lane
+- Export2Ex - By Schedule: no more Save button, and Cancel is now Close. Renames, schedule choices, output paths, new sets and deletions are saved to Project Information when the window closes (Close or Export selected), and only when something changed
+- Export2Ex - By Category: sheet-name and path edits in the sets table are saved when the window closes (Cancel is now Close)
+- Export2Ex - By Category: after an Export from the set editor, the chosen file is remembered on the saved set of that name, so batch export reuses it
+- Export2Ex - By Category: output paths are saved and shown like By Schedule's, with the user folder as `%userprofile%` (for example `%userprofile%\DC\ACC Docs\...`), so a set saved by one person points at the same ACC folder for everyone. Paths saved before stay valid and are not rewritten until they change
+- Import Key Schedule from Excel: the schedule name box is now a Key Schedule list: the key schedules of the chosen Target Type that are already in the model, then "Add new...". An existing key schedule is selected by default; "Add new..." shows a name box that starts as the Excel file name, always creates a new schedule, and refuses the name of an existing one. The import summary names the key schedule it wrote to
+- Bulk Import Shared Parameters: no file picker before the window. It opens with the firm Shared Parameters file (or the file Revit already uses); "Choose another..." in the window changes it
+
+### Fixed
+
+- Shared theme loading (`WWP_uiUtils`): a Revit session that already held an older theme (merged by a compiled dialog, or loaded before WWPTools was updated) kept it, so dialogs using newer theme keys failed to open. The theme file is now merged on top whenever one of the newest keys is missing
+- Export2Ex - By Schedule: the Sheet column could show the schedule name (or the half-typed filter) instead of the category plural until Settings was applied again. Picking a schedule read the combo box text before WPF updated it; the label now uses the picked schedule and stays blank until the row names a schedule in the model
+- Export2Ex - By Schedule: adding or deleting a set no longer drops unsaved renames and schedule choices in the other rows, deleting a set no longer drops the saved export settings, and a set that lists several schedules keeps them unless its schedule is changed
+- Export2Ex - By Category: typed sheet names were lost whenever a set was added, edited or deleted; a set without a sheet name now defaults to its category plural instead of the set name. Choosing a file with another extension in the editor now says so instead of doing nothing
+- Import Key Schedule from Excel: changing the Target Type replaced the typed schedule name with the last one used for that type (for example "wwp_Area Key Schedule_ON"), so the import updated that schedule instead of creating the named one
+
+## [2.6.3] - 2026-10-24
+
 ### Added
 
 - Room to Area Boundaries: moved from Suite Plan Tools pulldown to a new Area Plan Tools pulldown alongside Area Plan Duplicator
 - Room to Area Boundaries: area plan view list now sorts by scheme name, then level elevation (numeric), then view name
 - Room to Area Boundaries: added option to delete all existing area boundaries in selected views before processing
+
+### Changed
+
+- All dialogs now share the Landscape Data Manager look: light grey page, white cards with soft borders and 10px corners, a single teal accent, a page title and subtitle, and Fluent-style inputs, check boxes, toggles and scroll bars (shared `FlatTheme.xaml`, compiled and pyRevit copies kept identical)
+- Data tables use the LIM table language: related columns sit in pale swim lanes (green for results, blue for inputs), headers show the name over the unit, and numbers are right-aligned
+- Buttons: plain buttons are now neutral; each dialog marks its one main action in teal
+- Export2Ex - By Schedule: the main window is now a XAML dialog (`BatchExportDialog.xaml`) with a laned sets table (Source: schedule and sheet; Output: file or folder), a toolbar for Add set / Settings / Load / Save to file, and icon buttons for browse and delete; the Settings window is now `ExportSchedulesDialog.xaml`
+- Export2Ex - By Category: the main window is now `BatchExportDialog.xaml` with the same table, and each row shows the set's category and field count; the set editor is laid out as Source / Available parameters / Exported columns lanes, with Save set as the main action
+- Mass Stats CA results: area columns (GCA, GFA, NSA) and yield columns (units, population, jobs) are grouped in swim lanes with two-line headers and right-aligned numbers
+- Ribbon icons: the Area Plan Tools pulldown has its own icon, and Export Materials to JSON no longer reuses the Export Type Layers icon
+
+### Fixed
+
+- Export2Ex (By Schedule and By Category): exporting to a workbook that is open in Excel showed a raw error (`errno 13` / "used by another process"). It now says "The Excel file '...' is open in Excel (or another program)... Close it and try again". Batch export lists the locked set in its summary and carries on with the other sets instead of stopping. `WWP_xlsx.Workbook.save()` no longer swallows the sharing violation and retries through the fallback writer (which deleted the target first); new helpers `WWP_xlsx.is_file_locked()` / `is_file_lock_error()`
+- Export2Ex - By Category: Export in the set editor always failed with "Choose an Excel file path" because the editor no longer had a path box. It now checks the category and parameters, then asks where to save (pre-filled with the set's saved path or the last one used); cancelling keeps the editor open
+- Text boxes in every dialog were about 10px too tall with their text pushed right: the shared template applied the box padding twice
+- Dialogs built on pyRevit `forms.WPFWindow` (Bulk Import Shared Parameters, Family Swapper, Print Sheets, Edit Naming Formats, About) kept pyRevit's control styles because pyRevit merges its own theme into each window; the new `WWP_uiUtils.uiUtils_apply_window_theme(window)` merges the WWPTools theme in last. Bulk Import also loads the theme before parsing its XAML, so it opens in a fresh Revit session
+- Built-in OK/Cancel and toggle prompts (`WWPTools.WpfUI` `DialogStyles`) now use the theme's buttons and switches instead of the old blue styles
+- Export2Ex - By Category: the WWPTools logo never appeared in the set editor (wrong path to `lib`)
+- Export2Ex - By Schedule: removed the unused single-export form whose code referenced controls that no longer existed
 
 ## [2.6.2] - 2026-10-21
 

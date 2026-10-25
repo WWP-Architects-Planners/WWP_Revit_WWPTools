@@ -69,6 +69,7 @@ class DoorTypeDuplicatorDialog(object):
         self._btn_duplicate = self.window.FindName("BtnDuplicate")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._lbl_status = self.window.FindName("LblStatus")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._door_types = door_types
         for fam, name, elem in door_types:

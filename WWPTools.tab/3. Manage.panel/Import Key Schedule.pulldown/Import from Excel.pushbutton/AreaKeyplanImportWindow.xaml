@@ -1,145 +1,48 @@
+<!--
+  Import Area Key Schedule. Loaded by "Key Schedule-script.py" (_show_area_keyplan_import_dialog)
+  after WWP_uiUtils.uiUtils_ensure_theme(), and preferred by WWP_uiUtils.uiUtils_area_keyplan_import;
+  lib/AreaKeyplanImportWindow.xaml is the reduced fallback copy.
+
+  MappingGrid (LIM table language): Blue lane = the Excel source column, Green lane = the Revit
+  parameter it maps to. The Map To combos read their options from MappingGrid.Tag.
+-->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Import Area Key Schedule"
-        Height="720"
         Width="980"
+        Height="720"
         MinHeight="560"
         MinWidth="820"
         ResizeMode="CanResize"
-        WindowStartupLocation="CenterOwner">
-    <Window.Resources>
-        <SolidColorBrush x:Key="WindowBrush" Color="#FFF3F5F7" />
-        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="PanelBorderBrush" Color="#FFD9DEE7" />
-        <SolidColorBrush x:Key="TitleBrush" Color="#FF152033" />
-        <SolidColorBrush x:Key="MutedBrush" Color="#FF5F6B7A" />
-        <SolidColorBrush x:Key="PrimaryBrush" Color="#FF175CD3" />
-        <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#FF1849A9" />
-        <SolidColorBrush x:Key="PrimaryPressedBrush" Color="#FF12387A" />
-        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="SecondaryBrush" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="SecondaryBorderBrush" Color="#FFC5CCD8" />
-        <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#FFF3F5F8" />
-        <SolidColorBrush x:Key="SecondaryPressedBrush" Color="#FFE7EBF1" />
-
-        <Style TargetType="TextBox">
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="0,0,0,0" />
-            <Setter Property="BorderBrush" Value="#FFC8D0DB" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="White" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-
-        <Style TargetType="ComboBox">
-            <Setter Property="Padding" Value="6,4" />
-            <Setter Property="BorderBrush" Value="#FFC8D0DB" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="White" />
-            <Setter Property="MinHeight" Value="30" />
-        </Style>
-
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinWidth" Value="96" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PrimaryHoverBrush}" />
-                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryHoverBrush}" />
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PrimaryPressedBrush}" />
-                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryPressedBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-            <Setter Property="Foreground" Value="{StaticResource TitleBrush}" />
-            <Setter Property="Background" Value="{StaticResource SecondaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource SecondaryBorderBrush}" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource SecondaryHoverBrush}" />
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="{StaticResource SecondaryPressedBrush}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="BrandLogoFooter" TargetType="Image">
-            <Setter Property="Width" Value="56" />
-            <Setter Property="Height" Value="56" />
-            <Setter Property="Stretch" Value="Uniform" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
-        </Style>
-    </Window.Resources>
-
-    <Grid Margin="20" Background="{StaticResource WindowBrush}">
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource WindowBrush}">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="18"
-                Margin="0,0,0,14">
-            <StackPanel>
-                <TextBlock Text="Import Area Key Schedule"
-                           FontSize="22"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}" />
-                <TextBlock Text="Choose an Excel file and worksheet, load the source columns, then map each column to a Revit parameter."
-                           Margin="0,8,0,0"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedBrush}" />
-            </StackPanel>
-        </Border>
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Import Area Key Schedule"
+                       Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Choose an Excel file and worksheet, load the source columns, then map each column to a Revit parameter."
+                       Style="{StaticResource PageSubtitle}" />
+        </StackPanel>
 
         <Border Grid.Row="1"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="18"
-                Margin="0,0,0,14">
+                Margin="0,16,0,0"
+                Style="{StaticResource WwpCard}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="240" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="1.4*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -148,153 +51,157 @@
 
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
-                           Grid.ColumnSpan="2"
-                           Text="Excel File"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}"
-                           Margin="0,0,0,6" />
-                <TextBlock Grid.Row="2"
-                           Grid.Column="0"
-                           Text="Excel Sheet"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}"
-                           Margin="0,12,0,6" />
-                <TextBlock Grid.Row="2"
-                           Grid.Column="1"
-                           Text="Target Type"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}"
-                           Margin="14,12,0,6" />
-
-                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
+                           Grid.ColumnSpan="5"
+                           Style="{StaticResource FieldLabel}"
+                           Text="Excel File" />
+                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="FilePathBox"
-                             Grid.Column="0"
-                             MinHeight="32" />
+                             Grid.Column="0" />
                     <Button x:Name="BrowseButton"
                             Grid.Column="1"
                             Content="Browse"
-                            Margin="8,0,0,0"
-                            Style="{StaticResource SecondaryButtonStyle}" />
+                            MinWidth="88"
+                            Margin="8,0,0,0" />
                     <Button x:Name="LoadButton"
                             Grid.Column="2"
                             Content="Load"
-                            Margin="8,0,0,0"
-                            Style="{StaticResource PrimaryButtonStyle}" />
+                            MinWidth="88"
+                            Margin="8,0,0,0" />
                 </Grid>
+
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Margin="0,12,0,6"
+                           Style="{StaticResource FieldLabel}"
+                           Text="Excel Sheet" />
+                <TextBlock Grid.Row="2"
+                           Grid.Column="2"
+                           Margin="0,12,0,6"
+                           Style="{StaticResource FieldLabel}"
+                           Text="Target Type" />
+                <TextBlock Grid.Row="2"
+                           Grid.Column="4"
+                           Margin="0,12,0,6"
+                           Style="{StaticResource FieldLabel}"
+                           Text="Key Schedule" />
 
                 <ComboBox x:Name="SheetCombo"
                           Grid.Row="3"
                           Grid.Column="0"
-                          MinHeight="32"
                           ToolTip="Select a worksheet, then click Load to refresh its columns." />
-
                 <ComboBox x:Name="TargetTypeCombo"
                           Grid.Row="3"
-                          Grid.Column="1"
-                          Width="260"
-                          MinHeight="32"
-                          Margin="14,0,0,0" />
-
-                <TextBlock Grid.Row="4"
-                           Grid.Column="0"
-                           Grid.ColumnSpan="2"
-                           Text="Schedule Name"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}"
-                           Margin="0,12,0,6" />
-                <TextBox x:Name="ScheduleNameBox"
-                         Grid.Row="5"
-                         Grid.Column="0"
-                         Grid.ColumnSpan="2"
-                         MinHeight="32"
-                         ToolTip="Name of the key schedule to create or update in Revit." />
+                          Grid.Column="2" />
+                <!-- The key schedules of the Target Type already in the model, then "Add new...".
+                     NewScheduleNameBox shows only for "Add new..." (the script sets the spans). -->
+                <Grid Grid.Row="3" Grid.Column="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="ScheduleCombo"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="2"
+                              ToolTip="Update a key schedule of this type, or add a new one."
+                              AutomationProperties.Name="Key schedule" />
+                    <TextBox x:Name="NewScheduleNameBox"
+                             Grid.Column="1"
+                             Margin="8,0,0,0"
+                             Visibility="Collapsed"
+                             ToolTip="Name of the new key schedule. Starts as the Excel file name."
+                             AutomationProperties.Name="New key schedule name" />
+                </Grid>
             </Grid>
         </Border>
 
         <Border Grid.Row="2"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="12"
-                Margin="0,0,0,14">
+                Margin="0,16,0,0"
+                Style="{StaticResource WwpCard}">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
-                           Text="Saved set"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TitleBrush}"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0" />
-                <ComboBox x:Name="SavedSetCombo"
-                          Grid.Column="1"
-                          IsEditable="True"
-                          MinHeight="32"
-                          Margin="0,0,8,0" />
-                <Button x:Name="LoadSetButton"
-                        Grid.Column="2"
-                        Content="Load"
-                        MinWidth="72"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-                <Button x:Name="SaveSetButton"
-                        Grid.Column="3"
-                        Content="Save"
-                        MinWidth="72"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-                <Button x:Name="DeleteSetButton"
-                        Grid.Column="4"
-                        Content="Delete"
-                        MinWidth="72"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-                <Button x:Name="ExportSetButton"
-                        Grid.Column="5"
-                        Content="Export Setting"
-                        MinWidth="118"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-                <Button x:Name="ImportSetButton"
-                        Grid.Column="6"
-                        Content="Import Setting"
-                        MinWidth="118"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-            </Grid>
-        </Border>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="3"
-                   Text="Map Excel columns to parameters"
-                   FontWeight="SemiBold"
-                   Foreground="{StaticResource MutedBrush}"
-                   Margin="0,0,0,8" />
+                <TextBlock Grid.Row="0"
+                           Style="{StaticResource SectionHeader}"
+                           Text="Map Excel columns to parameters" />
 
-        <DataGrid x:Name="MappingGrid"
-                  Grid.Row="4"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  CanUserResizeRows="False"
-                  CanUserSortColumns="False"
-                  HeadersVisibility="Column"
-                  VirtualizingPanel.IsVirtualizing="False"
-                  Margin="0,0,0,12"
-                  MinHeight="200">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Excel Column"
-                                    Binding="{Binding ColumnName}"
-                                    IsReadOnly="True"
-                                    Width="2*" />
+                <Grid Grid.Row="1" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Style="{StaticResource FieldLabel}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"
+                               Text="Saved set" />
+                    <ComboBox x:Name="SavedSetCombo"
+                              Grid.Column="1"
+                              IsEditable="True"
+                              Margin="0,0,8,0" />
+                    <Button x:Name="LoadSetButton"
+                            Grid.Column="2"
+                            Content="Load"
+                            MinWidth="64"
+                            Margin="0,0,8,0" />
+                    <Button x:Name="SaveSetButton"
+                            Grid.Column="3"
+                            Content="Save"
+                            MinWidth="64"
+                            Margin="0,0,8,0" />
+                    <Button x:Name="DeleteSetButton"
+                            Grid.Column="4"
+                            Content="Delete"
+                            MinWidth="64"
+                            Margin="0,0,8,0" />
+                    <Button x:Name="ExportSetButton"
+                            Grid.Column="5"
+                            Content="Export Setting"
+                            Margin="0,0,8,0" />
+                    <Button x:Name="ImportSetButton"
+                            Grid.Column="6"
+                            Content="Import Setting" />
+                </Grid>
+
+                <DataGrid x:Name="MappingGrid"
+                          Grid.Row="2"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          CanUserSortColumns="False"
+                          HeadersVisibility="Column"
+                          VirtualizingPanel.IsVirtualizing="False"
+                          BorderThickness="0"
+                          MinHeight="160">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Excel Column"
+                                            Binding="{Binding ColumnName}"
+                                            IsReadOnly="True"
+                                            HeaderStyle="{StaticResource LaneBlueHeader}"
+                                            CellStyle="{StaticResource LaneBlueCell}"
+                                            ElementStyle="{StaticResource TableCellText}"
+                                            Width="2*" />
+                        <DataGridTemplateColumn Width="6"
+                                                HeaderStyle="{StaticResource LaneGapHeader}"
+                                                CellStyle="{StaticResource LaneGapCell}"
+                                                CanUserResize="False" />
                         <DataGridTemplateColumn Header="Map To"
+                                                HeaderStyle="{StaticResource LaneGreenHeader}"
+                                                CellStyle="{StaticResource LaneGreenCell}"
                                                 Width="3*">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -303,23 +210,27 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-            </DataGrid.Columns>
-        </DataGrid>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
 
-        <DockPanel Grid.Row="5">
-            <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}"
+        <DockPanel Grid.Row="3" Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
                    DockPanel.Dock="Left"
-                   VerticalAlignment="Bottom"
-                   HorizontalAlignment="Left" />
+                   VerticalAlignment="Center"
+                   Style="{StaticResource BrandLogoFooter}" />
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Right">
+                        VerticalAlignment="Center">
                 <Button x:Name="CancelButton"
                         Content="Cancel"
-                        Style="{StaticResource SecondaryButtonStyle}" />
+                        MinWidth="88"
+                        Margin="0,0,8,0" />
                 <Button x:Name="OkButton"
                         Content="OK"
-                        Style="{StaticResource PrimaryButtonStyle}" />
+                        MinWidth="96"
+                        Style="{StaticResource PrimaryButton}" />
             </StackPanel>
         </DockPanel>
     </Grid>

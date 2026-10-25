@@ -2,43 +2,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Views Duplicator"
         Width="500"
-        Height="530"
+        Height="540"
         MinWidth="420"
-        MinHeight="480"
+        MinHeight="540"
         ResizeMode="CanResizeWithGrip"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource WindowBrush}">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/WWPTools.WpfUI;component/Themes/FlatTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                <Setter Property="Background" Value="#E5EAF0" />
-                <Setter Property="BorderBrush" Value="#CBD5E1" />
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            </Style>
-            <Style TargetType="Label">
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Padding" Value="0,0,8,0" />
-            </Style>
-            <Style TargetType="RadioButton">
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Margin" Value="0,0,20,0" />
-            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Margin="20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="16" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="14" />
+            <RowDefinition Height="10" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="14" />
+            <RowDefinition Height="10" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -47,56 +32,42 @@
         <!-- Header -->
         <StackPanel Grid.Row="0">
             <TextBlock Text="Views Duplicator"
-                       FontSize="18"
-                       FontWeight="Bold"
-                       Foreground="{StaticResource TextBrush}" />
+                       Style="{StaticResource PageTitle}" />
             <TextBlock Text="Duplicate selected views with optional renaming."
-                       Margin="0,4,0,0"
-                       Foreground="{StaticResource MutedBrush}"
-                       FontSize="12" />
+                       Style="{StaticResource PageSubtitle}" />
         </StackPanel>
 
         <!-- Duplicate mode -->
-        <Border Grid.Row="2"
-                Padding="14,12"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
+        <Border Grid.Row="2" Style="{StaticResource WwpCard}">
             <StackPanel>
                 <TextBlock Text="Duplicate Mode"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}"
-                           Margin="0,0,0,8" />
-                <StackPanel Orientation="Horizontal">
+                           Style="{StaticResource SectionHeader}" />
+                <WrapPanel Orientation="Horizontal">
                     <RadioButton x:Name="RbDuplicate"
+                                 Margin="0,2,16,2"
                                  Content="Duplicate View"
                                  ToolTip="Creates an independent copy with no annotation elements." />
                     <RadioButton x:Name="RbDependent"
+                                 Margin="0,2,16,2"
                                  Content="As Dependent"
                                  ToolTip="Creates a dependent copy that shares crop and scope with the parent." />
                     <RadioButton x:Name="RbWithDetailing"
+                                 Margin="0,2,0,2"
                                  Content="With Detailing"
                                  IsChecked="True"
                                  ToolTip="Creates an independent copy including all annotation and detail elements." />
-                </StackPanel>
+                </WrapPanel>
             </StackPanel>
         </Border>
 
         <!-- Source info -->
         <TextBlock x:Name="TxtSource"
                    Grid.Row="4"
-                   Foreground="{StaticResource MutedBrush}"
-                   FontSize="11"
+                   Style="{StaticResource CaptionText}"
                    Text="Source: Current selection" />
 
         <!-- Rename fields -->
-        <Border Grid.Row="6"
-                Padding="14,12"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
+        <Border Grid.Row="6" Style="{StaticResource WwpCard}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -112,23 +83,27 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="Find:"
-                       ToolTip="Text to find in the original view name. Leave blank to skip find/replace." />
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Find:"
+                           Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center"
+                           ToolTip="Text to find in the original view name. Leave blank to skip find/replace." />
                 <TextBox x:Name="TxtFind" Grid.Row="0" Grid.Column="1"
                          ToolTip="Text to find in the original view name. Leave blank to skip find/replace." />
 
-                <Label Grid.Row="2" Grid.Column="0" Content="Replace:"
-                       ToolTip="Text to replace the found text with in the duplicate name." />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Replace:"
+                           Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center"
+                           ToolTip="Text to replace the found text with in the duplicate name." />
                 <TextBox x:Name="TxtReplace" Grid.Row="2" Grid.Column="1"
                          ToolTip="Text to replace the found text with in the duplicate name." />
 
-                <Label Grid.Row="4" Grid.Column="0" Content="Prefix:"
-                       ToolTip="Text prepended to the duplicate view name. Applied after Find/Replace." />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Prefix:"
+                           Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center"
+                           ToolTip="Text prepended to the duplicate view name. Applied after Find/Replace." />
                 <TextBox x:Name="TxtPrefix" Grid.Row="4" Grid.Column="1"
                          ToolTip="Text prepended to the duplicate view name. Applied after Find/Replace." />
 
-                <Label Grid.Row="6" Grid.Column="0" Content="Suffix:"
-                       ToolTip="Text appended to the duplicate view name. Applied after Find/Replace." />
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="Suffix:"
+                           Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center"
+                           ToolTip="Text appended to the duplicate view name. Applied after Find/Replace." />
                 <TextBox x:Name="TxtSuffix" Grid.Row="6" Grid.Column="1"
                          Text="-copy"
                          ToolTip="Text appended to the duplicate view name. Applied after Find/Replace." />
@@ -136,7 +111,7 @@
         </Border>
 
         <!-- Buttons -->
-        <DockPanel Grid.Row="8" Margin="0,16,0,0">
+        <DockPanel Grid.Row="8" Style="{StaticResource WwpFooter}">
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
@@ -144,12 +119,12 @@
                         MinWidth="90"
                         Margin="0,0,8,0"
                         Content="Cancel"
-                        IsCancel="True"
-                        Style="{StaticResource SecondaryButtonStyle}" />
+                        IsCancel="True" />
                 <Button x:Name="BtnDuplicate"
                         MinWidth="120"
                         Content="Duplicate"
                         IsDefault="True"
+                        Style="{StaticResource PrimaryButton}"
                         ToolTip="Duplicate the selected views with the specified rename settings." />
             </StackPanel>
         </DockPanel>

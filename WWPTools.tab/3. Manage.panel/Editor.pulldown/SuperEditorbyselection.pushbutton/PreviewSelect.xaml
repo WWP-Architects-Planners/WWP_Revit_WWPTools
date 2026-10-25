@@ -2,79 +2,74 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Preview"
         Width="720"
-        Height="600"
+        Height="620"
         MinWidth="480"
-        MinHeight="400"
+        MinHeight="420"
         ResizeMode="CanResizeWithGrip"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource WindowBrush}">
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/WWPTools.WpfUI;component/Themes/FlatTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            </Style>
         </ResourceDictionary>
     </Window.Resources>
 
-    <Grid Margin="20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />   <!-- 0  header -->
-            <RowDefinition Height="10" />     <!-- 1  gap -->
-            <RowDefinition Height="Auto" />   <!-- 2  select all/none row -->
-            <RowDefinition Height="8" />      <!-- 3  gap -->
-            <RowDefinition Height="*" />      <!-- 4  list -->
-            <RowDefinition Height="16" />     <!-- 5  gap -->
-            <RowDefinition Height="Auto" />   <!-- 6  buttons -->
+            <RowDefinition Height="*" />      <!-- 0  card: header, select all/none, list -->
+            <RowDefinition Height="Auto" />   <!-- 1  footer -->
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="TxtHeader"
-                   Grid.Row="0"
-                   Text=""
-                   FontSize="12"
-                   Foreground="{StaticResource TextBrush}"
-                   TextWrapping="Wrap" />
+        <Border Grid.Row="0" Style="{StaticResource WwpCard}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />   <!-- 0  header -->
+                    <RowDefinition Height="12" />     <!-- 1  gap -->
+                    <RowDefinition Height="Auto" />   <!-- 2  select all/none row -->
+                    <RowDefinition Height="8" />      <!-- 3  gap -->
+                    <RowDefinition Height="*" />      <!-- 4  list -->
+                </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal">
-            <Button x:Name="BtnSelectAll"
-                    Content="Select All"
-                    MinWidth="90"
-                    Margin="0,0,8,0"
-                    Style="{StaticResource SecondaryButtonStyle}" />
-            <Button x:Name="BtnSelectNone"
-                    Content="Select None"
-                    MinWidth="90"
-                    Style="{StaticResource SecondaryButtonStyle}" />
-        </StackPanel>
+                <TextBlock x:Name="TxtHeader"
+                           Grid.Row="0"
+                           Text=""
+                           TextWrapping="Wrap" />
 
-        <Border Grid.Row="4"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6">
-            <ListBox x:Name="LstPreviewItems"
-                     BorderThickness="0"
-                     Background="Transparent"
-                     Padding="4,4,4,4" />
+                <StackPanel Grid.Row="2" Orientation="Horizontal">
+                    <Button x:Name="BtnSelectAll"
+                            Content="Select All"
+                            MinWidth="90"
+                            Margin="0,0,8,0" />
+                    <Button x:Name="BtnSelectNone"
+                            Content="Select None"
+                            MinWidth="90" />
+                </StackPanel>
+
+                <ListBox x:Name="LstPreviewItems"
+                         Grid.Row="4" />
+            </Grid>
         </Border>
 
-        <DockPanel Grid.Row="6">
+        <DockPanel Grid.Row="1" Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
+                   DockPanel.Dock="Left"
+                   Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center" />
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Right">
+                        VerticalAlignment="Center">
                 <Button x:Name="BtnCancel"
                         MinWidth="90"
                         Margin="0,0,8,0"
                         Content="Cancel"
-                        IsCancel="True"
-                        Style="{StaticResource SecondaryButtonStyle}" />
+                        IsCancel="True" />
                 <Button x:Name="BtnApply"
                         MinWidth="150"
                         Content="Apply"
-                        IsDefault="True" />
+                        IsDefault="True"
+                        Style="{StaticResource PrimaryButton}" />
             </StackPanel>
         </DockPanel>
     </Grid>

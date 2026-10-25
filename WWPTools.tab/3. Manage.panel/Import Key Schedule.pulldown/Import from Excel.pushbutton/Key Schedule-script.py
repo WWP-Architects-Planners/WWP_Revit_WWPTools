@@ -13,6 +13,7 @@ from WWP_settings import get_tool_settings
 TITLE = "Import Key Schedule from Excel"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
+ADD_NEW_SCHEDULE_OPTION = "Add new..."
 TARGET_OPTIONS = [
     "Area Key Schedule",
     "Ceiling Key Schedule",
@@ -140,6 +141,9 @@ def _show_area_keyplan_import_dialog(
     loaded_sheet="",
     loaded_file_path="",
     schedule_name="",
+    schedule_is_new=False,
+    key_schedules_by_target=None,
+    remembered_schedule_names=None,
     column_names=None,
     target_types=None,
     selected_target_type="",
@@ -158,7 +162,11 @@ def _show_area_keyplan_import_dialog(
     from System.Windows.Interop import WindowInteropHelper
     from System.Windows import MessageBox
 
+    # The XAML uses the shared theme keys, so load the theme before parsing it.
+    _ui = load_uiutils()
+    _ui.uiUtils_ensure_theme()
     window = _load_local_window_xaml("AreaKeyplanImportWindow.xaml")
+    _ui.uiUtils_load_logo(window.FindName("LogoImage"))
     window.Title = title or "Import Area Key Schedule"
     if width > 0:
         window.Width = width
@@ -178,7 +186,8 @@ def _show_area_keyplan_import_dialog(
     load_button = window.FindName("LoadButton")
     sheet_combo = window.FindName("SheetCombo")
     target_combo = window.FindName("TargetTypeCombo")
-    schedule_name_box = window.FindName("ScheduleNameBox")
+    schedule_combo = window.FindName("ScheduleCombo")
+    new_name_box = window.FindName("NewScheduleNameBox")
     mapping_grid = window.FindName("MappingGrid")
     ok_button = window.FindName("OkButton")
     cancel_button = window.FindName("CancelButton")
@@ -192,10 +201,7 @@ def _show_area_keyplan_import_dialog(
     if file_path_box is not None:
         file_path_box.Text = file_path or ""
 
-    if schedule_name_box is not None:
-        schedule_name_box.Text = schedule_name or ""
-
-    sheets = [str(name) for name in (sheet_names or [])]
+    sheets =[str(name) for name in (sheet_names or [])]
     if sheet_combo is not None:
         for name in sheets:
             sheet_combo.Items.Add(name)
@@ -257,8 +263,81 @@ def _show_area_keyplan_import_dialog(
         value = str(file_path_box.Text or "") if file_path_box is not None else ""
         return os.path.expandvars(value)
 
+    # Key schedule: pick one of the target type's key schedules already in the model, or
+    # "Add new..." with a name (the Excel file name until the user types another).
+    schedules_by_target = key_schedules_by_target if isinstance(key_schedules_by_target, dict) else {}
+    remembered_names = remembered_schedule_names if isinstance(remembered_schedule_names, dict) else {}
+    _auto_new_name = [""]
+
+    def _is_new_schedule():
+        return str(schedule_combo.SelectedItem or "") == ADD_NEW_SCHEDULE_OPTION
+
     def _current_schedule_name():
-        return str(schedule_name_box.Text or "").strip() if schedule_name_box is not None else ""
+        if _is_new_schedule():
+            return str(new_name_box.Text or "").strip()
+        return str(schedule_combo.SelectedItem or "").strip()
+
+    def _default_new_name():
+        label = resolve_schedule_target(_current_target_type())["label"]
+        return _default_schedule_name(_current_file_path(), label)
+
+    def _sync_new_name_box():
+        from System.Windows import Visibility
+        from System.Windows.Controls import Grid as WpfGrid
+        is_new = _is_new_schedule()
+        new_name_box.Visibility = Visibility.Visible if is_new else Visibility.Collapsed
+        WpfGrid.SetColumnSpan(schedule_combo, 1 if is_new else 2)
+        if is_new:
+            _refresh_auto_new_name()
+
+    def _matching_schedule(names, name):
+        key = _normalize_name(name)
+        for existing in names:
+            if key and _normalize_name(existing) == key:
+                return existing
+        return None
+
+    def _fill_schedule_combo(preferred="", prefer_new=False):
+        # An existing key schedule of this type is the default; "Add new..." only when
+        # there is none, or when the user had chosen it.
+        names = list(schedules_by_target.get(_current_target_type()) or [])
+        schedule_combo.Items.Clear()
+        for name in names:
+            schedule_combo.Items.Add(name)
+        schedule_combo.Items.Add(ADD_NEW_SCHEDULE_OPTION)
+        match = _matching_schedule(names, preferred)
+        if prefer_new or not names:
+            new_name_box.Text = preferred if prefer_new and preferred else ""
+            if new_name_box.Text == _default_new_name():
+                _auto_new_name[0] = new_name_box.Text
+            schedule_combo.SelectedItem = ADD_NEW_SCHEDULE_OPTION
+        else:
+            schedule_combo.SelectedItem = match or names[0]
+        _sync_new_name_box()
+
+    def _select_schedule_name(name):
+        names = list(schedules_by_target.get(_current_target_type()) or [])
+        match = _matching_schedule(names, name)
+        if match:
+            schedule_combo.SelectedItem = match
+        else:
+            new_name_box.Text = name
+            schedule_combo.SelectedItem = ADD_NEW_SCHEDULE_OPTION
+        _sync_new_name_box()
+
+    def on_schedule_changed(sender, e):
+        _sync_new_name_box()
+
+    def on_target_changed(sender, e):
+        target = _current_target_type()
+        _fill_schedule_combo(remembered_names.get(target, ""))
+
+    def _refresh_auto_new_name():
+        # A new schedule follows the Excel file name until the user types their own.
+        current = str(new_name_box.Text or "").strip()
+        if not current or current == _auto_new_name[0]:
+            _auto_new_name[0] = _default_new_name()
+            new_name_box.Text = _auto_new_name[0]
 
     def _update_ok_state():
         if ok_button is None:
@@ -454,10 +533,9 @@ def _show_area_keyplan_import_dialog(
         if imported_file_path and file_path_box is not None:
             file_changed = _normalize_path(imported_file_path) != _normalize_path(_current_file_path())
             file_path_box.Text = imported_file_path
-        if schedule_name_box is not None:
-            imported_schedule_name = str(data.get("schedule_name") or "").strip()
-            if imported_schedule_name:
-                schedule_name_box.Text = imported_schedule_name
+        imported_schedule_name = str(data.get("schedule_name") or "").strip()
+        if imported_schedule_name:
+            _select_schedule_name(imported_schedule_name)
         imported_sheet_name = str(data.get("sheet_name") or "").strip()
         if imported_sheet_name and sheet_combo is not None and imported_sheet_name in sheets:
             sheet_combo.SelectedItem = imported_sheet_name
@@ -549,6 +627,18 @@ def _show_area_keyplan_import_dialog(
             file_path_box.Text = dlg.FileName or ""
 
     def on_ok(sender, e):
+        if _is_new_schedule():
+            new_name = _current_schedule_name()
+            if not new_name:
+                _show_message("Enter a name for the new key schedule.")
+                return
+            existing = _matching_schedule(schedules_by_target.get(_current_target_type()) or [], new_name)
+            if existing:
+                _show_message(
+                    "A key schedule named '{}' already exists. Pick it from the list to update it, "
+                    "or enter another name for the new one.".format(existing)
+                )
+                return
         result_state["load_requested"] = False
         window.DialogResult = True
 
@@ -561,6 +651,8 @@ def _show_area_keyplan_import_dialog(
 
     def on_file_path_changed(sender, e):
         _update_ok_state()
+        if _is_new_schedule():
+            _refresh_auto_new_name()
 
     def on_cancel(sender, e):
         window.DialogResult = False
@@ -590,6 +682,10 @@ def _show_area_keyplan_import_dialog(
         export_set_button.Click += on_export_set
     if import_set_button is not None:
         import_set_button.Click += on_import_set
+    _fill_schedule_combo(schedule_name, schedule_is_new)
+    if target_combo is not None:
+        target_combo.SelectionChanged += on_target_changed
+    schedule_combo.SelectionChanged += on_schedule_changed
     _refresh_saved_set_combo()
     window.ContentRendered += on_content_rendered
 
@@ -627,6 +723,7 @@ def _show_area_keyplan_import_dialog(
         "selected_sheet": _current_sheet(),
         "file_path": result_file_path,
         "schedule_name": _current_schedule_name(),
+        "schedule_is_new": _is_new_schedule(),
         "column_names": column_names_out,
         "selected_options": selected_options,
     }
@@ -1649,6 +1746,25 @@ def get_key_schedules(doc, category_bic):
     return schedules
 
 
+def get_key_schedule_names_by_target(doc):
+    """Names of the key schedules already in the model, per Target Type option."""
+    names = dict((option, []) for option, _bic, _label in _TARGET_MAP)
+    for view in DB.FilteredElementCollector(doc).OfClass(DB.ViewSchedule):
+        try:
+            if view.IsTemplate or not view.Definition or not view.Definition.IsKeySchedule:
+                continue
+            cat_id = view.Definition.CategoryId
+        except Exception:
+            continue
+        for option, bic, _label in _TARGET_MAP:
+            if _is_bic_value(cat_id, bic):
+                names[option].append(view.Name)
+                break
+    for option in names:
+        names[option].sort(key=lambda name: name.lower())
+    return names
+
+
 def find_key_schedule_by_name(doc, category_bic, schedule_name):
     target = _normalize_name(schedule_name)
     if not target:
@@ -2001,8 +2117,14 @@ def main():
         "defaults": [],
         "auto_defaults": [],
         "schedule_name": "",
+        "schedule_is_new": False,
         "selected_target_type": selected_target_type,
     }
+    key_schedules_by_target = get_key_schedule_names_by_target(doc)
+    remembered_schedule_names = dict(
+        (option, _safe_config_get(config, "area_key_import_schedule_name_{}".format(_normalize_name(label)), "") or "")
+        for option, _bic, label in _TARGET_MAP
+    )
 
     # Preload the most recently used workbook for this target type.
     if state["file_path"] and (_is_url(state["file_path"]) or os.path.exists(state["file_path"])):
@@ -2043,12 +2165,9 @@ def main():
                     }
                 )
 
-    if not state["schedule_name"]:
-        state["schedule_name"] = _safe_config_get(
-            config,
-            "area_key_import_schedule_name_{}".format(category_key),
-            "",
-        ) or _default_schedule_name(state["file_path"], category_label)
+    # The dialog selects this key schedule if it still exists, else the first one of the
+    # type, else "Add new..." named after the Excel file.
+    state["schedule_name"] = remembered_schedule_names.get(selected_target_type, "")
 
     while True:
         result = _show_area_keyplan_import_dialog(
@@ -2059,6 +2178,9 @@ def main():
             loaded_sheet=state["loaded_sheet"],
             loaded_file_path=state["loaded_file_path"],
             schedule_name=state.get("schedule_name", ""),
+            schedule_is_new=state.get("schedule_is_new", False),
+            key_schedules_by_target=key_schedules_by_target,
+            remembered_schedule_names=remembered_schedule_names,
             column_names=state["column_labels"],
             target_types=TARGET_OPTIONS,
             selected_target_type=state.get("selected_target_type", TARGET_OPTIONS[0]),
@@ -2089,13 +2211,11 @@ def main():
             parameter_options = [SKIP_OPTION, KEY_NAME_OPTION] + param_names
             state["defaults"] = []
             state["auto_defaults"] = []
-            state["schedule_name"] = _safe_config_get(
-                config,
-                "area_key_import_schedule_name_{}".format(category_key),
-                "",
-            ) or _default_schedule_name(state.get("file_path", ""), category_label)
-        elif result_schedule_name:
-            state["schedule_name"] = result_schedule_name
+        # The dialog already lists the key schedules of the chosen target type, so keep
+        # its choice. (Resetting it here on a target change is what replaced typed names
+        # with the remembered one.)
+        state["schedule_name"] = result_schedule_name
+        state["schedule_is_new"] = bool(result.get("schedule_is_new"))
 
         file_path = result.get("file_path") or ""
         selected_sheet = result.get("selected_sheet") or ""
@@ -2180,13 +2300,6 @@ def main():
                     "auto_defaults": auto_defaults,
                 }
             )
-            if not state.get("schedule_name"):
-                saved_name = _safe_config_get(
-                    config,
-                    "area_key_import_schedule_name_{}".format(category_key),
-                    "",
-                ) or ""
-                state["schedule_name"] = saved_name or _default_schedule_name(state["file_path"], category_label)
             _safe_config_set(config, "area_key_import_headers_signature", signature)
             _safe_config_set(config, "area_key_import_selected_options", defaults)
             _safe_config_set(config, _mapping_signature_key(category_key), signature)
@@ -2257,7 +2370,11 @@ def main():
         warnings = []
 
         with RevitTransaction(doc, TITLE):
-            schedule = find_key_schedule_by_name(doc, category_bic, schedule_name)
+            # "Add new..." always creates a schedule (create_key_schedule makes the view
+            # name unique), so it can never update, or delete rows from, an existing one.
+            schedule = None
+            if not state.get("schedule_is_new"):
+                schedule = find_key_schedule_by_name(doc, category_bic, schedule_name)
             if schedule is None:
                 schedule, err = create_key_schedule(doc, schedule_name, category_bic, category_label)
                 if schedule is None:
@@ -2380,13 +2497,18 @@ def main():
         _safe_config_set(config, "area_key_import_selected_options", selections)
         _safe_config_set(config, _mapping_signature_key(category_key), _header_signature(state.get("headers", [])))
         _safe_config_set(config, _mapping_selection_key(category_key), selections)
+        try:
+            schedule_name = schedule.Name or schedule_name
+        except Exception:
+            pass
         _safe_config_set(config, "area_key_import_schedule_name_{}".format(category_key), schedule_name)
         _save_config()
 
         summary = (
+            "Key schedule: {}\n\n"
             "Rows created: {}\nRows updated: {}\nRows deleted: {}\n"
             "Rows kept (in use): {}\nRows skipped: {}"
-        ).format(created, updated, deleted, kept_in_use, skipped)
+        ).format(schedule_name, created, updated, deleted, kept_in_use, skipped)
         if warnings:
             summary += "\n\nWarnings:\n" + "\n".join(warnings[:10])
             if len(warnings) > 10:

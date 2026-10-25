@@ -2,96 +2,47 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Manual Rev updater"
         Width="1120"
-        Height="760"
+        Height="800"
         MinWidth="920"
         MinHeight="620"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize">
-    <Window.Resources>
-        <ResourceDictionary>
-            <Style TargetType="Label">
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-            </Style>
+        ResizeMode="CanResize"
+        Background="{StaticResource WindowBrush}">
 
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="#E5EAF0" />
-                <Setter Property="BorderBrush" Value="#CBD5E1" />
-                <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="Height" Value="26.5" />
-                <Setter Property="Padding" Value="18,0" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="ButtonBorder"
-                                    Background="{TemplateBinding Background}"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="4">
-                                <ContentPresenter HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="ButtonBorder" Property="Background" Value="#D6DEE8" />
-                                    <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#B8C6D6" />
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-        </ResourceDictionary>
-    </Window.Resources>
-
-    <Grid Margin="18">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock x:Name="HeaderTitle"
-                       Text="Manual Rev updater"
-                       FontSize="18"
-                       FontWeight="Bold" />
+                       Style="{StaticResource PageTitle}"
+                       Text="Manual Rev updater" />
             <TextBlock x:Name="SheetLabel"
-                       Margin="0,4,0,0"
-                       Foreground="{DynamicResource MutedBrush}"
-                       FontSize="12"
+                       Style="{StaticResource PageSubtitle}"
                        Text="Select sheets to update. The current sheet is shown first." />
         </StackPanel>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="320" MinWidth="260" />
-                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="340" MinWidth="280" />
+                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" MinWidth="320" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="14" />
+                    <RowDefinition Height="16" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="10" />
+                    <RowDefinition Height="12" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0"
-                        Padding="16"
-                        Background="{DynamicResource PanelBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
+                <Border Grid.Row="0" Style="{StaticResource WwpCard}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -109,36 +60,30 @@
 
                         <TextBlock Grid.Row="0"
                                    Grid.ColumnSpan="2"
-                                   Margin="0,0,0,10"
-                                   FontWeight="Bold"
+                                   Style="{StaticResource SectionHeader}"
                                    Text="Parameter Mapping" />
 
-                        <Label Grid.Row="1" Grid.Column="0" Content="Set 1 dates" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" VerticalAlignment="Center" Text="Set 1 dates" />
                         <ComboBox x:Name="CmbLeftDatesParam" Grid.Row="1" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="2" Grid.Column="0" Content="Set 1 descriptions" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" VerticalAlignment="Center" Text="Set 1 descriptions" />
                         <ComboBox x:Name="CmbLeftDescsParam" Grid.Row="2" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="3" Grid.Column="0" Content="Set 2 dates" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" VerticalAlignment="Center" Text="Set 2 dates" />
                         <ComboBox x:Name="CmbRightDatesParam" Grid.Row="3" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="4" Grid.Column="0" Content="Set 2 descriptions" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" VerticalAlignment="Center" Text="Set 2 descriptions" />
                         <ComboBox x:Name="CmbRightDescsParam" Grid.Row="4" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="5" Grid.Column="0" Content="Set 3 dates" />
+                        <TextBlock Grid.Row="5" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,8" VerticalAlignment="Center" Text="Set 3 dates" />
                         <ComboBox x:Name="CmbSet3DatesParam" Grid.Row="5" Grid.Column="1" Margin="8,0,0,8" />
 
-                        <Label Grid.Row="6" Grid.Column="0" Content="Set 3 descriptions" />
+                        <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center" Text="Set 3 descriptions" />
                         <ComboBox x:Name="CmbSet3DescsParam" Grid.Row="6" Grid.Column="1" Margin="8,0,0,0" />
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="2"
-                        Padding="16,14"
-                        Background="{StaticResource InfoSoftBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
+                <Border Grid.Row="2" Style="{StaticResource WwpCard}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -152,85 +97,83 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Target Titleblock"
-                                   Grid.Row="0"
+                        <TextBlock Grid.Row="0"
                                    Grid.ColumnSpan="2"
-                                   FontWeight="SemiBold" />
-                        <TextBlock Margin="0,4,0,0"
-                                   Grid.Row="1"
+                                   Style="{StaticResource SectionHeader}"
+                                   Margin="0"
+                                   Text="Target Titleblock" />
+                        <TextBlock Grid.Row="1"
                                    Grid.ColumnSpan="2"
-                                   TextWrapping="Wrap"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource MutedBrush}"
+                                   Margin="0,4,0,12"
+                                   Style="{StaticResource CaptionText}"
                                    Text="Selected sheets always use the fake revision parameters on the target titleblock. Each selected sheet keeps its current titleblock as the source." />
-                        <Label Grid.Row="2" Grid.Column="0" Content="Target titleblock" />
-                        <ComboBox x:Name="CmbTargetTitleblock" Grid.Row="2" Grid.Column="1" Margin="10,0,0,8" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FieldLabel}" Margin="0,0,0,10" VerticalAlignment="Center" Text="Target titleblock" />
+                        <ComboBox x:Name="CmbTargetTitleblock" Grid.Row="2" Grid.Column="1" Margin="8,0,0,10" />
                         <CheckBox x:Name="ChkIgnoreSingleColumn"
                                   Grid.Row="3"
                                   Grid.ColumnSpan="2"
                                   IsChecked="True">
+                            <!-- The theme CheckBox lays its content out horizontally, so cap the width to let it wrap. -->
                             <TextBlock TextWrapping="Wrap"
+                                       MaxWidth="270"
                                        Text="Ignore if revision table does not need two columns (10 lines or less)" />
                         </CheckBox>
                         <TextBlock x:Name="TxtMappingInfo"
                                    Margin="0,10,0,0"
                                    Grid.Row="4"
                                    Grid.ColumnSpan="2"
-                                   TextWrapping="Wrap"
-                                   FontSize="11"
-                                   Foreground="{DynamicResource MutedBrush}"
+                                   Style="{StaticResource CaptionText}"
                                    Text="Select one or more sheets to update." />
                     </Grid>
                 </Border>
 
                 <TextBlock x:Name="TxtHint"
                            Grid.Row="4"
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource MutedBrush}"
-                           FontSize="11"
+                           Style="{StaticResource CaptionText}"
                            Text="Descriptions now wrap at about 34 characters without breaking words. Set 1 and Set 2 are required; Set 3 is optional for an extra revision column when needed." />
             </Grid>
 
             <GridSplitter Grid.Column="1"
-                          Width="8"
+                          Width="16"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
-                          Background="{StaticResource BorderBrush}"
+                          Background="Transparent"
                           ShowsPreview="True"
                           ResizeDirection="Columns"
                           ResizeBehavior="PreviousAndNext" />
 
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                    <TextBlock Text="Sheets to Update"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                    <StackPanel DockPanel.Dock="Right"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Right">
-                        <Button x:Name="BtnSelectAll"
-                                MinWidth="90"
-                                Margin="0,0,8,0"
-                                Content="Select All"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                        <Button x:Name="BtnClearSelection"
-                                MinWidth="90"
-                                Content="Clear"
-                                Style="{StaticResource SecondaryButtonStyle}" />
-                    </StackPanel>
-                </DockPanel>
-                <ListBox x:Name="SheetsList"
-                         Grid.Row="1"
-                         SelectionMode="Extended"
-                         MinHeight="260" />
-            </Grid>
+            <Border Grid.Column="2" Style="{StaticResource WwpCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                        <TextBlock Text="Sheets to Update"
+                                   Style="{StaticResource SectionHeader}"
+                                   Margin="0"
+                                   VerticalAlignment="Center" />
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <Button x:Name="BtnSelectAll"
+                                    MinWidth="90"
+                                    Margin="0,0,8,0"
+                                    Content="Select All" />
+                            <Button x:Name="BtnClearSelection"
+                                    MinWidth="90"
+                                    Content="Clear" />
+                        </StackPanel>
+                    </DockPanel>
+                    <ListBox x:Name="SheetsList"
+                             Grid.Row="1"
+                             SelectionMode="Extended"
+                             MinHeight="260" />
+                </Grid>
+            </Border>
         </Grid>
 
-        <DockPanel Grid.Row="2" Margin="0,16,0,0">
+        <DockPanel Grid.Row="2" Style="{StaticResource WwpFooter}">
             <StackPanel DockPanel.Dock="Right"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
@@ -238,12 +181,12 @@
                         MinWidth="90"
                         Margin="0,0,8,0"
                         Content="Cancel"
-                        IsCancel="True"
-                        Style="{StaticResource SecondaryButtonStyle}" />
+                        IsCancel="True" />
                 <Button x:Name="BtnApply"
                         MinWidth="130"
                         Content="Update Sheets"
-                        IsDefault="True" />
+                        IsDefault="True"
+                        Style="{StaticResource PrimaryButton}" />
             </StackPanel>
         </DockPanel>
     </Grid>

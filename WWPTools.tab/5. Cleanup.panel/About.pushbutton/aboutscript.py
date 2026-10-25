@@ -43,6 +43,7 @@ class AboutWindow(forms.WPFWindow):
     def __init__(self, xaml_file):
         ui.uiUtils_ensure_theme()
         forms.WPFWindow.__init__(self, xaml_file)
+        ui.uiUtils_apply_window_theme(self)
 
         version = get_installed_version("dev")
         self.logo_path = os.path.normpath(os.path.join(_extension_root(), "lib", "WWPtools-logo.png"))

@@ -85,6 +85,7 @@ def _show_selection_dialog(display_names):
     validation = window.FindName("ValidationText")
     ok_btn = window.FindName("OkButton")
     cancel_btn = window.FindName("CancelButton")
+    ui.uiUtils_load_logo(window.FindName("LogoImage"))
 
     for name in display_names:
         source_combo.Items.Add(name)

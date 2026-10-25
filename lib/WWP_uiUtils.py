@@ -159,6 +159,21 @@ def _ensure_application():
 		app.ShutdownMode = ShutdownMode.OnExplicitShutdown
 
 
+# Keys added to FlatTheme.xaml most recently: add new ones here when the theme gains keys.
+# The Revit session can already hold an older theme (merged by a compiled WpfUI dialog,
+# or loaded before WWPTools was updated). If one of these is missing, the current file
+# is merged on top, and later dictionaries win.
+_THEME_SENTINEL_KEYS = ("PanelBrush", "AddRowButton", "WwpContextMenu")
+
+
+def _theme_is_current():
+	from System.Windows import Application
+	for key in _THEME_SENTINEL_KEYS:
+		if Application.Current.TryFindResource(key) is None:
+			return False
+	return True
+
+
 def _ensure_theme():
 	global _THEME_LOADED
 	if _THEME_LOADED:
@@ -167,7 +182,7 @@ def _ensure_theme():
 	from System.Windows import Application
 	from System.Windows.Markup import XamlReader
 	try:
-		if Application.Current.Resources.Contains("PanelBrush"):
+		if _theme_is_current():
 			_THEME_LOADED = True
 			return
 	except Exception:
@@ -186,6 +201,32 @@ def uiUtils_ensure_theme():
 	"""Load the shared WWPTools theme for command-local XAML dialogs."""
 	_ensure_theme()
 	return bool(_THEME_LOADED)
+
+
+def uiUtils_apply_window_theme(window):
+	"""Make the WWPTools theme win inside a pyRevit forms.WPFWindow.
+
+	WPFWindow merges pyRevit's own Theme.xaml into the window resources, and
+	those implicit control styles outrank the WWPTools theme that
+	uiUtils_ensure_theme() puts in Application.Resources. Merging the WWPTools
+	dictionary into the window last lets its styles apply. Call it right after
+	forms.WPFWindow.__init__ (and call uiUtils_ensure_theme() before it, so the
+	XAML's StaticResource keys resolve while it is parsed).
+	"""
+	_ensure_theme()
+	try:
+		from System.Windows import Application
+		# The last theme dictionary is the newest (see _THEME_SENTINEL_KEYS).
+		theme = None
+		for res in Application.Current.Resources.MergedDictionaries:
+			if res.Contains("PanelBrush"):
+				theme = res
+		if theme is not None:
+			window.Resources.MergedDictionaries.Add(theme)
+			return True
+	except Exception:
+		pass
+	return False
 
 
 def uiUtils_load_logo(image_control, logo_path=None):

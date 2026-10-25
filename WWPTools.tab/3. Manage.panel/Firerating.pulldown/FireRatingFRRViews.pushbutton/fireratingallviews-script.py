@@ -119,6 +119,7 @@ class FRRViewsDialog(object):
         self._txt_param = self.window.FindName("TxtFrrParam")
         self._btn_select_all = self.window.FindName("BtnSelectAll")
         self._btn_deselect_all = self.window.FindName("BtnDeselectAll")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._txt_param.Text = FRR_PARAM_NAME
 

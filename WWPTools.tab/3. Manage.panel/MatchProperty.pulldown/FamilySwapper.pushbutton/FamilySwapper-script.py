@@ -77,10 +77,12 @@ def _safe_str(value):
 # Window
 # ---------------------------------------------------------------------------
 
+
 class FamilySwapperWindow(forms.WPFWindow):
 
     def __init__(self):
         forms.WPFWindow.__init__(self, 'FamilySwapper.xaml')
+        ui.uiUtils_apply_window_theme(self)
         self._family_type_map    = {}  # {family_name: [sorted type names]}
         self._family_cat_map     = {}  # {family_name: category ElementId}
         self._family_type_id_map = {}  # {family_name: {type_name: element_id}}
@@ -525,6 +527,7 @@ class FamilySwapperWindow(forms.WPFWindow):
 
 if __name__ == '__main__':
     try:
+        ui.uiUtils_ensure_theme()
         FamilySwapperWindow().ShowDialog()
         WWP_telemetry.track_use('FamilySwapper')
     except Exception:

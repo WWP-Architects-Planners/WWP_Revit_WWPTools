@@ -20,8 +20,8 @@ clr.AddReference("WindowsBase")
 from System.IO import File
 from System.Windows.Markup import XamlReader
 from System.Windows.Interop import WindowInteropHelper
-from System.Windows.Controls import ComboBoxItem, Label, ComboBox, Grid, ColumnDefinition
-from System.Windows import GridLength, Thickness
+from System.Windows.Controls import ComboBoxItem, Label, ComboBox, Grid, ColumnDefinition, Border
+from System.Windows import GridLength, Thickness, VerticalAlignment
 
 script_dir = os.path.dirname(__file__)
 lib_path = os.path.abspath(os.path.join(script_dir, "..", "..", "..", "..", "lib"))
@@ -94,6 +94,7 @@ class FireRatingAllDialog(object):
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._lbl_status = self.window.FindName("LblStatus")
         self._lbl_count = self.window.FindName("LblWallCount")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._txt_param.Text = default_param
         self._update_count()
@@ -151,6 +152,7 @@ class FRRMappingDialog(object):
         self._btn_ok = self.window.FindName("BtnOK")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._lbl_status = self.window.FindName("LblStatus")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._combos = {}  # frr_val -> ComboBox
         self._all_style_names = all_style_names
@@ -166,7 +168,6 @@ class FRRMappingDialog(object):
 
     def _add_row(self, frr_val, saved_style):
         row_grid = Grid()
-        row_grid.Margin = Thickness(0, 0, 0, 6)
         col1 = ColumnDefinition()
         col1.Width = GridLength(120)
         col2 = ColumnDefinition()
@@ -176,12 +177,12 @@ class FRRMappingDialog(object):
 
         lbl = Label()
         lbl.Content = frr_val
-        lbl.Foreground = _hex_brush("#17324D")
+        lbl.Foreground = _theme_brush(self.window, "TextBrush", "#1B1B1B")
+        lbl.Padding = Thickness(0)
+        lbl.VerticalAlignment = VerticalAlignment.Center
         Grid.SetColumn(lbl, 0)
 
         combo = ComboBox()
-        combo.Height = 30
-        combo.FontSize = 12
         combo.Margin = Thickness(6, 0, 0, 0)
         Grid.SetColumn(combo, 1)
 
@@ -201,7 +202,12 @@ class FRRMappingDialog(object):
 
         row_grid.Children.Add(lbl)
         row_grid.Children.Add(combo)
-        self._panel.Children.Add(row_grid)
+        row = Border()
+        row_style = self.window.TryFindResource("TableRow")
+        if row_style is not None:
+            row.Style = row_style
+        row.Child = row_grid
+        self._panel.Children.Add(row)
         self._combos[frr_val] = combo
 
     def _on_ok(self, sender, args):
@@ -228,6 +234,15 @@ def _hex_brush(hex_color):
     g = int(hex_color[2:4], 16)
     b = int(hex_color[4:6], 16)
     return SolidColorBrush(Color.FromRgb(r, g, b))
+
+
+def _theme_brush(window, key, fallback_hex):
+    brush = None
+    try:
+        brush = window.TryFindResource(key)
+    except Exception:
+        brush = None
+    return brush if brush is not None else _hex_brush(fallback_hex)
 
 
 def System_Windows_GridUnitType_Star():

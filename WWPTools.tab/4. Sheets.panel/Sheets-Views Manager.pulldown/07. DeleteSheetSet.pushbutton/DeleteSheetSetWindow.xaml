@@ -3,11 +3,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Delete Sheet Set"
     Width="1000" Height="680"
-    MinWidth="720" MinHeight="500"
+    MinWidth="720" MinHeight="600"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
     Background="{StaticResource WindowBrush}">
-    <Grid Margin="20">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -15,198 +15,165 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Delete Sheet Set"
-                       FontSize="20" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
+                       Style="{StaticResource PageTitle}" />
             <TextBlock Text="Filter by parameter, search, and delete the selected set while continuing to work in Revit."
-                       FontSize="12" Foreground="{StaticResource MutedBrush}"
-                       Margin="0,4,0,0" TextWrapping="Wrap" />
+                       Style="{StaticResource PageSubtitle}" />
         </StackPanel>
 
-        <!-- Main: left filter sidebar + splitter + right lists -->
+        <!-- Main: left filter card + splitter + right lists card -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" MinWidth="160" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="*" MinWidth="280" />
+                <ColumnDefinition Width="280" MinWidth="220" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" MinWidth="300" />
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: filter controls -->
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="10" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="6" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="6" />
-                    <RowDefinition Height="120" MaxHeight="160" />
-                    <RowDefinition Height="8" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="6" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="8" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource WwpCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="0" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="120" MaxHeight="160" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="0" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <!-- Filter Parameter label -->
-                <TextBlock Grid.Row="0"
-                           FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}" Text="Filter Parameter" />
+                    <!-- Filter Parameter label -->
+                    <TextBlock Grid.Row="0"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Filter Parameter" />
 
-                <!-- Filter parameter combo -->
-                <ComboBox x:Name="FilterParamCombo"
-                          Grid.Row="2"
-                          Height="30"
-                          FontSize="12"
-                          Background="{StaticResource PanelBrush}"
-                          BorderBrush="{StaticResource BorderBrush}" />
+                    <!-- Filter parameter combo -->
+                    <ComboBox x:Name="FilterParamCombo"
+                              Grid.Row="2" />
 
-                <!-- Value label -->
-                <TextBlock Grid.Row="4"
-                           FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}" Text="Value" />
+                    <!-- Value label -->
+                    <TextBlock Grid.Row="4"
+                               Style="{StaticResource FieldLabel}"
+                               Margin="0"
+                               VerticalAlignment="Center"
+                               Text="Value" />
 
-                <!-- Apply + Clear buttons on same row as Value label -->
-                <StackPanel Grid.Row="4"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right">
-                    <Button x:Name="ApplyFilterButton"
-                            Content="Apply" Width="64" Height="24"
-                            FontSize="11"
-                            Background="{StaticResource InfoBrush}" Foreground="White"
-                            BorderThickness="0" Cursor="Hand" />
-                    <Button x:Name="ClearFilterButton"
-                            Content="Clear" Width="52" Height="24"
-                            FontSize="11"
-                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                            BorderBrush="{StaticResource BorderBrush}" Margin="4,0,0,0"
-                            Cursor="Hand" />
-                </StackPanel>
+                    <!-- Apply + Clear buttons on same row as Value label -->
+                    <StackPanel Grid.Row="4"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button x:Name="ApplyFilterButton"
+                                Content="Apply"
+                                Height="28"
+                                Padding="12,0" />
+                        <Button x:Name="ClearFilterButton"
+                                Content="Clear"
+                                Height="28"
+                                Padding="12,0"
+                                Margin="6,0,0,0" />
+                    </StackPanel>
 
-                <!-- Value list -->
-                <Border Grid.Row="6"
-                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                        Background="{StaticResource PanelBrush}">
+                    <!-- Value list -->
                     <ListBox x:Name="FilterValueList"
+                             Grid.Row="6"
                              SelectionMode="Extended"
-                             BorderThickness="0"
-                             FontSize="12"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                </Border>
 
-                <!-- Search label -->
-                <TextBlock Grid.Row="8"
-                           FontSize="12" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}" Text="Search" />
+                    <!-- Search label -->
+                    <TextBlock Grid.Row="8"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Search" />
 
-                <!-- Search box -->
-                <TextBox x:Name="SearchBox"
-                         Grid.Row="10"
-                         Height="30"
-                         FontSize="12"
-                         VerticalContentAlignment="Center"
-                         Padding="6,0"
-                         BorderBrush="{StaticResource BorderBrush}"
-                         Background="{StaticResource PanelBrush}" />
+                    <!-- Search box -->
+                    <TextBox x:Name="SearchBox"
+                             Grid.Row="10" />
 
-                <!-- Select All / None / Invert -->
-                <WrapPanel Grid.Row="12" Orientation="Horizontal">
-                    <Button x:Name="SelectAllButton"
-                            Content="Select All" Width="88" Height="28"
-                            FontSize="11"
-                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            Margin="0,0,4,4" Cursor="Hand" />
-                    <Button x:Name="SelectNoneButton"
-                            Content="None" Width="64" Height="28"
-                            FontSize="11"
-                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            Margin="0,0,4,4" Cursor="Hand" />
-                    <Button x:Name="InvertButton"
-                            Content="Invert" Width="64" Height="28"
-                            FontSize="11"
-                            Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"
-                            Margin="0,0,0,4" Cursor="Hand" />
-                </WrapPanel>
+                    <!-- Select All / None / Invert -->
+                    <WrapPanel Grid.Row="12" Orientation="Horizontal">
+                        <Button x:Name="SelectAllButton"
+                                Content="Select All"
+                                Margin="0,0,6,6" />
+                        <Button x:Name="SelectNoneButton"
+                                Content="None"
+                                Margin="0,0,6,6" />
+                        <Button x:Name="InvertButton"
+                                Content="Invert"
+                                Margin="0,0,0,6" />
+                    </WrapPanel>
 
-                <!-- Count label -->
-                <TextBlock x:Name="CountLabel"
-                           Grid.Row="14"
-                           FontSize="11"
-                           Foreground="{StaticResource MutedBrush}"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Bottom" />
-            </Grid>
+                    <!-- Count label -->
+                    <TextBlock x:Name="CountLabel"
+                               Grid.Row="14"
+                               Style="{StaticResource CaptionText}"
+                               VerticalAlignment="Bottom" />
+                </Grid>
+            </Border>
 
             <!-- GridSplitter -->
             <GridSplitter Grid.Column="1"
-                          Width="8"
+                          Width="16"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
-                          Background="#D9E2EC"
+                          Background="Transparent"
                           ResizeBehavior="PreviousAndNext"
                           Cursor="SizeWE" />
 
             <!-- RIGHT: available + to-delete lists -->
-            <Grid Grid.Column="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <Border Grid.Column="2" Style="{StaticResource WwpCard}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- Available sheets -->
-                <Grid Grid.Column="0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="6" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0"
-                               FontSize="12" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" Text="Available Sheets" />
-                    <Border Grid.Row="2"
-                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                            Background="{StaticResource PanelBrush}">
+                    <!-- Available sheets -->
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="0" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Style="{StaticResource SectionHeader}"
+                                   Text="Available Sheets" />
                         <ListBox x:Name="AvailableList"
-                                 BorderThickness="0"
-                                 FontSize="12"
+                                 Grid.Row="2"
                                  HorizontalContentAlignment="Stretch"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                    </Border>
-                </Grid>
+                    </Grid>
 
-                <!-- Sheets to delete -->
-                <Grid Grid.Column="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="6" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0"
-                               FontSize="12" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" Text="Sheets To Delete" />
-                    <Border Grid.Row="2"
-                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                            Background="{StaticResource WindowBrush}">
+                    <!-- Sheets to delete (read-only preview) -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="0" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Style="{StaticResource SectionHeader}"
+                                   Text="Sheets To Delete" />
                         <ListBox x:Name="PreviewList"
-                                 BorderThickness="0"
-                                 FontSize="12"
+                                 Grid.Row="2"
+                                 Background="{StaticResource SurfaceBrush}"
                                  Foreground="{StaticResource MutedBrush}"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />
-                    </Border>
+                    </Grid>
                 </Grid>
-            </Grid>
+            </Border>
         </Grid>
 
         <!-- Footer -->
-        <Grid Grid.Row="2" Margin="0,12,0,0">
+        <Grid Grid.Row="2" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -216,29 +183,22 @@
                        Grid.Column="0"
                        VerticalAlignment="Center"
                        Foreground="{StaticResource DangerBrush}"
-                       FontSize="12"
                        TextWrapping="Wrap"
                        Visibility="Collapsed" />
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="RefreshButton"
-                        Content="Refresh" Width="90" Height="34"
-                        FontSize="13"
-                        Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        Margin="0,0,8,0" Cursor="Hand" />
+                        Content="Refresh"
+                        MinWidth="90"
+                        Margin="0,0,8,0" />
                 <Button x:Name="DeleteButton"
-                        Content="Delete Selected" Width="140" Height="34"
-                        FontSize="13" FontWeight="SemiBold"
-                        Background="{StaticResource DangerBrush}" Foreground="White"
-                        BorderThickness="0"
-                        Margin="0,0,8,0" Cursor="Hand" />
+                        Content="Delete Selected"
+                        MinWidth="140"
+                        Style="{StaticResource DestructiveButton}"
+                        Margin="0,0,8,0" />
                 <Button x:Name="CloseButton"
-                        Content="Close" Width="90" Height="34"
-                        FontSize="13"
-                        Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        Cursor="Hand" />
+                        Content="Close"
+                        MinWidth="90" />
             </StackPanel>
         </Grid>
     </Grid>

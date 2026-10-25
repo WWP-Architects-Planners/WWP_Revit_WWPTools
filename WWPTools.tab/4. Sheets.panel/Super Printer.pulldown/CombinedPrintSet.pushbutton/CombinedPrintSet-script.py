@@ -779,6 +779,7 @@ class CombinedPrintSetDialog(object):
         self._footer_status = self.window.FindName("FooterStatus")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._btn_print = self.window.FindName("BtnPrint")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         self._header_title.Text = WINDOW_TITLE
         self._header_subtitle.Text = "Load sheets from open or closed Revit models, arrange the final order, and print one merged PDF drawing set."

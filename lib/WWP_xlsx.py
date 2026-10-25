@@ -56,6 +56,85 @@ def _add_refs():
 
 
 # ---------------------------------------------------------------------------
+# Locked-file detection: a workbook open in Excel cannot be overwritten, and
+# callers turn that into a clear "close it and try again" message instead of a
+# raw traceback.
+# ---------------------------------------------------------------------------
+
+_LOCK_HRESULTS = (0x80070020, 0x80070021)  # ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+# Windows sharing/lock violations. Not errno 13: it also means plain "permission denied"
+# (read-only file, no folder rights); a real lock that IronPython surfaces as errno 13
+# still matches through the wrapped .NET exception's HResult.
+_LOCK_ERRNOS = (32, 33)
+
+
+def is_file_lock_error(exc):
+    """Return True if exc (or an exception it wraps) is a Windows sharing violation."""
+    pending = [exc]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        try:
+            hresult = int(getattr(current, "HResult", None)) & 0xffffffff
+        except (TypeError, ValueError):
+            hresult = None
+        if hresult in _LOCK_HRESULTS:
+            return True
+
+        for attr_name in ("errno", "winerror"):
+            try:
+                number = int(getattr(current, attr_name, None))
+            except (TypeError, ValueError):
+                number = None
+            if number in _LOCK_ERRNOS:
+                return True
+
+        try:
+            message = str(current).lower()
+        except Exception:  # IronPython 2.7 str() of a localized non-ASCII message
+            message = ""
+        if "sharing violation" in message or "used by another process" in message:
+            return True
+
+        for attr_name in ("InnerException", "clsException", "__cause__", "__context__"):
+            nested = getattr(current, attr_name, None)
+            if nested is not None:
+                pending.append(nested)
+    return False
+
+
+def is_file_locked(path):
+    """True if an existing file cannot be opened exclusively because another process
+    (usually Excel) has it open. Any other failure returns False so the normal
+    export path reports it as before."""
+    if clr is None or not path or not os.path.isfile(path):
+        return False
+    from System.IO import File, FileAccess, FileMode, FileShare
+
+    stream = None
+    try:
+        stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite, getattr(FileShare, "None"))
+        return False
+    except Exception as exc:
+        return is_file_lock_error(exc)
+    finally:
+        if stream is not None:
+            stream.Close()
+
+
+def file_locked_message(path):
+    name = os.path.basename(path or "") or path
+    return (
+        "The Excel file '{}' is open in Excel (or another program), so it can't be "
+        "overwritten. Close it and try again.".format(name)
+    )
+
+
+# ---------------------------------------------------------------------------
 # Column / cell-reference helpers (pure Python).
 # ---------------------------------------------------------------------------
 
@@ -292,8 +371,11 @@ class Workbook(object):
         try:
             _write_via_service(self, path)
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            # A locked target fails the fallback too (it deletes the file first), and
+            # its errno 13 hides the real cause, so let the sharing violation through.
+            if is_file_lock_error(exc):
+                raise
         _save_workbook(self, path)
 
 

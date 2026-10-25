@@ -944,6 +944,8 @@ class VariablePaperPrintSettingListItem(PrintSettingListItem):
 class EditNamingFormatsWindow(forms.WPFWindow):
     def __init__(self, xaml_file_name, start_with=None, doc=None):
         forms.WPFWindow.__init__(self, xaml_file_name)
+        ui.uiUtils_apply_window_theme(self)
+        ui.uiUtils_load_logo(self.FindName("LogoImage"))
 
         self._starting_item = start_with
         self._saved = False
@@ -1446,10 +1448,11 @@ class UnlistedSheetsList(object):
                  .ToElements()
 
 
-
 class PrintSheetsWindow(forms.WPFWindow):
     def __init__(self, xaml_file_name):
         forms.WPFWindow.__init__(self, xaml_file_name)
+        ui.uiUtils_apply_window_theme(self)
+        ui.uiUtils_load_logo(self.FindName("LogoImage"))
 
         self._init_psettings = None
         self._scheduled_sheets = []

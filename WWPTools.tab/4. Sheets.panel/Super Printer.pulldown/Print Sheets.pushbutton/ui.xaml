@@ -3,68 +3,24 @@
         Title="Print Sheets from Excel"
         Height="820" Width="1400"
         WindowStartupLocation="CenterScreen"
-        Background="#F2F2F2"
-        FontFamily="Segoe UI">
-    <Window.Resources>
-        <SolidColorBrush x:Key="DarkBrush" Color="#2F343F" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#F2994A" />
-        <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
-
-        <Style TargetType="TextBox">
-            <Setter Property="Margin" Value="0,4,0,8" />
-            <Setter Property="Padding" Value="8,6" />
-        </Style>
-
-        <Style TargetType="ComboBox">
-            <Setter Property="Margin" Value="0,4,0,8" />
-            <Setter Property="Padding" Value="6,4" />
-        </Style>
-
-        <Style TargetType="Button">
-            <Setter Property="Height" Value="32" />
-            <Setter Property="Margin" Value="0,4,0,8" />
-        </Style>
-
-        <Style TargetType="ToggleButton">
-            <Setter Property="Height" Value="30" />
-            <Setter Property="MinWidth" Value="90" />
-            <Setter Property="Margin" Value="0,4,8,8" />
-            <Setter Property="Background" Value="#E0E0E0" />
-            <Setter Property="BorderBrush" Value="#B0B0B0" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Foreground" Value="#333333" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Style.Triggers>
-                <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background" Value="#F2994A" />
-                    <Setter Property="BorderBrush" Value="#DD7F2B" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-    </Window.Resources>
-
+        Background="{StaticResource WindowBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI Variable, Segoe UI" FontSize="13.5" UseLayoutRounding="True">
+    <!-- Page background and type are set on the Window itself so they also apply when this is
+         loaded as a pyRevit WPFWindow subclass (which skips the theme's implicit Window style). -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <Grid Margin="16">
+        <Grid Margin="{StaticResource PageMargin}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="200" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource DarkBrush}" CornerRadius="10" Padding="16" Margin="0,0,0,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="200" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Print Sheets from Excel" Foreground="White" FontSize="22" FontWeight="SemiBold" />
-                        <TextBlock x:Name="DocTitleText" Text="Active Document" Foreground="#D5D5D5" Margin="0,4,0,0" />
-                    </StackPanel>
-                    <Button x:Name="PrintNowButton" Grid.Column="1" Content="Print Now" Background="{StaticResource AccentBrush}" Foreground="White" FontWeight="SemiBold" />
-                </Grid>
-            </Border>
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="Print Sheets from Excel" Style="{StaticResource PageTitle}" />
+                <TextBlock x:Name="DocTitleText" Text="Active Document" Style="{StaticResource PageSubtitle}" />
+            </StackPanel>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -74,48 +30,48 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Excel Database" FontWeight="SemiBold" FontSize="14" />
-                            <TextBlock Text="Column A: Printed File Name (overrides naming format), Column B: Drawing Name, Column C: Drawing Number" Foreground="#666666" Margin="0,4,0,8" />
+                            <TextBlock Text="Excel Database" Style="{StaticResource SectionHeader}" Margin="0,0,0,2" />
+                            <TextBlock Text="Column A: Printed File Name (overrides naming format), Column B: Drawing Name, Column C: Drawing Number" Style="{StaticResource CaptionText}" Margin="0,0,0,8" />
                             <TextBox x:Name="ExcelPathBox" IsReadOnly="True" />
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="BrowseExcelButton" Content="Browse Excel" Width="120" />
-                                <Button x:Name="GenerateExcelButton" Content="Generate/Update" Width="140" Margin="8,4,0,8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button x:Name="BrowseExcelButton" Content="Browse Excel" MinWidth="120" />
+                                <Button x:Name="GenerateExcelButton" Content="Generate/Update" MinWidth="140" Margin="8,0,0,0" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Sheet Selection" FontWeight="SemiBold" FontSize="14" />
-                            <TextBlock Text="Sheet Set" FontWeight="SemiBold" Margin="0,6,0,0" />
+                            <TextBlock Text="Sheet Selection" Style="{StaticResource SectionHeader}" />
+                            <TextBlock Text="Sheet Set" Style="{StaticResource FieldLabel}" />
                             <ComboBox x:Name="SheetSetCombo" />
-                            <CheckBox x:Name="UseSelectedSheetsCheck" Content="Use selected sheets only" Margin="0,4,0,8" />
+                            <CheckBox x:Name="UseSelectedSheetsCheck" Content="Use selected sheets only" Margin="0,10,0,8" />
                             <ListBox x:Name="SheetListBox" SelectionMode="Extended" Height="200" />
                         </StackPanel>
                     </Border>
 
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Output Folder" FontWeight="SemiBold" FontSize="14" />
+                            <TextBlock Text="Output Folder" Style="{StaticResource SectionHeader}" />
                             <TextBox x:Name="OutputPathBox" IsReadOnly="True" />
-                            <Button x:Name="BrowseOutputButton" Content="Choose Folder" Width="120" />
+                            <Button x:Name="BrowseOutputButton" Content="Choose Folder" MinWidth="120" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
 
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Export Options" FontWeight="SemiBold" FontSize="14" />
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                <ToggleButton x:Name="PdfToggle" Content="PDF" IsChecked="True" />
-                                <ToggleButton x:Name="DwgToggle" Content="DWG" />
+                            <TextBlock Text="Export Options" Style="{StaticResource SectionHeader}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ToggleButton x:Name="PdfToggle" Content="PDF" IsChecked="True" Style="{StaticResource ToggleSwitch}" Margin="0,0,24,0" />
+                                <ToggleButton x:Name="DwgToggle" Content="DWG" Style="{StaticResource ToggleSwitch}" />
                             </StackPanel>
-                            <TextBlock Text="Naming Format" FontWeight="SemiBold" Margin="0,10,0,0" />
+                            <TextBlock Text="Naming Format" Style="{StaticResource FieldLabel}" Margin="0,14,0,6" />
                             <TextBox x:Name="NamingFormatBox" Text="{}{number}_{name}" />
-                            <TextBlock Text="{}Tokens: {index} {number} {name} {name_dash} {name_underline} {current_date} {issue_date} {rev_number} {rev_desc} {rev_date}" Foreground="#666666" TextWrapping="Wrap" />
-                            <TextBlock Text="{}Project/user tokens: {proj_name} {proj_number} {proj_building_name} {proj_issue_date} {proj_org_name} {proj_status} {username} {revit_version}" Foreground="#666666" TextWrapping="Wrap" Margin="0,2,0,0" />
-                            <TextBlock Text="{}Param tokens: {sheet_param:PARAM} {tblock_param:PARAM} {proj_param:PARAM} {glob_param:PARAM} | Excel: {excel_name} {excel_number}" Foreground="#666666" TextWrapping="Wrap" Margin="0,2,0,0" />
+                            <TextBlock Text="{}Tokens: {index} {number} {name} {name_dash} {name_underline} {current_date} {issue_date} {rev_number} {rev_desc} {rev_date}" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
+                            <TextBlock Text="{}Project/user tokens: {proj_name} {proj_number} {proj_building_name} {proj_issue_date} {proj_org_name} {proj_status} {username} {revit_version}" Style="{StaticResource CaptionText}" Margin="0,2,0,0" />
+                            <TextBlock Text="{}Param tokens: {sheet_param:PARAM} {tblock_param:PARAM} {proj_param:PARAM} {glob_param:PARAM} | Excel: {excel_name} {excel_number}" Style="{StaticResource CaptionText}" Margin="0,2,0,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -123,26 +79,27 @@
                 <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="16" Background="Transparent" />
 
                 <StackPanel Grid.Column="2">
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Schedule One-Time Print" FontWeight="SemiBold" FontSize="14" />
-                            <TextBlock Text="Revit must remain open until the scheduled time." Foreground="#666666" Margin="0,4,0,8" />
-                            <TextBlock Text="Date" FontWeight="SemiBold" />
-                            <DatePicker x:Name="ScheduleDatePicker" />
-                            <TextBlock Text="Time (HH:MM, 24h)" FontWeight="SemiBold" />
+                            <TextBlock Text="Schedule One-Time Print" Style="{StaticResource SectionHeader}" Margin="0,0,0,2" />
+                            <TextBlock Text="Revit must remain open until the scheduled time." Style="{StaticResource CaptionText}" Margin="0,0,0,10" />
+                            <TextBlock Text="Date" Style="{StaticResource FieldLabel}" />
+                            <DatePicker x:Name="ScheduleDatePicker" MinHeight="32" VerticalContentAlignment="Center"
+                                        Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource InputStrokeBrush}" />
+                            <TextBlock Text="Time (HH:MM, 24h)" Style="{StaticResource FieldLabel}" Margin="0,12,0,6" />
                             <TextBox x:Name="ScheduleTimeBox" Text="09:00" />
-                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                <Button x:Name="ScheduleButton" Content="Schedule" Width="120" />
-                                <Button x:Name="CancelScheduleButton" Content="Cancel Schedule" Width="140" Margin="8,4,0,8" />
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,8">
+                                <Button x:Name="ScheduleButton" Content="Schedule" MinWidth="120" />
+                                <Button x:Name="CancelScheduleButton" Content="Cancel Schedule" MinWidth="140" Margin="8,0,0,0" />
                             </StackPanel>
-                            <TextBlock x:Name="ScheduleStatusText" Text="No schedule" Foreground="#666666" />
+                            <TextBlock x:Name="ScheduleStatusText" Text="No schedule" Style="{StaticResource MutedText}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="14">
+                    <Border Style="{StaticResource WwpCard}" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="Notes" FontWeight="SemiBold" FontSize="14" />
-                            <TextBlock Text="- Drawing Name (Column B) must match sheet names exactly." TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock Text="Notes" Style="{StaticResource SectionHeader}" />
+                            <TextBlock Text="- Drawing Name (Column B) must match sheet names exactly." TextWrapping="Wrap" />
                             <TextBlock Text="- Printed File Name (Column A) controls output names." TextWrapping="Wrap" Margin="0,4,0,0" />
                             <TextBlock Text="- Use Generate/Update to build the database from sheets." TextWrapping="Wrap" Margin="0,4,0,0" />
                         </StackPanel>
@@ -150,12 +107,18 @@
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Row="2" Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="12">
+            <Border Grid.Row="2" Style="{StaticResource WwpCard}" Padding="16,12">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Log" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" />
+                    <TextBlock DockPanel.Dock="Top" Text="Log" Style="{StaticResource SectionHeader}" Margin="0,0,0,6" />
+                    <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"
+                             VerticalContentAlignment="Top" />
                 </DockPanel>
             </Border>
+
+            <DockPanel Grid.Row="3" Style="{StaticResource WwpFooter}">
+                <Image x:Name="LogoImage" Style="{StaticResource BrandLogoFooter}" DockPanel.Dock="Left" VerticalAlignment="Center" />
+                <Button x:Name="PrintNowButton" Content="Print Now" Style="{StaticResource PrimaryButton}" MinWidth="140" DockPanel.Dock="Right" />
+            </DockPanel>
         </Grid>
     </ScrollViewer>
 </Window>

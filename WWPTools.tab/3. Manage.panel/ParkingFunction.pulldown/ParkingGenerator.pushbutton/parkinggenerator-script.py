@@ -747,9 +747,10 @@ def _show_dialog(doc, room, families):
         ComboBox, TextBox, Button, Grid, Border, ColumnDefinition,
     )
     from System.Windows import (
-        GridLength, GridUnitType, Thickness,
+        GridLength, GridUnitType, Thickness, CornerRadius,
         VerticalAlignment, HorizontalAlignment, TextAlignment,
     )
+    from System.Windows.Automation import AutomationProperties
     from System.Windows.Media import SolidColorBrush, Color
 
     xaml_path = os.path.join(script_dir, "ParkingLayoutDialog.xaml")
@@ -883,13 +884,20 @@ def _show_dialog(doc, room, families):
         except Exception:
             pass
 
-    # Colours used for dynamically-created row controls
+    # Colours used for dynamically-created row controls: shared theme brushes,
+    # with the old literal colours only as a fallback if the theme is missing.
+    def _theme_brush(key, r, g, b):
+        brush = window.TryFindResource(key)
+        if brush is None:
+            brush = SolidColorBrush(Color.FromRgb(r, g, b))
+        return brush
+
     sorted_families = sorted(families.keys())
-    c_gray   = SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80))
-    c_border = SolidColorBrush(Color.FromRgb(0xD7, 0xDE, 0xE6))
-    c_row_bg = SolidColorBrush(Color.FromRgb(0xFA, 0xFB, 0xFC))
-    c_white  = SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF))
-    c_btn_br = SolidColorBrush(Color.FromRgb(0xCB, 0xD5, 0xE1))
+    c_gray   = _theme_brush("MutedBrush", 0x6B, 0x72, 0x80)
+    c_border = _theme_brush("BorderBrush", 0xD7, 0xDE, 0xE6)
+    c_row_bg = _theme_brush("SurfaceBrush", 0xFA, 0xFB, 0xFC)
+    c_danger = _theme_brush("DangerBrush", 220, 50, 50)
+    icon_btn_style = window.TryFindResource("IconButton")
 
     _rows = []
 
@@ -897,6 +905,7 @@ def _show_dialog(doc, room, families):
         brd = Border()
         brd.BorderBrush = c_border
         brd.BorderThickness = Thickness(1)
+        brd.CornerRadius = CornerRadius(8)
         brd.Margin = Thickness(0, 0, 0, 6)
         brd.Padding = Thickness(8, 6, 8, 6)
         brd.Background = c_row_bg
@@ -911,7 +920,6 @@ def _show_dialog(doc, room, families):
         fc = ComboBox()
         fc.Margin = Thickness(0, 0, 5, 0)
         fc.Height = 26
-        fc.FontSize = 12
         Grid.SetColumn(fc, 0)
         for fn in sorted_families:
             fc.Items.Add(fn)
@@ -922,7 +930,6 @@ def _show_dialog(doc, room, families):
         tc = ComboBox()
         tc.Margin = Thickness(0, 0, 5, 0)
         tc.Height = 26
-        tc.FontSize = 12
         Grid.SetColumn(tc, 1)
 
         # Count TextBox
@@ -930,21 +937,23 @@ def _show_dialog(doc, room, families):
         cnt.Text = "0"
         cnt.TextAlignment = TextAlignment.Right
         cnt.Height = 26
-        cnt.FontSize = 12
         cnt.Margin = Thickness(0, 0, 5, 0)
         cnt.ToolTip = "Number of stalls (0 = fill all remaining positions)"
         Grid.SetColumn(cnt, 2)
 
-        # Delete button
+        # Delete button: the theme's ghost icon button (Segoe MDL2 "Cancel" glyph)
         db = Button()
-        db.Content = "x"
-        db.Width = 24
-        db.Height = 24
+        if icon_btn_style is not None:
+            db.Style = icon_btn_style
+            db.Content = u"\uE711"
+        else:
+            db.Content = "x"
+            db.Foreground = c_gray
         db.FontSize = 11
-        db.Background = c_white
-        db.BorderBrush = c_btn_br
-        db.BorderThickness = Thickness(1)
-        db.Foreground = c_gray
+        db.Width = 26
+        db.Height = 26
+        db.ToolTip = "Remove row"
+        AutomationProperties.SetName(db, "Remove row")
         db.VerticalAlignment = VerticalAlignment.Center
         db.HorizontalAlignment = HorizontalAlignment.Center
         Grid.SetColumn(db, 3)
@@ -1039,7 +1048,7 @@ def _show_dialog(doc, room, families):
         if ok:
             status_text.Foreground = c_gray
         else:
-            status_text.Foreground = SolidColorBrush(Color.FromRgb(220, 50, 50))
+            status_text.Foreground = c_danger
 
     # --- Generate ---
     def _on_generate(s, e):

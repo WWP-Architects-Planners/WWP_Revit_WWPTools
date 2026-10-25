@@ -2,68 +2,56 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Create Non-Rated Line for ALL Walls"
-    Width="480" Height="280"
-    MinWidth="400" MinHeight="240"
+    Width="520" Height="310"
+    MinWidth="440" MinHeight="290"
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
     Background="{StaticResource WindowBrush}">
-    <Grid Margin="24">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,18">
-            <TextBlock Text="Create Lines for ALL Walls"
-                       FontSize="20" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <TextBlock Text="Create Lines for ALL Walls" Style="{StaticResource PageTitle}"/>
             <TextBlock Text="Creates detail lines along the centerline of every wall in the current view."
-                       FontSize="12" Foreground="{StaticResource MutedBrush}"
-                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+                       Style="{StaticResource PageSubtitle}"/>
         </StackPanel>
 
         <!-- Line Style -->
-        <Grid Grid.Row="1" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="140"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Line Style:"
-                       VerticalAlignment="Center"
-                       Foreground="{StaticResource TextBrush}" FontSize="13"/>
-            <ComboBox Grid.Column="1" x:Name="CboLineStyle"
-                      Height="32"
-                      BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                      FontSize="13"/>
-        </Grid>
+        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Line Style:"
+                           Style="{StaticResource FieldLabel}"
+                           Margin="0" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" x:Name="CboLineStyle"/>
+            </Grid>
+        </Border>
 
         <!-- Status -->
-        <TextBlock Grid.Row="3" x:Name="LblStatus"
+        <TextBlock Grid.Row="2" x:Name="LblStatus"
                    Foreground="{StaticResource DangerBrush}" FontSize="12"
-                   Margin="0,4,0,8" TextWrapping="Wrap"/>
+                   Margin="0,10,0,0" TextWrapping="Wrap"/>
 
-        <!-- Buttons -->
-        <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="8"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="1" x:Name="BtnCancel"
-                    Content="Cancel" Width="90" Height="34"
-                    FontSize="13"
-                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
-            <Button Grid.Column="3" x:Name="BtnRun"
-                    Content="Create" Width="90" Height="34"
-                    FontSize="13" FontWeight="SemiBold"
-                    Background="{StaticResource AccentBrush}" Foreground="White"
-                    BorderThickness="0" Cursor="Hand"/>
-        </Grid>
+        <!-- Footer -->
+        <DockPanel Grid.Row="3" Style="{StaticResource WwpFooter}">
+            <Image x:Name="LogoImage"
+                   DockPanel.Dock="Left"
+                   Style="{StaticResource BrandLogoFooter}"
+                   VerticalAlignment="Center"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BtnCancel" Content="Cancel" MinWidth="90" Margin="0,0,8,0"/>
+                <Button x:Name="BtnRun" Content="Create" MinWidth="90"
+                        Style="{StaticResource PrimaryButton}"/>
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Window>

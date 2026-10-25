@@ -483,6 +483,14 @@ class LayoutPreviewWindow(object):
     def ShowDialog(self):
         return self.window.ShowDialog()
 
+    def _brush(self, key, fallback):
+        # Shared theme brush (lib/FlatTheme.xaml); the old fixed colour if the theme is missing.
+        try:
+            brush = self.window.TryFindResource(key)
+        except Exception:
+            brush = None
+        return brush if brush is not None else fallback
+
     def _build_view_records(self, preselected_view_ids):
         preselected = set(preselected_view_ids or [])
         for view in self.all_views:
@@ -680,8 +688,8 @@ class LayoutPreviewWindow(object):
         }
 
         sheet_border = Border()
-        sheet_border.Background = Brushes.WhiteSmoke
-        sheet_border.BorderBrush = Brushes.DimGray
+        sheet_border.Background = self._brush("PanelBrush", Brushes.WhiteSmoke)
+        sheet_border.BorderBrush = self._brush("StrongBorderBrush", Brushes.DimGray)
         sheet_border.BorderThickness = Thickness(1)
         sheet_border.CornerRadius = CornerRadius(0)
         sheet_border.IsHitTestVisible = False
@@ -711,8 +719,8 @@ class LayoutPreviewWindow(object):
     def _build_preview_box(self, item):
         border = Border()
         border.Tag = item
-        border.Background = Brushes.Gainsboro
-        border.BorderBrush = Brushes.Gray
+        border.Background = self._brush("PressedBrush", Brushes.Gainsboro)
+        border.BorderBrush = self._brush("StrongBorderBrush", Brushes.Gray)
         border.BorderThickness = Thickness(1)
         border.CornerRadius = CornerRadius(4)
         border.Cursor = Cursors.SizeAll
@@ -722,7 +730,7 @@ class LayoutPreviewWindow(object):
         label.TextWrapping = TextWrapping.Wrap
         label.TextAlignment = TextAlignment.Center
         label.Margin = Thickness(8)
-        label.Foreground = Brushes.Black
+        label.Foreground = self._brush("TextBrush", Brushes.Black)
         border.Child = label
         border.MouseLeftButtonDown += self._on_box_mouse_down
         border.MouseMove += self._on_box_mouse_move
@@ -785,7 +793,7 @@ class LayoutPreviewWindow(object):
         self._drag_start_mouse = event_args.GetPosition(self._preview_canvas)
         self._drag_start_center = DB.XYZ(item["center"].X, item["center"].Y, 0.0)
         sender.CaptureMouse()
-        sender.BorderBrush = Brushes.DimGray
+        sender.BorderBrush = self._brush("AccentBrush", Brushes.DimGray)
         event_args.Handled = True
 
     def _on_box_mouse_move(self, sender, event_args):
@@ -807,7 +815,7 @@ class LayoutPreviewWindow(object):
     def _on_box_mouse_up(self, sender, event_args):
         if sender.IsMouseCaptured:
             sender.ReleaseMouseCapture()
-        sender.BorderBrush = Brushes.Gray
+        sender.BorderBrush = self._brush("StrongBorderBrush", Brushes.Gray)
         self._drag_item = None
         self._drag_start_mouse = None
         self._drag_start_center = None

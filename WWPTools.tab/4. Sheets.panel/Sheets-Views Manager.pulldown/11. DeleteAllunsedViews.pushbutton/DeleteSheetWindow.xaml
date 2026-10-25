@@ -7,57 +7,58 @@
     WindowStartupLocation="CenterOwner"
     ResizeMode="CanResizeWithGrip"
     Background="{StaticResource WindowBrush}">
-    <Grid Margin="24">
+    <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="120"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Delete Sheets by Print Set"
-                       FontSize="20" FontWeight="SemiBold"
-                       Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                       Style="{StaticResource PageTitle}"/>
             <TextBlock Text="Select a print set to delete all its sheets."
-                       FontSize="12" Foreground="{StaticResource MutedBrush}"
-                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+                       Style="{StaticResource PageSubtitle}"/>
         </StackPanel>
 
-        <!-- Print set list -->
-        <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="4" Margin="0,0,0,8">
-            <ListBox x:Name="LstPrintSets"
-                     Background="{StaticResource PanelBrush}" BorderThickness="0"
-                     FontSize="13" Foreground="{StaticResource TextBrush}"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+        <Border Grid.Row="1" Style="{StaticResource WwpCard}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="120"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Print set list -->
+                <ListBox x:Name="LstPrintSets"
+                         Grid.Row="0"
+                         Margin="0,0,0,12"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                <!-- Sheet count -->
+                <TextBlock Grid.Row="1" x:Name="LblCount"
+                           Style="{StaticResource FieldLabel}"/>
+
+                <!-- Sheets preview (read only) -->
+                <ListBox x:Name="LstSheets"
+                         Grid.Row="2"
+                         Background="{StaticResource SurfaceBrush}"
+                         Foreground="{StaticResource MutedBrush}"
+                         IsHitTestVisible="False"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                <!-- Status -->
+                <TextBlock Grid.Row="3" x:Name="LblStatus"
+                           Foreground="{StaticResource DangerBrush}"
+                           Margin="0,8,0,0"
+                           TextWrapping="Wrap"/>
+            </Grid>
         </Border>
-
-        <!-- Sheet count -->
-        <TextBlock Grid.Row="2" x:Name="LblCount"
-                   FontSize="12" Foreground="{StaticResource TextBrush}"
-                   Margin="0,0,0,4"/>
-
-        <!-- Sheets preview -->
-        <Border Grid.Row="3" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                CornerRadius="4" Margin="0,0,0,10">
-            <ListBox x:Name="LstSheets"
-                     Background="{StaticResource WindowBrush}" BorderThickness="0"
-                     FontSize="12" Foreground="{StaticResource MutedBrush}"
-                     IsHitTestVisible="False"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-        </Border>
-
-        <!-- Status -->
-        <TextBlock Grid.Row="4" x:Name="LblStatus"
-                   Foreground="{StaticResource DangerBrush}" FontSize="12"
-                   Margin="0,4,0,8" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
-        <Grid Grid.Row="5">
+        <Grid Grid.Row="2" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -65,15 +66,12 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button Grid.Column="1" x:Name="BtnCancel"
-                    Content="Cancel" Width="90" Height="34"
-                    FontSize="13"
-                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
-                    Foreground="{StaticResource TextBrush}" Cursor="Hand"/>
+                    Content="Cancel"
+                    MinWidth="90"/>
             <Button Grid.Column="3" x:Name="BtnDelete"
-                    Content="Delete Sheets" Width="120" Height="34"
-                    FontSize="13" FontWeight="SemiBold"
-                    Background="{StaticResource DangerBrush}" Foreground="White"
-                    BorderThickness="0" Cursor="Hand"/>
+                    Content="Delete Sheets"
+                    MinWidth="120"
+                    Style="{StaticResource DestructiveButton}"/>
         </Grid>
     </Grid>
 </Window>

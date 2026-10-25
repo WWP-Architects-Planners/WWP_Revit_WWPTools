@@ -65,6 +65,7 @@ class FireLineDialog(object):
         self._btn_run = self.window.FindName("BtnRun")
         self._btn_cancel = self.window.FindName("BtnCancel")
         self._lbl_status = self.window.FindName("LblStatus")
+        ui.uiUtils_load_logo(self.window.FindName("LogoImage"))
 
         default_style = "WWP - FRR - PH"
         default_idx = 0
