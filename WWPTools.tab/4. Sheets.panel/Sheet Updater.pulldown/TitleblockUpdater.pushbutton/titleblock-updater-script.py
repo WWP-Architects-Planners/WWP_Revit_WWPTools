@@ -246,7 +246,8 @@ def _get_north_angle_for_view(view, north_vector):
     north_up = north_vector.DotProduct(up)
     north_right = north_vector.DotProduct(right)
     # Negate north_right to get CCW angle from view up (matches Revit's convention)
-    return round(math.degrees(math.atan2(-north_right, north_up)) % 360.0, 4)
+    # Normalize again after rounding so numerical noise near zero stays 0, not 360.
+    return round(math.degrees(math.atan2(-north_right, north_up)) % 360.0, 4) % 360.0
 
 def _get_true_north_angle_for_view(doc, view):
     """
@@ -255,16 +256,18 @@ def _get_true_north_angle_for_view(doc, view):
     """
     try:
         proj_pos = doc.ActiveProjectLocation.GetProjectPosition(DB.XYZ.Zero)
-        angle_rad = proj_pos.Angle  # CCW from Project North (+Y) to True North
+        # ProjectPosition.Angle has the opposite sign to the CCW rotation
+        # from internal +Y (Project North) to True North.
+        angle_rad = proj_pos.Angle
     except Exception:
         angle_rad = 0.0
 
-    tn = DB.XYZ(-math.sin(angle_rad), math.cos(angle_rad), 0)
+    tn = DB.XYZ(math.sin(angle_rad), math.cos(angle_rad), 0)
 
     try:
         return _get_north_angle_for_view(view, tn)
     except Exception:
-        return round(math.degrees(angle_rad) % 360.0, 4)
+        return round(-math.degrees(angle_rad) % 360.0, 4) % 360.0
 
 def _get_project_north_angle_for_view(view):
     """

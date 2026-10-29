@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.5] - 2026-10-28
+
+### Changed
+
+- About: the ribbon button now shows the installed release version directly below its name, with the same version in its tooltip. Release publishing keeps this label synchronized with `WWPTools.version.json`.
+
+### Fixed
+
+- Titleblock Updater: corrected the True North vector and fallback angle direction. A True North plan could receive an incorrect titleblock arrow rotation (for example, 269.04 degrees instead of 0 degrees). Angles that round to a full turn now normalize to 0 degrees.
+- Added regression checks for the reported Revit view, positive and negative project-location angles, fallback calculations, and near-zero rounding. The corrected calculation was checked read-only in Revit 2025 on sheet 21100: True North 0 degrees and Project North 314.52 degrees.
+
 ## [2.6.4] - 2026-10-24
 
 ### Added
