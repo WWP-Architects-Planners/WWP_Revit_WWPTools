@@ -666,10 +666,14 @@ def _resolve_sheet_targets(archive):
 
 def load_workbook(path, data_only=True, read_only=False, keep_vba=False, **kwargs):
     _add_refs()
-    from System.IO.Compression import ZipFile
+    from System.IO import File, FileAccess, FileMode, FileShare
+    from System.IO.Compression import ZipArchive, ZipArchiveMode
 
-    archive = ZipFile.OpenRead(path)
+    # Only read the source, allowing Excel to keep its write handle open.
+    stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)
+    archive = None
     try:
+        archive = ZipArchive(stream, ZipArchiveMode.Read, True)
         shared = _parse_shared_strings(_read_entry_text(archive, "xl/sharedStrings.xml"))
         theme_colors = _load_theme_colors(archive)
         cellxf_fill_ids, fills = _parse_styles(_read_entry_text(archive, "xl/styles.xml"), theme_colors)
@@ -696,7 +700,11 @@ def load_workbook(path, data_only=True, read_only=False, keep_vba=False, **kwarg
         workbook._source_path = path
         return workbook
     finally:
-        archive.Dispose()
+        try:
+            if archive is not None:
+                archive.Dispose()
+        finally:
+            stream.Dispose()
 
 
 # ---------------------------------------------------------------------------

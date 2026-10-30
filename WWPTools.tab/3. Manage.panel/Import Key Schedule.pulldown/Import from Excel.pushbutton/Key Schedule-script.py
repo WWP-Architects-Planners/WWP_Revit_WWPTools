@@ -542,7 +542,7 @@ def _show_area_keyplan_import_dialog(
 
         _apply_setting_set(setting)
         if file_changed:
-            _show_message("Setting '{}' imported. Click Load to read the referenced Excel file.".format(name))
+            _show_message("Setting '{}' imported. Click Refresh to read the referenced Excel file.".format(name))
 
     def _sync_mapping_grid_combos():
         if mapping_grid is None or mapping_grid.ItemsSource is None:
@@ -625,6 +625,7 @@ def _show_area_keyplan_import_dialog(
         dlg.InitialDirectory = init_dir
         if dlg.ShowDialog() == True:
             file_path_box.Text = dlg.FileName or ""
+            on_load(sender, e)
 
     def on_ok(sender, e):
         if _is_new_schedule():
@@ -1260,6 +1261,12 @@ def read_workbook(path, ui):
     add_lib_path()
     try:
         import WWP_xlsx
+        # Pick up reader fixes even if this Revit session imported an older copy.
+        try:
+            reload_xlsx = reload
+        except NameError:
+            from importlib import reload as reload_xlsx
+        reload_xlsx(WWP_xlsx)
     except Exception as exc:
         ui.uiUtils_alert("Excel reader is not available.\n{}".format(exc), title=TITLE)
         return None
@@ -2102,7 +2109,7 @@ def main():
         saved_setting_sets.update(new_data)
         _write_saved_setting_sets(doc, config, saved_setting_sets)
 
-    last_file_path = _safe_config_get(config, "area_key_import_file_path", "") or ""
+    last_file_path = os.path.expandvars(_safe_config_get(config, "area_key_import_file_path", "") or "")
     last_sheet_name = _safe_config_get(config, "area_key_import_sheet_name", "") or ""
 
     state = {
@@ -2126,7 +2133,7 @@ def main():
         for option, _bic, label in _TARGET_MAP
     )
 
-    # Preload the most recently used workbook for this target type.
+    # Refresh the saved workbook on every launch, resolving portable paths first.
     if state["file_path"] and (_is_url(state["file_path"]) or os.path.exists(state["file_path"])):
         workbook = read_workbook(state["file_path"], ui)
         if workbook is not None:
@@ -2272,7 +2279,7 @@ def main():
                 _safe_config_set(config, "area_key_import_sheet_name", selected_sheet)
             if not column_labels:
                 ui.uiUtils_alert(
-                    "No data found on worksheet '{}'. Select another Excel sheet and click Load.".format(
+                    "No data found on worksheet '{}'. Select another Excel sheet and click Refresh.".format(
                         selected_sheet or "(unknown)"
                     ),
                     title=TITLE,
@@ -2315,10 +2322,10 @@ def main():
             ui.uiUtils_alert("Load an Excel file first.", title=TITLE)
             continue
         if not state.get("loaded_sheet") or state.get("selected_sheet") != state.get("loaded_sheet"):
-            ui.uiUtils_alert("Select an Excel sheet and click Load before importing.", title=TITLE)
+            ui.uiUtils_alert("Select an Excel sheet and click Refresh before importing.", title=TITLE)
             continue
         if _normalize_path(state.get("file_path", "")) != _normalize_path(state.get("loaded_file_path", "")):
-            ui.uiUtils_alert("The Excel file changed. Click Load before importing.", title=TITLE)
+            ui.uiUtils_alert("The Excel file changed. Click Refresh before importing.", title=TITLE)
             continue
 
         selections = result.get("selected_options") or []

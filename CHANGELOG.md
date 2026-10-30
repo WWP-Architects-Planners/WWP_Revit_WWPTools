@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.6] - 2026-10-30
+
+### Changed
+
+- Import Key Schedule from Excel: selecting a workbook with Browse now loads it automatically. Opening the tool refreshes the previously assigned workbook, including saved paths that use `%USERPROFILE%`.
+- Import Key Schedule from Excel: compact source controls and collapsible saved mapping sets give the column mapping table more height. The table fills the remaining window space; Refresh rereads the workbook and Import applies the mapping.
+
+### Fixed
+
+- Excel imports: the shared workbook reader now opens files with read access and allows Excel to keep them open for editing. This avoids sharing-lock errors when reading the last saved workbook and does not require write access to the source.
+
 ## [2.6.5] - 2026-10-28
 
 ### Changed
