@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.7] - 2026-11-04
+
+### Added
+
+- Export2Ex - By Schedule and By Category: choose local user settings or shared Project Information settings when opening either tool. Local mode stores both tools in `%APPDATA%\pyRevit\WWPTools\ExportSchedules.user.json`, with separate sections for each project and tool, without requiring or creating the export text parameter. The previous storage choice is listed first; existing sets stay in their original storage and can be transferred using Sets file.
+- Local export storage uses atomic writes and a shared file lock across Revit sessions. It preserves other projects and tools, reports file errors, and refuses to overwrite invalid JSON.
+- Titleblock Updater: separate Reverse rotation controls for True North and Project North. Family angle parameters use clockwise rotation by default; Reverse rotation switches to counterclockwise. Each tab's setting is saved when Remember my choices is enabled.
+
+### Changed
+
+- Import Key Schedule from Excel: Target Type now lists the categories supported by Revit's key schedule API, including Doors, instead of a fixed category list; Supports categories are excluded. Existing category labels and saved mappings are retained. Unsupported saved targets are rejected instead of silently importing into a different category.
+- Titleblock Updater: target and visibility parameter selections on all three tabs now default to the current sheet's titleblock family. Matching saved parameter names are retained within that family; other families remain available for manual selection. When no current sheet family has eligible parameters, the existing defaults are retained.
+- Titleblock Updater: Project/Construction North uses the assigned scope box's directed top through the view's crop transform, including inherited dependent-view assignments. Unscoped views retain the model's Project North. North angles also account for viewport rotation on the sheet.
+- Both north update tabs now inspect every placed plan view. Different Construction North directions or displayed north angles hide both titleblock north arrows using the visibility controls selected on the two North tabs. Different scope boxes with matching directions remain compatible. The report lists affected views, scope boxes, and angles for manual placement of per-view symbols; missing or read-only visibility controls are reported as failures.
+
 ## [2.6.6] - 2026-10-30
 
 ### Changed

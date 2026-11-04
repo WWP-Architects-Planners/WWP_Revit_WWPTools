@@ -19,6 +19,7 @@ from System.Text import Encoding, UTF8Encoding
 
 from pyrevit import DB
 from WWP_settings import get_tool_settings
+from WWP_export_settings import ExportSettingsStore
 from WWP_versioning import apply_window_title
 
 
@@ -39,6 +40,8 @@ LOG_FILE_NAME = "Export2Ex.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 PARAM_SAVED_SETS = "! P_STATS_Export_Text"
 SAVED_SET_NAMESPACE = "export2ex"
+_settings_store = None
+_last_write_error = ""
 
 
 
@@ -168,6 +171,8 @@ def get_active_doc():
 
 
 def read_saved_sets(doc, param_name=None):
+    if _settings_store is not None and _settings_store.mode == "local":
+        return _settings_store.read(SAVED_SET_NAMESPACE)
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
@@ -202,6 +207,15 @@ def _looks_like_legacy_saved_sets(data):
 
 
 def write_saved_sets(doc, sets_dict, param_name=None):
+    global _last_write_error
+    _last_write_error = ""
+    if _settings_store is not None and _settings_store.mode == "local":
+        try:
+            _settings_store.write(SAVED_SET_NAMESPACE, sets_dict)
+            return True
+        except Exception as exc:
+            _last_write_error = str(exc)
+            return False
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
@@ -247,7 +261,7 @@ def _get_proj_info_text_params(doc):
         names = []
         for param in proj_info.Parameters:
             try:
-                if param.StorageType == DB.StorageType.String:
+                if param.StorageType == DB.StorageType.String and not param.IsReadOnly:
                     names.append(param.Definition.Name)
             except Exception:
                 continue
@@ -790,7 +804,7 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
                        default_settings=None, edit_callback=None, add_callback=None):
     """Primary export UI (BatchExportDialog.xaml): one row per saved set with its schedule
     (searchable), sheet name, output path, and per-row Browse / Export / Delete.
-    There is no Save button: row edits are written to Project Information once, when the
+    There is no Save button: row edits are written to the chosen storage once, when the
     window closes, and only if something changed."""
     clr.AddReference("PresentationFramework")
     clr.AddReference("PresentationCore")
@@ -1152,6 +1166,8 @@ def _show_batch_dialog(saved_sets, doc, ui=None, saved_sets_param=None,
     renames = _collect_edits()
     if _snapshot() != _saved_snapshot[0] and not _write_sets() and ui:
         ui.uiUtils_alert(
+            ("Could not save the set changes to the local JSON file.\n" + _last_write_error)
+            if _settings_store is not None and _settings_store.mode == "local" else
             "Could not save the set changes to Project Information. "
             "In a workshared model, check that nobody else is editing Project Information.",
             title="Export Schedules")
@@ -1785,6 +1801,7 @@ def select_csv_delimiter(ui, default_delimiter=","):
 
 
 def main():
+    global _settings_store
     log_message("main start log_path='{}'".format(_log_file_path()))
     doc = get_active_doc()
     if doc is None:
@@ -1793,7 +1810,20 @@ def main():
         return
     config, save_config = get_config_and_saver()
     ui = load_uiutils()
-    saved_sets_param = _ensure_saved_sets_param(doc, config, ui, save_config)
+    try:
+        _settings_store = ExportSettingsStore(doc)
+        if not _settings_store.choose(ui):
+            return
+    except Exception as exc:
+        ui.uiUtils_alert("Could not open export settings:\n{}".format(exc), title="Export Schedules")
+        return
+    saved_sets_param = None
+    if _settings_store.mode == "local":
+        config, save_config = _settings_store.get_config(SAVED_SET_NAMESPACE, config)
+    else:
+        saved_sets_param = _ensure_saved_sets_param(doc, config, ui, save_config)
+        if not saved_sets_param:
+            return
     proj_data = _normalize_namespace_data(read_saved_sets(doc, saved_sets_param))
     project_settings = proj_data.get("settings", {}) if isinstance(proj_data, dict) else {}
     if not isinstance(project_settings, dict):

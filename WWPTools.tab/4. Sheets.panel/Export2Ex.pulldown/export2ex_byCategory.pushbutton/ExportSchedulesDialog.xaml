@@ -193,7 +193,7 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Name="BatchExportButton" Content="Save set" MinWidth="110" Margin="0,0,8,0"
                         Style="{StaticResource PrimaryButton}"
-                        ToolTip="Save this set to Project Information" />
+                        ToolTip="Save this set to the chosen location" />
                 <Button Name="OkButton" Content="Export" MinWidth="96" Margin="0,0,8,0"
                         ToolTip="Export this set now" />
                 <Button Name="CancelButton" Content="Cancel" MinWidth="88" />

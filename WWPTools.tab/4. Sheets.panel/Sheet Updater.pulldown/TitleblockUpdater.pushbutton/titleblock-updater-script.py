@@ -269,15 +269,170 @@ def _get_true_north_angle_for_view(doc, view):
     except Exception:
         return round(-math.degrees(angle_rad) % 360.0, 4) % 360.0
 
-def _get_project_north_angle_for_view(view):
-    """
-    Returns the Project North angle (degrees) as seen in the given view.
-    Project North is always the model's +Y axis in internal coordinates.
-    """
+def _get_scope_box_for_view(doc, view):
+    """Resolve a view's scope box, including an inherited dependent-view assignment."""
+    scope_param = view.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
+    scope_id = scope_param.AsElementId() if scope_param else None
+    if (_elem_id_int(scope_id) or -1) < 0 and hasattr(view, "GetPrimaryViewId"):
+        primary_id = view.GetPrimaryViewId()
+        if (_elem_id_int(primary_id) or -1) > 0:
+            primary = doc.GetElement(primary_id)
+            if primary:
+                scope_param = primary.get_Parameter(DB.BuiltInParameter.VIEWER_VOLUME_OF_INTEREST_CROP)
+                scope_id = scope_param.AsElementId() if scope_param else None
+    if (_elem_id_int(scope_id) or -1) < 0:
+        return None
+    scope_box = doc.GetElement(scope_id)
+    if not scope_box:
+        raise ValueError("Assigned scope box could not be resolved for {}".format(view.Name))
+    return scope_box
+
+
+def _get_project_north_reference(doc, view):
+    """Scope-box top is Construction North; unscoped plans use global Project North."""
+    scope_box = _get_scope_box_for_view(doc, view)
+    if not scope_box:
+        return None, DB.XYZ(0, 1, 0)
+    crop_box = view.CropBox
+    if crop_box is None:
+        raise ValueError("Scope-box crop orientation is unavailable for {}".format(view.Name))
+    # Revit defines the crop's Y axis as screen up. For a scope-controlled view,
+    # this is the assigned scope box's directed top, without guessing an edge axis.
+    basis = crop_box.Transform.BasisY
+    north = DB.XYZ(basis.X, basis.Y, 0)
+    if north.X * north.X + north.Y * north.Y < 1e-18:
+        raise ValueError("Scope-box Construction North is not horizontal for {}".format(view.Name))
+    return scope_box, north
+
+
+def _get_project_north_angle_for_view(view, doc=None):
+    """Construction North (CCW from view up), using the scope box when assigned."""
+    if doc is not None:
+        _, north = _get_project_north_reference(doc, view)
+        return _get_north_angle_for_view(view, north)
     try:
         return _get_north_angle_for_view(view, DB.XYZ(0, 1, 0))
     except Exception:
         return 0.0
+
+
+def _get_angle_on_sheet(angle_value, viewport):
+    """Transform a CCW bearing from view projection space into sheet space."""
+    angle = math.radians(angle_value)
+    direction = DB.XYZ(-math.sin(angle), math.cos(angle), 0)
+    sheet_direction = viewport.GetProjectionToSheetTransform().OfVector(direction)
+    if sheet_direction.X * sheet_direction.X + sheet_direction.Y * sheet_direction.Y < 1e-18:
+        raise ValueError("Viewport north direction could not be projected onto the sheet")
+    return round(math.degrees(math.atan2(-sheet_direction.X, sheet_direction.Y)) % 360.0, 4) % 360.0
+
+
+def _get_sheet_north_data(doc, sheet):
+    """Inspect every plan viewport; retain a non-plan fallback for existing hide rules."""
+    plan_types = (DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan,
+                  DB.ViewType.EngineeringPlan, DB.ViewType.AreaPlan)
+    ignored_types = (DB.ViewType.Legend, DB.ViewType.DraftingView, DB.ViewType.Schedule)
+    rows = []
+    fallback_view = None
+    for vp_id in sheet.GetAllViewports():
+        viewport = doc.GetElement(vp_id)
+        if not viewport:
+            continue
+        view = doc.GetElement(viewport.ViewId)
+        if not view or view.ViewType in ignored_types:
+            continue
+        if fallback_view is None:
+            fallback_view = view
+        if view.ViewType not in plan_types:
+            continue
+        scope_box, north = _get_project_north_reference(doc, view)
+        heading = round(math.degrees(math.atan2(-north.X, north.Y)) % 360.0, 4) % 360.0
+        rows.append({
+            "view": view,
+            "scope_box_name": scope_box.Name if scope_box else None,
+            "north_heading": heading,
+            "project_angle": _get_angle_on_sheet(_get_north_angle_for_view(view, north), viewport),
+            "true_angle": _get_angle_on_sheet(_get_true_north_angle_for_view(doc, view), viewport),
+        })
+    return {"primary_view": rows[0]["view"] if rows else fallback_view, "views": rows}
+
+
+def _sheet_north_orientations_conflict(rows, tolerance=0.01):
+    """Compare construction headings and both displayed bearings, with circular tolerance."""
+    if len(rows) < 2:
+        return False
+    for row in rows[1:]:
+        for key in ("north_heading", "project_angle", "true_angle"):
+            difference = abs((row[key] - rows[0][key] + 180.0) % 360.0 - 180.0)
+            if difference > tolerance:
+                return True
+    return False
+
+
+def _hide_sheet_north_arrows(titleblock_instance, visibility_groups):
+    """Preflight both selected north controls before hiding either one."""
+    parameters = {}
+    for label, parameter_names in visibility_groups:
+        if not parameter_names:
+            return "Select the {} visibility parameter(s) on its tab to hide both arrows".format(label)
+        for name in parameter_names:
+            param = titleblock_instance.LookupParameter(name)
+            if not param:
+                return "{} visibility parameter is missing: {}".format(label, name)
+            if param.IsReadOnly or param.StorageType != DB.StorageType.Integer or not _is_yes_no_parameter(param):
+                return "{} visibility parameter is not a writable Yes/No control: {}".format(label, name)
+            parameters[name] = param
+    for name, param in parameters.items():
+        try:
+            if param.AsInteger() != 0:
+                param.Set(0)
+            if param.AsInteger() != 0:
+                return "Could not switch off visibility parameter: {}".format(name)
+        except Exception as ex:
+            return "Could not switch off {}: {}".format(name, str(ex))
+    return None
+
+
+def _prepare_sheet_north_update(doc, sheet, titleblock_instance, sheet_label, visibility_groups):
+    """Check the complete sheet before an active north tab writes any angle."""
+    try:
+        data = _get_sheet_north_data(doc, sheet)
+    except Exception as ex:
+        return None, "failed", sheet_label + " - Cannot determine north orientation: " + str(ex)
+    if not _sheet_north_orientations_conflict(data["views"]):
+        return data, "ready", None
+    data["conflict"] = True
+    details = []
+    for row in data["views"]:
+        details.append("{} [scope: {}; Construction heading: {:.2f}; sheet PN: {:.2f}; sheet TN: {:.2f} deg clockwise]".format(
+            row["view"].Name, row["scope_box_name"] or "None (global Project North)",
+            (-row["north_heading"]) % 360.0, (-row["project_angle"]) % 360.0,
+            (-row["true_angle"]) % 360.0))
+    reason = sheet_label + " - Mixed plan orientations; per-view north-arrow symbols required. " + "; ".join(details)
+    error = _hide_sheet_north_arrows(titleblock_instance, visibility_groups)
+    if error:
+        return data, "failed", reason + " - BOTH ARROWS COULD NOT BE HIDDEN: " + error
+    return data, "hidden", reason + " - Both titleblock north arrows hidden."
+
+
+def _get_arrow_parameter_angle(angle_value, reverse_rotation=False):
+    """Convert the CCW north bearing to the family's clockwise angle by default."""
+    signed_angle = angle_value if reverse_rotation else -angle_value
+    return round(signed_angle % 360.0, 4) % 360.0
+
+
+def _get_parameter_list_defaults(param_groups, default_labels, preferred_family):
+    """Prefer the current sheet family without removing other available families."""
+    groups = list(param_groups or [])
+    current = [(family, keys) for family, keys in groups
+               if family == preferred_family and keys]
+    if not current:
+        return groups, list(default_labels or [])
+    groups = current + [(family, keys) for family, keys in groups
+                        if family != preferred_family]
+    current_keys = set(key for _, keys in current for key in keys)
+    labels = [key for key in (default_labels or []) if key in current_keys]
+    return groups, labels or [current[0][1][0]]
+
 
 def _populate_parameter_list(list_box, param_groups, default_labels):
     from System.Windows import Thickness
@@ -624,7 +779,7 @@ def _build_scale_tab_state(window, sheet_items, param_groups, yesno_param_groups
 def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_groups, yesno_labels,
                                  prechecked_indices, default_labels, default_visibility_labels,
                                  visibility_enabled_default, hide_default,
-                                 all_sheets_default):
+                                 all_sheets_default, reverse_rotation_default=False):
     prefix = "TN_"
     from System.Windows import Visibility
     from System.Windows.Controls import ListBoxItem
@@ -638,6 +793,7 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_g
     set_visibility_checkbox = window.FindName(prefix + "SetVisibilityCheckBox")
     visibility_param_list = window.FindName(prefix + "VisibilityParamList")
     hide_checkbox = window.FindName(prefix + "HideCheckBox")
+    reverse_rotation_checkbox = window.FindName(prefix + "ReverseRotationCheckBox")
 
     selected_indices = set(prechecked_indices or [])
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
@@ -645,6 +801,8 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_g
     _populate_parameter_list(parameter_list, param_groups, default_labels)
     _populate_parameter_list(visibility_param_list, yesno_param_groups, default_visibility_labels)
 
+    if reverse_rotation_checkbox is not None:
+        reverse_rotation_checkbox.IsChecked = bool(reverse_rotation_default)
     if all_sheets_checkbox is not None:
         all_sheets_checkbox.IsChecked = bool(all_sheets_default)
         search_box.IsEnabled = not bool(all_sheets_default)
@@ -799,6 +957,7 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_g
             "visibility_params": _selected_list_values(visibility_param_list) if visibility_enabled else [],
             "hide_on": bool(hide_checkbox is not None and hide_checkbox.IsChecked),
             "all_sheets": bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked),
+            "reverse_rotation": bool(reverse_rotation_checkbox is not None and reverse_rotation_checkbox.IsChecked),
         }
 
     return {"validate": validate, "get_result": get_result}
@@ -806,7 +965,7 @@ def _build_true_north_tab_state(window, sheet_items, param_groups, yesno_param_g
 def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_param_groups, yesno_labels,
                                     prechecked_indices, default_labels, default_visibility_labels,
                                     visibility_enabled_default, hide_default,
-                                    all_sheets_default):
+                                    all_sheets_default, reverse_rotation_default=False):
     prefix = "PN_"
     from System.Windows import Visibility
     from System.Windows.Controls import ListBoxItem
@@ -820,6 +979,7 @@ def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_para
     set_visibility_checkbox = window.FindName(prefix + "SetVisibilityCheckBox")
     visibility_param_list = window.FindName(prefix + "VisibilityParamList")
     hide_checkbox = window.FindName(prefix + "HideCheckBox")
+    reverse_rotation_checkbox = window.FindName(prefix + "ReverseRotationCheckBox")
 
     selected_indices = set(prechecked_indices or [])
     param_labels = [key for _, keys in (param_groups or []) for key in keys]
@@ -827,6 +987,8 @@ def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_para
     _populate_parameter_list(parameter_list, param_groups, default_labels)
     _populate_parameter_list(visibility_param_list, yesno_param_groups, default_visibility_labels)
 
+    if reverse_rotation_checkbox is not None:
+        reverse_rotation_checkbox.IsChecked = bool(reverse_rotation_default)
     if all_sheets_checkbox is not None:
         all_sheets_checkbox.IsChecked = bool(all_sheets_default)
         search_box.IsEnabled = not bool(all_sheets_default)
@@ -981,6 +1143,7 @@ def _build_project_north_tab_state(window, sheet_items, param_groups, yesno_para
             "visibility_params": _selected_list_values(visibility_param_list) if visibility_enabled else [],
             "hide_on": bool(hide_checkbox is not None and hide_checkbox.IsChecked),
             "all_sheets": bool(all_sheets_checkbox is not None and all_sheets_checkbox.IsChecked),
+            "reverse_rotation": bool(reverse_rotation_checkbox is not None and reverse_rotation_checkbox.IsChecked),
         }
 
     return {"validate": validate, "get_result": get_result}
@@ -1044,6 +1207,19 @@ def _show_titleblock_dialog(
 
     prompt_text.Text = "Choose a tab, select the target parameter(s), then run that update:"
     defaults = dialog_defaults or {}
+    preferred_family = defaults.get("preferred_family")
+    tn_param_groups, tn_default_labels = _get_parameter_list_defaults(
+        tn_param_groups, tn_default_labels, preferred_family)
+    pn_param_groups, pn_default_labels = _get_parameter_list_defaults(
+        pn_param_groups, pn_default_labels, preferred_family)
+    sc_param_groups, sc_default_labels = _get_parameter_list_defaults(
+        sc_param_groups, sc_default_labels, preferred_family)
+    yesno_param_groups, tn_default_visibility_labels = _get_parameter_list_defaults(
+        yesno_param_groups, tn_default_visibility_labels, preferred_family)
+    yesno_param_groups, pn_default_visibility_labels = _get_parameter_list_defaults(
+        yesno_param_groups, pn_default_visibility_labels, preferred_family)
+    yesno_param_groups, sc_default_visibility_labels = _get_parameter_list_defaults(
+        yesno_param_groups, sc_default_visibility_labels, preferred_family)
     if remember_choices_checkbox is not None:
         remember_choices_checkbox.IsChecked = bool(defaults.get("remember_choices", True))
 
@@ -1053,6 +1229,7 @@ def _show_titleblock_dialog(
         bool(defaults.get("tn_set_visibility", True)),
         bool(defaults.get("tn_hide_on", True)),
         bool(defaults.get("tn_all_sheets", True)),
+        bool(defaults.get("tn_reverse_rotation", False)),
     )
     pn_state = _build_project_north_tab_state(
         window, sheet_items, pn_param_groups, yesno_param_groups, yesno_labels,
@@ -1060,6 +1237,7 @@ def _show_titleblock_dialog(
         bool(defaults.get("pn_set_visibility", True)),
         bool(defaults.get("pn_hide_on", True)),
         bool(defaults.get("pn_all_sheets", True)),
+        bool(defaults.get("pn_reverse_rotation", False)),
     )
     sc_state = _build_scale_tab_state(
         window, sheet_items, sc_param_groups, yesno_param_groups, yesno_labels,
@@ -1124,6 +1302,10 @@ def _show_titleblock_dialog(
     tn_result = tn_state["get_result"]()
     pn_result = pn_state["get_result"]()
     sc_result = sc_state["get_result"]()
+    # Conflicting plan orientations always hide both arrows, independently of
+    # each tab's ordinary visibility-update toggle.
+    tn_result["conflict_visibility_params"] = _selected_list_values(window.FindName("TN_VisibilityParamList"))
+    pn_result["conflict_visibility_params"] = _selected_list_values(window.FindName("PN_VisibilityParamList"))
     tn_result["enabled"] = selected_tab_index == 0
     pn_result["enabled"] = selected_tab_index == 1
     sc_result["enabled"] = selected_tab_index == 2
@@ -1193,6 +1375,15 @@ def main():
         UI.TaskDialog.Show("Titleblock Updater", "No titleblock found on any sheet.")
         return
 
+    current_titleblock_family = None
+    if current_sheet_id_val is not None:
+        for tb in titleblocks:
+            try:
+                if _elem_id_int(tb.OwnerViewId) == current_sheet_id_val:
+                    current_titleblock_family = tb.Symbol.Family.Name
+            except Exception:
+                continue
+
     tn_param_groups, tn_param_entries = _get_param_entries_angle(titleblocks)
     sc_param_groups, sc_param_entries = _get_param_entries_scale(titleblocks)
     if not tn_param_groups and not sc_param_groups:
@@ -1236,6 +1427,9 @@ def main():
 
     dialog_defaults = {
         "remember_choices": remember_choices,
+        "preferred_family": current_titleblock_family,
+        "tn_reverse_rotation": bool(getattr(config, "tn_reverse_rotation", False)) if use_saved_choices else False,
+        "pn_reverse_rotation": bool(getattr(config, "pn_reverse_rotation", False)) if use_saved_choices else False,
         "selected_tab_index": int(getattr(config, "selected_tab_index", 0)) if use_saved_choices else 0,
         "tn_set_visibility": bool(getattr(config, "tn_set_visibility", True)) if use_saved_choices else True,
         "pn_set_visibility": bool(getattr(config, "pn_set_visibility", True)) if use_saved_choices else True,
@@ -1279,6 +1473,10 @@ def main():
     tn = dialog_result.get("true_north") or {}
     pn = dialog_result.get("project_north") or {}
     sc = dialog_result.get("scale") or {}
+    north_visibility_groups = [
+        ("True North", list(tn.get("conflict_visibility_params") or [])),
+        ("Project North", list(pn.get("conflict_visibility_params") or [])),
+    ]
 
     if not tn.get("enabled") and not pn.get("enabled") and not sc.get("enabled"):
         uiUtils_alert("Nothing selected. Operation cancelled.", "Titleblock Updater")
@@ -1293,6 +1491,7 @@ def main():
 
     tn_updated_sheets, tn_failed_sheets, tn_hidden_sheets = [], [], []
     pn_updated_sheets, pn_failed_sheets, pn_hidden_sheets = [], [], []
+    mixed_orientation_reports = []
     sc_updated_sheets, sc_failed_sheets, sc_warning_sheets = [], [], []
     tn_param_labels, pn_param_labels, sc_param_labels = [], [], []
     tn_targets, pn_targets, sc_targets = [], [], []
@@ -1307,7 +1506,6 @@ def main():
             visibility_param_names = list(tn.get("visibility_params") or [])
             hide_on_unsupported_view = bool(tn.get("hide_on"))
 
-            view_cache = {}
             for i in tn.get("selected_indices", []):
                 sheet = sheet_by_index[i]
                 sheet_number = sheet.SheetNumber or ""
@@ -1319,25 +1517,19 @@ def main():
                     tn_failed_sheets.append(sheet_label + " - No titleblock found")
                     continue
 
-                primary_view = None
-                for vp_id in sheet.GetAllViewports():
-                    viewport = doc.GetElement(vp_id)
-                    if not viewport:
-                        continue
-                    view_id = viewport.ViewId
-                    if view_id in view_cache:
-                        view = view_cache[view_id]
+                north_data, guard_status, guard_message = _prepare_sheet_north_update(
+                    doc, sheet, titleblock_instance, sheet_label, north_visibility_groups)
+                if north_data and north_data.get("conflict"):
+                    mixed_orientation_reports.append(guard_message)
+                if guard_status != "ready":
+                    if guard_status == "hidden":
+                        tn_hidden_sheets.append(guard_message)
                     else:
-                        view = doc.GetElement(view_id)
-                        view_cache[view_id] = view
-                    if not view or not hasattr(view, "ViewType"):
-                        continue
-                    if view.ViewType in (DB.ViewType.Legend, DB.ViewType.DraftingView, DB.ViewType.Schedule):
-                        continue
-                    primary_view = view
-                    break
-
-                true_north_angle = _get_true_north_angle_for_view(doc, primary_view) if primary_view else 0.0
+                        tn_failed_sheets.append(guard_message)
+                    continue
+                primary_view = north_data["primary_view"]
+                true_north_angle = north_data["views"][0]["true_angle"] if north_data["views"] else 0.0
+                true_north_angle = _get_arrow_parameter_angle(true_north_angle, bool(tn.get("reverse_rotation")))
                 status, message = _update_arrow_for_sheet(
                     titleblock_instance, sheet, sheet_label, primary_view,
                     tn_targets,
@@ -1359,7 +1551,6 @@ def main():
             pn_visibility_param_names = list(pn.get("visibility_params") or [])
             hide_on_unsupported_view_pn = bool(pn.get("hide_on"))
 
-            pn_view_cache = {}
             for i in pn.get("selected_indices", []):
                 sheet = sheet_by_index[i]
                 sheet_number = sheet.SheetNumber or ""
@@ -1371,25 +1562,19 @@ def main():
                     pn_failed_sheets.append(sheet_label + " - No titleblock found")
                     continue
 
-                primary_view = None
-                for vp_id in sheet.GetAllViewports():
-                    viewport = doc.GetElement(vp_id)
-                    if not viewport:
-                        continue
-                    view_id = viewport.ViewId
-                    if view_id in pn_view_cache:
-                        view = pn_view_cache[view_id]
+                north_data, guard_status, guard_message = _prepare_sheet_north_update(
+                    doc, sheet, titleblock_instance, sheet_label, north_visibility_groups)
+                if north_data and north_data.get("conflict"):
+                    mixed_orientation_reports.append(guard_message)
+                if guard_status != "ready":
+                    if guard_status == "hidden":
+                        pn_hidden_sheets.append(guard_message)
                     else:
-                        view = doc.GetElement(view_id)
-                        pn_view_cache[view_id] = view
-                    if not view or not hasattr(view, "ViewType"):
-                        continue
-                    if view.ViewType in (DB.ViewType.Legend, DB.ViewType.DraftingView, DB.ViewType.Schedule):
-                        continue
-                    primary_view = view
-                    break
-
-                project_north_angle = _get_project_north_angle_for_view(primary_view) if primary_view else 0.0
+                        pn_failed_sheets.append(guard_message)
+                    continue
+                primary_view = north_data["primary_view"]
+                project_north_angle = north_data["views"][0]["project_angle"] if north_data["views"] else 0.0
+                project_north_angle = _get_arrow_parameter_angle(project_north_angle, bool(pn.get("reverse_rotation")))
                 pn_status, pn_message = _update_arrow_for_sheet(
                     titleblock_instance, sheet, sheet_label, primary_view,
                     pn_targets,
@@ -1506,24 +1691,26 @@ def main():
         config.tn_enabled = bool(tn.get("enabled"))
         config.tn_sheet_ids = [v for v in (_elem_id_int(sheet_by_index[i].Id) for i in tn.get("selected_indices", [])) if v is not None]
         config.tn_all_sheets = bool(tn.get("all_sheets"))
+        config.tn_reverse_rotation = bool(tn.get("reverse_rotation"))
         config.tn_param_labels = list(tn.get("selected_parameters") or [])
         first_target = tn_param_entries.get(config.tn_param_labels[0]) if config.tn_param_labels else None
         config.tn_param_name = first_target.get("name") if first_target else ""
         config.tn_param_scope = first_target.get("scope") if first_target else ""
         config.tn_set_visibility = bool(tn.get("set_visibility"))
-        config.tn_visibility_param_names = list(tn.get("visibility_params") or [])
+        config.tn_visibility_param_names = list(tn.get("conflict_visibility_params") or [])
         config.tn_visibility_param_name = config.tn_visibility_param_names[0] if config.tn_visibility_param_names else ""
         config.tn_hide_on_elev_section = bool(tn.get("hide_on"))
 
         config.pn_enabled = bool(pn.get("enabled"))
         config.pn_sheet_ids = [v for v in (_elem_id_int(sheet_by_index[i].Id) for i in pn.get("selected_indices", [])) if v is not None]
         config.pn_all_sheets = bool(pn.get("all_sheets"))
+        config.pn_reverse_rotation = bool(pn.get("reverse_rotation"))
         config.pn_param_labels = list(pn.get("selected_parameters") or [])
         first_target = tn_param_entries.get(config.pn_param_labels[0]) if config.pn_param_labels else None
         config.pn_param_name = first_target.get("name") if first_target else ""
         config.pn_param_scope = first_target.get("scope") if first_target else ""
         config.pn_set_visibility = bool(pn.get("set_visibility"))
-        config.pn_visibility_param_names = list(pn.get("visibility_params") or [])
+        config.pn_visibility_param_names = list(pn.get("conflict_visibility_params") or [])
         config.pn_visibility_param_name = config.pn_visibility_param_names[0] if config.pn_visibility_param_names else ""
         config.pn_hide_on = bool(pn.get("hide_on"))
 
@@ -1563,6 +1750,8 @@ def main():
         if sc_failed_sheets:
             line += " Failed/Skipped: {}.".format(len(sc_failed_sheets))
         msg_lines.append(line)
+    if mixed_orientation_reports:
+        msg_lines.append("Mixed orientations: {} sheet(s) require per-view north-arrow symbols. See the report for view angles and any visibility errors.".format(len(mixed_orientation_reports)))
     UI.TaskDialog.Show("Titleblock Updater", "\n".join(msg_lines))
 
     _print_text("")

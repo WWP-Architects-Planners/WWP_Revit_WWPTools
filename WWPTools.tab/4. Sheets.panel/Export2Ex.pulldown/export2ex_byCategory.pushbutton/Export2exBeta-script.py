@@ -19,6 +19,7 @@ from System.Windows.Controls import ListBoxItem
 
 from pyrevit import DB
 from WWP_settings import get_tool_settings
+from WWP_export_settings import ExportSettingsStore
 from WWP_versioning import apply_window_title
 
 
@@ -30,6 +31,7 @@ CONFIG_LAST_PARAM_NAMES = "last_param_names"
 CONFIG_LAST_SHEET_NAME = "last_sheet_name"
 PARAM_SAVED_SETS = "! P_STATS_Export_Text"
 SAVED_SET_NAMESPACE = "export2ex_beta"
+_settings_store = None
 LOG_FILE_NAME = "Export2ExBeta.log"
 ALLOWED_EXCEL_EXTENSIONS = (".xlsx", ".xlsm")
 _last_write_error = ""
@@ -228,7 +230,7 @@ EMBEDDED_EXPORT_DIALOG_XAML = r'''<Window xmlns="http://schemas.microsoft.com/wi
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Name="BatchExportButton" Content="Save set" MinWidth="110" Margin="0,0,8,0"
                         Style="{StaticResource PrimaryButton}"
-                        ToolTip="Save this set to Project Information" />
+                        ToolTip="Save this set to the chosen location" />
                 <Button Name="OkButton" Content="Export" MinWidth="96" Margin="0,0,8,0"
                         ToolTip="Export this set now" />
                 <Button Name="CancelButton" Content="Cancel" MinWidth="88" />
@@ -337,6 +339,8 @@ def get_active_doc():
 
 
 def read_saved_sets(doc):
+    if _settings_store is not None and _settings_store.mode == "local":
+        return _settings_store.read(SAVED_SET_NAMESPACE).get("sets", {})
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
@@ -373,6 +377,15 @@ def _looks_like_legacy_saved_sets(data):
 def write_saved_sets(doc, sets_dict):
     global _last_write_error
     _last_write_error = ""
+    if _settings_store is not None and _settings_store.mode == "local":
+        try:
+            data = _settings_store.read(SAVED_SET_NAMESPACE)
+            data["sets"] = sets_dict
+            _settings_store.write(SAVED_SET_NAMESPACE, data)
+            return True
+        except Exception as exc:
+            _last_write_error = str(exc)
+            return False
     try:
         proj_info = doc.ProjectInformation
         if proj_info is None:
@@ -858,6 +871,8 @@ SCHEDULE_TOOL_NAMESPACE = "export2ex"
 def read_schedule_tool_sets(doc):
     """Saved sets of Export2Ex - By Schedule. They sit in the same Project Information
     parameter under their own namespace, or in the parameter that tool was pointed at."""
+    if _settings_store is not None and _settings_store.mode == "local":
+        return _settings_store.read(SCHEDULE_TOOL_NAMESPACE).get("sets", {})
     param_names = [PARAM_SAVED_SETS]
     try:
         schedule_config, _save = get_tool_settings("Export2Ex", doc=doc)
@@ -954,7 +969,7 @@ def _load_batch_window():
 
 def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_callback=None):
     """Primary UI for Export2Ex Beta (BatchExportDialog.xaml): manage and batch-export saved sets.
-    There is no Save button: sheet and path edits are written to Project Information once,
+    There is no Save button: sheet and path edits are written to the chosen storage once,
     when the window closes, and only if something changed. Add set and Edit go through the
     set editor, which saves the set itself."""
     clr.AddReference("PresentationFramework")
@@ -1198,7 +1213,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
         dialogs = ui or load_uiutils()
         schedule_sets = read_schedule_tool_sets(doc)
         if not schedule_sets:
-            dialogs.uiUtils_alert("No sets saved in Export2Ex - By Schedule were found in this project.",
+            dialogs.uiUtils_alert("No By Schedule sets were found for this project in the chosen storage.",
                                   title="Export2Ex Beta")
             return
         names = sorted(schedule_sets)
@@ -1224,7 +1239,7 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
             _forget_pending(new_sets.keys())
             saved_sets.update(new_sets)
             if not _write_sets():
-                notes.append("Could not save to Project Information: {}".format(_last_write_error))
+                notes.append("Could not save to the chosen settings storage: {}".format(_last_write_error))
             _rebuild_rows()
         message = "Copied {} set(s).".format(len(new_sets))
         if notes:
@@ -1244,7 +1259,9 @@ def _show_beta_batch_dialog(saved_sets, doc, ui=None, add_callback=None, edit_ca
     _apply_edits()
     if _snapshot() != _saved_snapshot[0] and not _write_sets() and ui:
         ui.uiUtils_alert(
-            "Could not save the sheet and path changes to Project Information.\n{}".format(_last_write_error),
+            "Could not save the sheet and path changes to {}.\n{}".format(
+                "the local JSON file" if _settings_store is not None and _settings_store.mode == "local"
+                else "Project Information", _last_write_error),
             title="Export2Ex Beta",
         )
 
@@ -1579,6 +1596,8 @@ def show_export_form(ui, doc, schedules, categories, init_excel_path, initial_mo
         saved_sets[name] = new_data
         if not write_saved_sets(doc, saved_sets):
             ui.uiUtils_alert(
+                ("Could not save to the local JSON file.\n" + _last_write_error)
+                if _settings_store is not None and _settings_store.mode == "local" else
                 "Could not write to '{}' on Project Information.\nCheck the parameter exists and is not read-only.".format(PARAM_SAVED_SETS),
                 title="Export2Ex Beta",
             )
@@ -2321,6 +2340,7 @@ def show_error_report(ui, exc):
 
 
 def main():
+    global _settings_store
     log_message("main start")
     doc = get_active_doc()
     ui = load_uiutils()
@@ -2332,6 +2352,15 @@ def main():
     categories = [CategoryItem(record) for record in collect_category_records(doc)]
 
     config, save_config = get_config_and_saver()
+    try:
+        _settings_store = ExportSettingsStore(doc)
+        if not _settings_store.choose(ui):
+            return
+    except Exception as exc:
+        ui.uiUtils_alert("Could not open export settings:\n{}".format(exc), title="Export by Category")
+        return
+    if _settings_store.mode == "local":
+        config, save_config = _settings_store.get_config(SAVED_SET_NAMESPACE, config)
     default_dir = get_default_dir(doc)
     last_excel_path = config_get(config, CONFIG_LAST_EXCEL_PATH, "")
     init_excel_path = last_excel_path or os.path.join(default_dir, "CategoryExport.xlsx")

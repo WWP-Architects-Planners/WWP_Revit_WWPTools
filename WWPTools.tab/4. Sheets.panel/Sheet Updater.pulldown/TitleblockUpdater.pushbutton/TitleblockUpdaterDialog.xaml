@@ -24,6 +24,10 @@
                        Style="{StaticResource PageTitle}" />
             <TextBlock x:Name="PromptText"
                        Style="{StaticResource PageSubtitle}" />
+            <TextBlock Text="North updates check all plan views. Mixed orientations hide both arrows using the visibility parameters selected on the two North tabs; per-view symbols are then required."
+                       Style="{StaticResource CaptionText}"
+                       TextWrapping="Wrap"
+                       Margin="0,6,0,0" />
         </StackPanel>
 
         <TabControl x:Name="MainTabControl"
@@ -83,6 +87,14 @@
                                           Grid.Column="2"
                                           Content="Hide arrow for elevation, section, or 3D primary views"
                                           IsChecked="True"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <CheckBox x:Name="TN_ReverseRotationCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="0"
+                                          Content="Reverse rotation (counterclockwise)"
+                                          ToolTip="Clockwise by default. Enable for a family whose angle parameter increases counterclockwise."
+                                          IsChecked="False"
                                           Margin="0,12,0,0"
                                           Style="{StaticResource ToggleSwitchCheckBox}" />
                             </Grid>
@@ -189,6 +201,14 @@
                                           Grid.Column="2"
                                           Content="Hide arrow for elevation, section, or 3D primary views"
                                           IsChecked="True"
+                                          Margin="0,12,0,0"
+                                          Style="{StaticResource ToggleSwitchCheckBox}" />
+                                <CheckBox x:Name="PN_ReverseRotationCheckBox"
+                                          Grid.Row="3"
+                                          Grid.Column="0"
+                                          Content="Reverse rotation (counterclockwise)"
+                                          ToolTip="Clockwise by default. Enable for a family whose angle parameter increases counterclockwise."
+                                          IsChecked="False"
                                           Margin="0,12,0,0"
                                           Style="{StaticResource ToggleSwitchCheckBox}" />
                             </Grid>

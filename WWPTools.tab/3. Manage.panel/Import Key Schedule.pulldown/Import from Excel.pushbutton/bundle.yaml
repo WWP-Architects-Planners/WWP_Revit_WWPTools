@@ -1,6 +1,6 @@
 title: "Import from\nExcel"
 tooltip: |
-  Import an Excel workbook into an Area or Room key schedule
+  Import an Excel workbook into a key schedule for any category supported by Revit, including Doors. Supports categories are excluded.
 help_url: "https://wwparchitects.gitbook.io/wwparchitects/w7kFyDX0kRTb27slSn93/software/revit/4.1-or-wwptools/3-manage/import-key-schedule/import-from-excel"
 author: "Jason Tian"
 

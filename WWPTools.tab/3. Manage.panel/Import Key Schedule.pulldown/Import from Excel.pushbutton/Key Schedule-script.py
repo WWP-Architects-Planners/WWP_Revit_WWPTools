@@ -5,6 +5,7 @@ import os
 import re
 import sys
 from difflib import SequenceMatcher
+from System import Enum
 
 from pyrevit import DB
 from WWP_settings import get_tool_settings
@@ -14,18 +15,7 @@ TITLE = "Import Key Schedule from Excel"
 SKIP_OPTION = "(Skip)"
 KEY_NAME_OPTION = "Key Name"
 ADD_NEW_SCHEDULE_OPTION = "Add new..."
-TARGET_OPTIONS = [
-    "Area Key Schedule",
-    "Ceiling Key Schedule",
-    "Door Key Schedule",
-    "Floor Key Schedule",
-    "Parking Key Schedule",
-    "Planting Key Schedule",
-    "Roof Key Schedule",
-    "Room Key Schedule",
-    "Wall Key Schedule",
-    "Window Key Schedule",
-]
+TARGET_OPTIONS = []  # Filled from Revit's supported key schedule categories.
 DEFAULT_SCHEDULE_SUFFIX = "Key Schedule - Imported"
 _CONFIG_CACHE = None
 PROJECT_SETTINGS_PARAM = "! P_STATS_KeyScheduleMap"
@@ -134,7 +124,7 @@ def _useful_selection_count(selections):
 
 
 def _show_area_keyplan_import_dialog(
-    title="Import Area Key Schedule",
+    title="Import Key Schedule from Excel",
     file_path="",
     sheet_names=None,
     selected_sheet="",
@@ -167,7 +157,7 @@ def _show_area_keyplan_import_dialog(
     _ui.uiUtils_ensure_theme()
     window = _load_local_window_xaml("AreaKeyplanImportWindow.xaml")
     _ui.uiUtils_load_logo(window.FindName("LogoImage"))
-    window.Title = title or "Import Area Key Schedule"
+    window.Title = title or TITLE
     if width > 0:
         window.Width = width
     if height > 0:
@@ -997,7 +987,10 @@ def _mapping_selection_key(category_key):
 
 
 def _target_category_key(selected_target_type):
-    target = resolve_schedule_target(selected_target_type)
+    try:
+        target = resolve_schedule_target(selected_target_type)
+    except ValueError:
+        return _normalize_name(selected_target_type)
     return _normalize_name(target.get("label"))
 
 
@@ -1079,7 +1072,7 @@ def _is_bic_value(cat_id, bic):
         return False
 
 
-_TARGET_MAP = [
+_LEGACY_TARGET_MAP = [
     ("Area Key Schedule",     DB.BuiltInCategory.OST_Areas,    "Area"),
     ("Ceiling Key Schedule",  DB.BuiltInCategory.OST_Ceilings, "Ceiling"),
     ("Door Key Schedule",     DB.BuiltInCategory.OST_Doors,    "Door"),
@@ -1092,12 +1085,48 @@ _TARGET_MAP = [
     ("Window Key Schedule",   DB.BuiltInCategory.OST_Windows,  "Window"),
 ]
 
+_TARGET_MAP = []
+
+
+def initialize_schedule_targets(doc):
+    """Use every category supported by this Revit version; retain saved labels."""
+    global _TARGET_MAP, TARGET_OPTIONS
+    legacy = dict((int(bic), (option, label)) for option, bic, label in _LEGACY_TARGET_MAP)
+    targets = {}
+    for category_id in DB.ViewSchedule.GetValidCategoriesForKeySchedule():
+        category = DB.Category.GetCategory(doc, category_id)
+        if category is None:
+            raise ValueError("Could not resolve a supported key schedule category: {}".format(category_id))
+        if _normalize_name(category.Name) == "supports":
+            continue
+        # Some API ids resolve to an alias Category with a different built-in id
+        # (for example stair stringers). The valid-category id is authoritative.
+        bic = Enum.ToObject(DB.BuiltInCategory, _elem_id_int(category_id))
+        try:
+            category_name = DB.LabelUtils.GetLabelFor(bic)
+        except Exception:
+            category_name = category.Name
+        if _normalize_name(category_name) == "supports":
+            continue
+        option, label = legacy.get(int(bic), (category_name + " Key Schedule", category_name))
+        targets[int(bic)] = (option, bic, label)
+    counts = {}
+    for option, bic, label in targets.values():
+        counts[option] = counts.get(option, 0) + 1
+    for key, (option, bic, label) in list(targets.items()):
+        if counts[option] > 1:
+            label = "{} ({})".format(label, str(bic).replace("OST_", ""))
+            targets[key] = (label + " Key Schedule", bic, label)
+    _TARGET_MAP = sorted(targets.values(), key=lambda item: item[0].lower())
+    TARGET_OPTIONS = [item[0] for item in _TARGET_MAP]
+
+
 def resolve_schedule_target(selected_target_type):
     key = _normalize_name(selected_target_type)
     for option, bic, label in _TARGET_MAP:
         if _normalize_name(option) == key:
             return {"bic": bic, "label": label}
-    return {"bic": _TARGET_MAP[0][1], "label": _TARGET_MAP[0][2]}
+    raise ValueError("Unsupported key schedule category: {}".format(selected_target_type))
 
 
 def add_lib_path():
@@ -2092,8 +2121,15 @@ def main():
     if doc is None:
         raise Exception("Active Revit document is not available.")
     ui = load_uiutils()
+    initialize_schedule_targets(doc)
+    if not TARGET_OPTIONS:
+        ui.uiUtils_alert("This document has no supported key schedule categories.", title=TITLE)
+        return
     config = _get_config()
-    selected_target_type = _safe_config_get(config, "area_key_import_target", "") or TARGET_OPTIONS[0]
+    default_target_type = "Area Key Schedule" if "Area Key Schedule" in TARGET_OPTIONS else TARGET_OPTIONS[0]
+    selected_target_type = _safe_config_get(config, "area_key_import_target", "") or default_target_type
+    if selected_target_type not in TARGET_OPTIONS:
+        selected_target_type = default_target_type
     target = resolve_schedule_target(selected_target_type)
     category_bic = target["bic"]
     category_label = target["label"]
@@ -2204,6 +2240,9 @@ def main():
 
         result_schedule_name = str(result.get("schedule_name") or "").strip()
         selected_target_type = result.get("selected_target_type") or state.get("selected_target_type", TARGET_OPTIONS[0])
+        if selected_target_type not in TARGET_OPTIONS:
+            ui.uiUtils_alert("The saved category is not supported for key schedules in this Revit version.", title=TITLE)
+            continue
         next_target = resolve_schedule_target(selected_target_type)
         next_category_bic = next_target["bic"]
         next_category_label = next_target["label"]

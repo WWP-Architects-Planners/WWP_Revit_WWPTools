@@ -2,7 +2,7 @@
   Export2Ex - By Category: the main window. One row per saved export set.
   Export2exBeta-script.py (_show_beta_batch_dialog) loads this file, clones SetRowTemplate once
   per set into RowsHost and wires every named control, so keep the x:Name values in step with it.
-  There is no Save button: the script writes sheet and path edits to Project Information when
+  There is no Save button: the script writes sheet and path edits to the chosen storage when
   the window closes. Add set and Edit open the set editor (ExportSchedulesDialog.xaml).
 
   Table layout (LIM table language): the lane layer, the lane-label row, the header row and
@@ -91,7 +91,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
             <TextBlock Text="Export by category" Style="{StaticResource PageTitle}" />
             <TextBlock Style="{StaticResource PageSubtitle}"
-                       Text="Each set writes the chosen parameters of one category to a worksheet. Changes are saved to the project when you close." />
+                       Text="Each set writes the chosen parameters of one category to a worksheet. Changes are saved to your chosen location when you close." />
         </StackPanel>
 
         <!-- Sets card -->
@@ -265,7 +265,7 @@
                 <Button x:Name="ExportSelectedButton" Content="Export selected" MinWidth="140"
                         Margin="0,0,8,0" Style="{StaticResource PrimaryButton}" />
                 <Button x:Name="CancelButton" Content="Close" MinWidth="88" IsCancel="True"
-                        ToolTip="Save your changes to the project and close" />
+                        ToolTip="Save your changes to the chosen location and close" />
             </StackPanel>
         </DockPanel>
     </Grid>
