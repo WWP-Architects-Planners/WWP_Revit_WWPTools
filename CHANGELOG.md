@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.8] - 2026-11-05
+
+### Added
+
+- Import Key Schedule from Excel: standard door-workbook headers now automatically select the requested mappings for Key Name, Door Panel Material/Finish, Frame Material/Finish, Fire Rating (Min.), Temp. Rise, Hardware, PDO, Exit Device, Weather Strip, Thermally Insulated Y/N, and Comments. Fire Rating targets `! S_DOORS_FireRating-Instance_Text`, PDO targets PowerDoorOperator, and Exit Device targets PanicHardware. Matching ignores Excel column prefixes, case and punctuation, and selects parameters available in the current project.
+
 ## [2.6.7] - 2026-11-04
 
 ### Added

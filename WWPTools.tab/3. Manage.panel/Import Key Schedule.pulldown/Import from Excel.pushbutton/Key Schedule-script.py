@@ -31,6 +31,18 @@ SAVED_SETTING_FILE_FILTER = "WWPTools Import Key Schedule Settings (*.json)|*.js
 LEGACY_SAVED_SETTING_SCHEMA_GUID = "79c6f037-2a4b-4b5d-8ab8-fb699f0785af"
 LEGACY_SAVED_SETTING_SCHEMA_FIELD = "SavedSetsJson"
 STANDARD_HEADER_PARAMETER_ALIASES = {
+    "door panel material": ["! P_DOORS_PanelMaterial_Text"],
+    "door panel finish": ["! P_DOORS_PanelFinish_Text"],
+    "frame material": ["! P_DOORS_FrameMaterial_Text"],
+    "frame finish": ["! P_DOORS_FrameFinish_Text"],
+    "fire rating min": ["! S_DOORS_FireRating-Instance_Text"],
+    "temp rise": ["! P_DOORS_HW-TemperatureRiseLabel_Text"],
+    "hardware": ["! P_DOORS_HW-Hardware_Text"],
+    "pdo": ["! P_DOORS_HW-PowerDoorOperator_Text"],
+    "exit device": ["! P_DOORS_HW-PanicHardware_Text"],
+    "weather strip": ["! P_DOORS_HW-WeatherStrip"],
+    "thermally insulated y n": ["! P_DOORS_HW-Insulated_Text"],
+    "comments": ["Comments"],
     "name": ["Name"],
     "unitcount": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
     "unit count": ["! S_STATS_Counts_Number", "S_STATS_Counts_Number"],
