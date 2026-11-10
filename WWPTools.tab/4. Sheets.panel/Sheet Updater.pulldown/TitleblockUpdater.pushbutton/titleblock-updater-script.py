@@ -115,6 +115,37 @@ def _collect_titleblocks():
         .ToElements()
     )
 
+def _titleblock_has_params(titleblock_instance, param_names):
+    """True if the titleblock (instance or type) defines every named parameter."""
+    symbol = getattr(titleblock_instance, "Symbol", None)
+    for name in param_names:
+        if not name:
+            continue
+        found = None
+        try:
+            found = titleblock_instance.LookupParameter(name)
+        except Exception:
+            found = None
+        if not found and symbol is not None:
+            try:
+                found = symbol.LookupParameter(name)
+            except Exception:
+                found = None
+        if not found:
+            return False
+    return True
+
+def _pick_titleblock(candidates, param_names):
+    """Pick the sheet's titleblock whose family defines the selected parameters.
+
+    A sheet can hold several titleblocks (e.g. main + disclaimer); only the one
+    that owns the selected parameters may be updated.
+    """
+    for tb in (candidates or []):
+        if _titleblock_has_params(tb, param_names):
+            return tb
+    return None
+
 def _get_param_entries(titleblock_instances, matches_param):
     """Shared family-grouped parameter scan. `matches_param(param)` decides inclusion."""
     family_params = {}
@@ -1485,7 +1516,7 @@ def main():
     titleblocks_by_sheet = {}
     for tb in titleblocks:
         try:
-            titleblocks_by_sheet[tb.OwnerViewId] = tb
+            titleblocks_by_sheet.setdefault(tb.OwnerViewId, []).append(tb)
         except Exception:
             continue
 
@@ -1512,9 +1543,11 @@ def main():
                 sheet_name = sheet.Name or ""
                 sheet_label = "{} - {}".format(sheet_number, sheet_name) if sheet_number else sheet_name
 
-                titleblock_instance = titleblocks_by_sheet.get(sheet.Id)
+                titleblock_instance = _pick_titleblock(
+                    titleblocks_by_sheet.get(sheet.Id),
+                    [t.get("name") for t in tn_targets] + (visibility_param_names if set_visibility else []))
                 if not titleblock_instance:
-                    tn_failed_sheets.append(sheet_label + " - No titleblock found")
+                    tn_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
 
                 north_data, guard_status, guard_message = _prepare_sheet_north_update(
@@ -1557,9 +1590,11 @@ def main():
                 sheet_name = sheet.Name or ""
                 sheet_label = "{} - {}".format(sheet_number, sheet_name) if sheet_number else sheet_name
 
-                titleblock_instance = titleblocks_by_sheet.get(sheet.Id)
+                titleblock_instance = _pick_titleblock(
+                    titleblocks_by_sheet.get(sheet.Id),
+                    [t.get("name") for t in pn_targets] + (pn_visibility_param_names if set_pn_visibility else []))
                 if not titleblock_instance:
-                    pn_failed_sheets.append(sheet_label + " - No titleblock found")
+                    pn_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
 
                 north_data, guard_status, guard_message = _prepare_sheet_north_update(
@@ -1604,9 +1639,11 @@ def main():
                 sheet_name = sheet.Name
                 sheet_label = "{} - {}".format(sheet_number, sheet_name) if sheet_number else sheet_name
 
-                titleblock_instance = titleblocks_by_sheet.get(sheet.Id)
+                titleblock_instance = _pick_titleblock(
+                    titleblocks_by_sheet.get(sheet.Id),
+                    [t.get("name") for t in sc_targets] + (visibility_param_names if set_visibility else []))
                 if not titleblock_instance:
-                    sc_failed_sheets.append(sheet_label + " - No titleblock found")
+                    sc_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
 
                 viewport_ids = sheet.GetAllViewports()
