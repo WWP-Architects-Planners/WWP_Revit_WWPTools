@@ -1545,7 +1545,7 @@ def main():
 
                 titleblock_instance = _pick_titleblock(
                     titleblocks_by_sheet.get(sheet.Id),
-                    [t.get("name") for t in tn_targets] + (visibility_param_names if set_visibility else []))
+                    [tgt.get("name") for tgt in tn_targets] + (visibility_param_names if set_visibility else []))
                 if not titleblock_instance:
                     tn_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
@@ -1592,7 +1592,7 @@ def main():
 
                 titleblock_instance = _pick_titleblock(
                     titleblocks_by_sheet.get(sheet.Id),
-                    [t.get("name") for t in pn_targets] + (pn_visibility_param_names if set_pn_visibility else []))
+                    [tgt.get("name") for tgt in pn_targets] + (pn_visibility_param_names if set_pn_visibility else []))
                 if not titleblock_instance:
                     pn_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
@@ -1641,7 +1641,7 @@ def main():
 
                 titleblock_instance = _pick_titleblock(
                     titleblocks_by_sheet.get(sheet.Id),
-                    [t.get("name") for t in sc_targets] + (visibility_param_names if set_visibility else []))
+                    [tgt.get("name") for tgt in sc_targets] + (visibility_param_names if set_visibility else []))
                 if not titleblock_instance:
                     sc_failed_sheets.append(sheet_label + " - No titleblock with the selected parameters found")
                     continue
