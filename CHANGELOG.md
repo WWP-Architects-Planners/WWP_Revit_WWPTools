@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- QuickOSM Urban exporter accepts an optional QuickOSM building polygon layer. It is exported whole (never clipped to the road extent) into the same package as a `Buildings` category with a `height_m` per footprint. Height comes from an optional building-height column you choose in the QGIS dialog, else OSM `height`, else `building:levels` x 3 m, else a stable pseudo-random 6-8 m. Revit imports buildings as native Mass-category extrusions (DirectShapes) in the category colour; roads remain flat floors. Updates replace the package's masses like its floors.
+
+## [2.6.9] - 2026-11-12
+
+### Added
+
+- QuickOSM Urban Context: Shift-click installs a QGIS Processing exporter; normal click imports its road-only JSON package into native 10 mm floors with separate Urban renderer category types/materials and editable road-name TextNotes. Export includes an explicit projected metric CRS, source CRS/WKT, units and local origin. Repeat imports retain placement across changed export extents, update only owned elements, and preserve unrelated model content. Invalid input and failures leave the previous import intact. Buildings, terrain and decorative line overlays are excluded.
+- Urban exports default to the full road layer regardless of screen zoom, with an optional explicit crop. Revit provides a road-group checklist with colours/counts and remembers the previous selection; excluded groups also exclude their road-name text.
+- Choose road widths from the QGIS colored-body style frozen at a reference scale, or from OSM physical widths with lane/class estimates. Export records width mode/provenance and the Revit review dialog shows the selected mode.
+
+### Fixed
+
+- Urban context imports remove returning polygon spikes below Revit's geometry tolerance before native boundary validation. This handles valid QGIS polygons with nearly coincident junction edges without requiring a new export or omitting whole road surfaces.
+
 ## [2.6.8] - 2026-11-05
 
 ### Added

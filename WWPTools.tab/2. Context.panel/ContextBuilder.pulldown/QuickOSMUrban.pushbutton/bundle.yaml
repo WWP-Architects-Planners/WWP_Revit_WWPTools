@@ -1,0 +1,9 @@
+title: "QuickOSM\nUrban"
+tooltip: |
+  Import an exported QuickOSM Urban package as categorized 10 mm road floors,
+  matching materials and editable road-name text. Repeat imports update only
+  the same package. Shift-click to install the QGIS Processing exporter.
+author: "Jason Tian"
+context: doc-project
+engine:
+  clean: true
