@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-20
+
+### Added
+
+- PD Export saved settings: the window now remembers your settings per Windows user in `%APPDATA%\WWPTools\PDExport\settings.json` (export folder, preset and ticked formats, settings folder and the four settings-file overrides, view-set / sheet-set / export-setup names, IFC source, Convert Linked Files and PDF setup name). They are saved automatically when you press Run and when you close the window, and Advanced has **Save settings** (save now) and **Reset to defaults** buttons. The sheet selection from Edit Set is still session-only and is not saved. A settings folder that no longer exists falls back to the default, and an unreadable settings file is ignored with a note in the log.
+
+### Fixed
+
+- PD Export Advanced: the four settings-file boxes (ReNumber rule, PDF naming JSON, IFC JSON, Navisworks XML) now show the default file inside the settings folder when the window opens (in grey), so nothing has to be browsed manually; they follow a changed settings folder until you pick or type a different file (shown in the normal colour), and the x puts the default back. Untouched boxes still use the settings folder at run time.
+- PD Export Edit Set: it now starts from the Sheet Export Set name typed under Advanced instead of always PD_ExportSet_Sheets (header and "not in saved set" flags follow that name).
+- PD Export NWC: the warnings about Navisworks XML options Revit's API cannot apply no longer read like errors; they now say "NWC exported OK. Setting 'nwexportrevit_embed_textures' = 'true' from the Navisworks XML cannot be applied through Revit's API; the Navisworks exporter's own current setting was used." (short option name, one warning per option).
+
 ## [2.7.0] - 2026-11-20
 
 ### Added
