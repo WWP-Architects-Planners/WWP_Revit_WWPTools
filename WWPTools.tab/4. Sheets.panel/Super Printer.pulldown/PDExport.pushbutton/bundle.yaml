@@ -1,0 +1,6 @@
+title: "PD\nExport"
+tooltip: |
+  Export PDFs, DWGs and other deliverables for the PD workflow (replaces Ideate Automation exports).
+author: "Jason Tian"
+context: zero-doc
+min_revit_version: 2025
